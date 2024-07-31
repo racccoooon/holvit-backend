@@ -1,9 +1,9 @@
 -- +migrate Up
 create table "realms"
 (
-    "id"           uuid not null default gen_random_uuid(),
-    "name"         text not null,
-    "display_name" text not null,
+    "id"                    uuid  not null default gen_random_uuid(),
+    "name"                  text  not null,
+    "display_name"          text  not null,
     "encrypted_private_key" bytea not null,
     primary key ("id")
 );
@@ -12,12 +12,12 @@ create unique index "idx_unique_realm_name" on "realms" ("name");
 
 create table "clients"
 (
-    "id"            uuid   not null default gen_random_uuid(),
-    "realm_id"      uuid   not null,
-    "display_name"  text   not null,
-    "client_id"     text   not null,
-    "client_secret" bytea  not null,
-    "redirect_uris" text[] not null,
+    "id"                   uuid   not null default gen_random_uuid(),
+    "realm_id"             uuid   not null,
+    "display_name"         text   not null,
+    "client_id"            text   not null,
+    "hashed_client_secret" text   not null,
+    "redirect_uris"        text[] not null,
     primary key ("id")
 );
 
@@ -50,11 +50,11 @@ alter table "credentials"
 
 create table "scopes"
 (
-    "id" uuid not null default gen_random_uuid(),
-    "realm_id" uuid not null,
-    "name" text not null,
+    "id"           uuid not null default gen_random_uuid(),
+    "realm_id"     uuid not null,
+    "name"         text not null,
     "display_name" text not null,
-    "description" text not null,
+    "description"  text not null,
     primary key ("id")
 );
 
@@ -65,9 +65,9 @@ create unique index "idx_unique_scope_name_in_realm" on "scopes" ("name", "realm
 
 create table "grants"
 (
-    "id" uuid not null default gen_random_uuid(),
-    "scope_id" uuid not null,
-    "user_id" uuid not null,
+    "id"        uuid not null default gen_random_uuid(),
+    "scope_id"  uuid not null,
+    "user_id"   uuid not null,
     "client_id" uuid not null,
     primary key ("id")
 );
@@ -81,15 +81,37 @@ alter table "grants"
 
 create unique index "idx_unique_grants" on "grants" ("scope_id", "user_id", "client_id");
 
-create table "sessions" 
+create table "sessions"
 (
-    "id" uuid not null,
-    "client_id" uuid not null,
-    "user_id" uuid not null,
-    "realm_id" uuid not null,
-    "token" bytea not null,
+    "id"           uuid not null,
+    "user_id"      uuid not null,
+    "realm_id"     uuid not null,
+    "hashed_token" text not null,
     primary key ("id")
 );
+
+alter table "sessions"
+    add constraint "fk_sessions_users" foreign key ("user_id") references "users";
+alter table "sessions"
+    add constraint "fk_sessions_realms" foreign key ("realm_id") references "realms";
+
+create table "refresh_tokens"
+(
+    "id"           uuid      not null,
+    "user_id"      uuid      not null,
+    "client_id"    uuid      not null,
+    "realm_id"     uuid      not null,
+    "hashed_token" text      not null,
+    "valid_until"  timestamp not null,
+    primary key ("id")
+);
+
+alter table "refresh_tokens"
+    add constraint "fk_refresh_tokens_users" foreign key ("user_id") references "users";
+alter table "refresh_tokens"
+    add constraint "fk_refresh_tokens_clients" foreign key ("client_id") references "clients";
+alter table "refresh_tokens"
+    add constraint "fk_refresh_tokens_realms" foreign key ("realm_id") references "realms";
 
 -- +migrate Down
 drop table "sessions" cascade;

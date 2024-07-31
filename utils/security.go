@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 )
@@ -18,6 +19,15 @@ func GenerateRandomBytes(length int) ([]byte, error) {
 	}
 
 	return bytes, nil
+}
+
+func GenerateRandomString(length int) (string, error) {
+	bytes, err := GenerateRandomBytes(length)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
 func GenerateKeyPair() (ed25519.PrivateKey, ed25519.PublicKey, error) {
@@ -88,4 +98,18 @@ func DecryptSymmetric(ciphertext []byte, key []byte) ([]byte, error) {
 
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
 	return gcm.Open(nil, nonce, ciphertext, nil)
+}
+
+func CheapHash(input string) string {
+	// Create a new SHA-256 hash
+	hash := sha256.New()
+
+	// Write the input data to the hash
+	hash.Write([]byte(input))
+
+	// Calculate the SHA-256 hash and get the result as a byte slice
+	hashedData := hash.Sum(nil)
+
+	// Convert the byte slice to a hexadecimal string
+	return fmt.Sprintf("%x", hashedData)
 }

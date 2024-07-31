@@ -41,6 +41,14 @@ type HolvitConfig struct {
 		Database string
 		SslMode  string
 	}
+
+	Redis struct {
+		Host     string
+		Port     int
+		Password string
+		Db       int
+		Protocol int
+	}
 }
 
 const (
@@ -109,8 +117,16 @@ func setDefaultConfigValues() {
 
 	C.Server.MaxReadBytes = 1048576
 
+	C.Database.Host = "localhost"
+	C.Database.Port = 5432
 	C.Database.Database = "holvit"
 	C.Database.SslMode = "disable"
+
+	C.Redis.Host = "localhost"
+	C.Redis.Port = 6379
+	C.Redis.Password = ""
+	C.Redis.Db = 0
+	C.Redis.Protocol = 3
 }
 
 func readConfigValues() {

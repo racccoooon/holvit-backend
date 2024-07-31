@@ -27,7 +27,6 @@ type Credential struct {
 type CredentialPasswordDetails struct {
 	HashedPassword string `json:"hashed_password"`
 	Temporary      bool   `json:"temporary"`
-	HashAlgorithm  string `json:"hash_algorithm"`
 }
 
 func (c CredentialPasswordDetails) Value() (driver.Value, error) {

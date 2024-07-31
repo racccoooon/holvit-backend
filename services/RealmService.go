@@ -72,6 +72,26 @@ func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 		return nil, err
 	}
 
+	_, err = scopeRepository.CreateScope(ctx, &repositories.Scope{
+		RealmId:     realmId,
+		Name:        "email",
+		DisplayName: "Email",
+		Description: "Access your email address",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = scopeRepository.CreateScope(ctx, &repositories.Scope{
+		RealmId:     realmId,
+		Name:        "profile",
+		DisplayName: "Profile",
+		Description: "Access your name",
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	keyCache := ioc.Get[cache.KeyCache](scope)
 	keyCache.Set(realmId, privateKeyBytes)
 

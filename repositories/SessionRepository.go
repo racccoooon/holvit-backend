@@ -14,19 +14,19 @@ import (
 type Session struct {
 	BaseModel
 
-	UserId   uuid.UUID
-	ClientId uuid.UUID
-	RealmId  uuid.UUID
+	UserId  uuid.UUID
+	RealmId uuid.UUID
 
-	Token []byte
+	HashedToken string
 }
 
 type SessionFilter struct {
 	BaseFilter
 
-	RealmId  *uuid.UUID
-	UserId   *uuid.UUID
-	ClientId *uuid.UUID
+	RealmId *uuid.UUID
+	UserId  *uuid.UUID
+
+	HashedToken *string
 }
 
 type SessionRepository interface {
@@ -71,7 +71,7 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
-		"id", "user_id", "client_id", "realm_id", "token").
+		"id", "user_id", "realm_id", "hashed_token").
 		From("sessions")
 
 	if filter.RealmId != nil {
@@ -79,9 +79,6 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 	}
 	if filter.UserId != nil {
 		sb.Where(sb.Equal("user_id", filter.UserId))
-	}
-	if filter.ClientId != nil {
-		sb.Where(sb.Equal("client_id", filter.ClientId))
 	}
 
 	if filter.PagingInfo.PageSize > 0 {
@@ -104,9 +101,8 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 		err := rows.Scan(&totalCount,
 			&row.Id,
 			&row.UserId,
-			&row.ClientId,
 			&row.RealmId,
-			&row.Token)
+			&row.HashedToken)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -128,13 +124,12 @@ func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Sess
 	}
 
 	err = tx.QueryRow(`insert into "sessions"
-    			("user_id", "client_id", "realm_id", "token")
+    			("user_id", "realm_id", "hashed_token")
     			values ($1, $2, $3, $4)
     			returning "id"`,
 		session.UserId,
-		session.ClientId,
 		session.RealmId,
-		session.Token).
+		session.HashedToken).
 		Scan(&resultingId)
 
 	return resultingId, err

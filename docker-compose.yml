@@ -11,3 +11,9 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: holvit
+  keydb:
+    image: eqalpha/keydb
+    restart: always
+    ports:
+      - "6379:6379"
+    

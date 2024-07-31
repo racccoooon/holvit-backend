@@ -21,16 +21,19 @@ func ServeApi(dp *ioc.DependencyProvider) {
 
 	r := mux.NewRouter()
 
+	r.Use(middlewares.ScopeMiddleware(dp))
+	r.Use(middlewares.ErrorHandlingMiddleware)
+
 	r.Use(middlewares.AccessLogMiddleware)
 
 	r.Use(middlewares.MaxReadBytesMiddleware)
 	// r.Use(middlewares.EnforceJsonMiddleware)
 
-	r.Use(middlewares.ScopeMiddleware(dp))
-
 	r.HandleFunc("/api/health", handlers.Health).Methods("GET")
 
 	r.HandleFunc("/oidc/authorize/{realmName}", handlers.Authorize).Methods("GET", "POST")
+	r.HandleFunc("/oidc/authorize-grant", handlers.AuthorizeGrant).Methods("POST")
+
 	r.HandleFunc("/oidc/token", handlers.Token)
 	r.HandleFunc("/oidc/userinfo", handlers.Token)
 	r.HandleFunc("/oidc/jwks", handlers.Token)

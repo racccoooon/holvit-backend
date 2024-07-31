@@ -2,13 +2,14 @@ package services
 
 import (
 	"context"
-	"encoding/base64"
 	"github.com/google/uuid"
 	"holvit/config"
+	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
 	"holvit/repositories"
 	"holvit/utils"
+	"strings"
 )
 
 type CreateClientRequest struct {
@@ -22,8 +23,14 @@ type CreateClientResponse struct {
 	ClientSecret string
 }
 
+type AuthenticateClientRequest struct {
+	ClientId     string
+	ClientSecret string
+}
+
 type ClientService interface {
 	CreateClient(ctx context.Context, request CreateClientRequest) (*CreateClientResponse, error)
+	Authenticate(ctx context.Context, request AuthenticateClientRequest) (*repositories.Client, error)
 }
 
 type ClientServiceImpl struct{}
@@ -32,7 +39,31 @@ func NewClientService() ClientService {
 	return &ClientServiceImpl{}
 }
 
-func (c ClientServiceImpl) CreateClient(ctx context.Context, request CreateClientRequest) (*CreateClientResponse, error) {
+func (c *ClientServiceImpl) Authenticate(ctx context.Context, request AuthenticateClientRequest) (*repositories.Client, error) {
+	scope := middlewares.GetScope(ctx)
+
+	clientRepository := ioc.Get[repositories.ClientRepository](scope)
+	clients, count, err := clientRepository.FindClients(ctx, repositories.ClientFilter{
+		ClientId: &request.ClientId,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return nil, httpErrors.NotFound().WithMessage("Client not found")
+	}
+	client := clients[0]
+
+	requestClientSecret, _ := strings.CutPrefix(request.ClientSecret, "secret_")
+	err = utils.CompareHash(requestClientSecret, client.ClientSecret)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClientRequest) (*CreateClientResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
 	clientRepository := ioc.Get[repositories.ClientRepository](scope)
@@ -43,13 +74,13 @@ func (c ClientServiceImpl) CreateClient(ctx context.Context, request CreateClien
 	}
 	clientIdString := clientId.String()
 
-	clientSecretBytes, err := utils.GenerateRandomBytes(32)
+	clientSecret, err := utils.GenerateRandomString(32)
 	if err != nil {
 		return nil, err
 	}
 
 	hashAlgorithm := config.C.GetHashAlgorithm()
-	hashedClientSecret, err := hashAlgorithm.Hash(clientSecretBytes)
+	hashedClientSecret, err := hashAlgorithm.Hash(clientSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +102,6 @@ func (c ClientServiceImpl) CreateClient(ctx context.Context, request CreateClien
 	return &CreateClientResponse{
 		Id:           clientDbId,
 		ClientId:     clientIdString,
-		ClientSecret: "secret_" + base64.StdEncoding.EncodeToString(clientSecretBytes),
+		ClientSecret: "secret_" + clientSecret,
 	}, nil
 }

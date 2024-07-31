@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/redis/go-redis/v9"
 	"holvit/cache"
 	"holvit/config"
 	"holvit/database"
@@ -172,6 +173,9 @@ func configureServices() *ioc.DependencyProvider {
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.ScopeRepository {
 		return repositories.NewScopeReposiroty()
 	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.RefreshTokenRepository {
+		return repositories.NewRefreshTokenRepository()
+	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.UserService {
 		return services.NewUserService()
@@ -182,6 +186,9 @@ func configureServices() *ioc.DependencyProvider {
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.ClientService {
 		return services.NewClientService()
 	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.RefreshTokenService {
+		return services.NewRefreshTokenService()
+	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.OidcService {
 		return services.NewOidcService()
@@ -189,6 +196,19 @@ func configureServices() *ioc.DependencyProvider {
 
 	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) cache.KeyCache {
 		return cache.NewInMemoryKeyCache()
+	})
+
+	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) services.TokenService {
+		return &services.TokenServiceImpl{}
+	})
+
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) *redis.Client {
+		return redis.NewClient(&redis.Options{
+			Addr:     fmt.Sprintf("%s:%d", config.C.Redis.Host, config.C.Redis.Port),
+			Password: config.C.Redis.Password,
+			DB:       config.C.Redis.Db,
+			Protocol: config.C.Redis.Protocol,
+		})
 	})
 
 	return builder.Build()

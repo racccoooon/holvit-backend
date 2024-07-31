@@ -120,7 +120,7 @@ func verifyPassword(credential *repositories.Credential, password []byte) error 
 		return err
 	}
 
-	err = utils.CompareHash(details.HashAlgorithm, password, hashedPassword)
+	err = utils.CompareHash(password, hashedPassword)
 	if err != nil {
 		return err
 	}

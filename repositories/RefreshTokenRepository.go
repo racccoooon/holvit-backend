@@ -4,54 +4,47 @@ import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/lib/pq"
 	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"time"
 )
 
-type Client struct {
+type RefreshToken struct {
 	BaseModel
 
-	RealmId uuid.UUID
+	UserId   uuid.UUID
+	ClientId uuid.UUID
+	RealmId  uuid.UUID
 
-	DisplayName string
-
-	ClientId     string
-	ClientSecret string
-
-	RedirectUris []string
+	HashedToken string
+	ValidUntil  time.Time
 }
 
-type ClientFilter struct {
+type RefreshTokenFilter struct {
 	BaseFilter
 
-	RealmId  *uuid.UUID
-	ClientId *string
+	HashedToken *string
+	ClientId    *uuid.UUID
 }
 
-type ClientUpdate struct {
-	DisplayName  *string
-	RedirectUris *[]string
+type RefreshTokenRepository interface {
+	FindRefreshTokenById(ctx context.Context, id uuid.UUID) (*RefreshToken, error)
+	FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) ([]*RefreshToken, int, error)
+	CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) (uuid.UUID, error)
+	DeleteRefreshToken(ctx context.Context, id uuid.UUID) error
 }
 
-type ClientRepository interface {
-	FindClientById(ctx context.Context, id uuid.UUID) (*Client, error)
-	FindClients(ctx context.Context, filter ClientFilter) ([]*Client, int, error)
-	CreateClient(ctx context.Context, client *Client) (uuid.UUID, error)
-	UpdateClient(ctx context.Context, id uuid.UUID, upd *ClientUpdate) error
+type RefreshTokenRepositoryImpl struct{}
+
+func NewRefreshTokenRepository() RefreshTokenRepository {
+	return &RefreshTokenRepositoryImpl{}
 }
 
-type ClientRepositoryImpl struct{}
-
-func NewClientRepository() ClientRepository {
-	return &ClientRepositoryImpl{}
-}
-
-func (c *ClientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID) (*Client, error) {
-	result, resultCount, err := c.FindClients(ctx, ClientFilter{
+func (r *RefreshTokenRepositoryImpl) FindRefreshTokenById(ctx context.Context, id uuid.UUID) (*RefreshToken, error) {
+	result, resultCount, err := r.FindRefreshTokens(ctx, RefreshTokenFilter{
 		BaseFilter: BaseFilter{
 			Id: id,
 			PagingInfo: PagingInfo{
@@ -70,7 +63,7 @@ func (c *ClientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID)
 	return result[0], nil
 }
 
-func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFilter) ([]*Client, int, error) {
+func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) ([]*RefreshToken, int, error) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -80,8 +73,12 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
-		"id", "realm_id", "display_name", "client_id", "client_secret", "redirect_uris").
-		From("clients")
+		"id", "user_id", "client_id", "realm_id", "hashed_token", "valid_until").
+		From("refresh_tokens")
+
+	if filter.HashedToken != nil {
+		sb.Where(sb.Equal("hashed_token", *filter.HashedToken))
+	}
 
 	if filter.ClientId != nil {
 		sb.Where(sb.Equal("client_id", *filter.ClientId))
@@ -101,16 +98,16 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 	defer rows.Close()
 
 	var totalCount int
-	var result []*Client
+	var result []*RefreshToken
 	for rows.Next() {
-		var row Client
+		var row RefreshToken
 		err := rows.Scan(&totalCount,
 			&row.Id,
-			&row.RealmId,
-			&row.DisplayName,
+			&row.UserId,
 			&row.ClientId,
-			&row.ClientSecret,
-			pq.Array(&row.RedirectUris))
+			&row.RealmId,
+			&row.HashedToken,
+			&row.ValidUntil)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -120,7 +117,7 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 	return result, totalCount, nil
 }
 
-func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client) (uuid.UUID, error) {
+func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) (uuid.UUID, error) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -131,21 +128,21 @@ func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client)
 		return resultingId, err
 	}
 
-	err = tx.QueryRow(`insert into "clients"
-    			("realm_id", "display_name", "client_id", "client_secret", "redirect_uris")
-    			values ($1, $2, $3, $4, $5)
+	err = tx.QueryRow(`insert into "refresh_tokens"
+    			("user_id", "client_id", "realm_id", "hashed_token", "valid_until")
+    			values ($1, $2, $3)
     			returning "id"`,
-		client.RealmId,
-		client.DisplayName,
-		client.ClientId,
-		client.ClientSecret,
-		pq.Array(client.RedirectUris)).
+		refreshToken.UserId,
+		refreshToken.ClientId,
+		refreshToken.RealmId,
+		refreshToken.HashedToken,
+		refreshToken.ValidUntil).
 		Scan(&resultingId)
 
 	return resultingId, err
 }
 
-func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, upd *ClientUpdate) error {
+func (r *RefreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id uuid.UUID) error {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -154,16 +151,7 @@ func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, u
 		return err
 	}
 
-	sb := sqlbuilder.Update("clients")
-
-	if upd.DisplayName != nil {
-		sb.Set(sb.Assign("display_name", *upd.DisplayName))
-	}
-
-	if upd.RedirectUris != nil {
-		sb.Set(sb.Assign("redirect_uris", *upd.RedirectUris))
-	}
-
+	sb := sqlbuilder.DeleteFrom("refresh_tokens")
 	sb.Where(sb.Equal("id", id))
 
 	sqlString, args := sb.Build()

@@ -1,0 +1,10 @@
+---
+Environment: Development
+Secret: test
+InitialAdminPassword: password
+Database:
+  Database: holvit
+  Username: user
+  Password: password
+  Host: localhost
+  Port: 5783

@@ -13,6 +13,7 @@ import (
 	"holvit/middlewares"
 	"holvit/repositories"
 	"holvit/requestContext"
+	"holvit/utils"
 	"net/http"
 	"net/url"
 	"strings"
@@ -98,7 +99,7 @@ func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request
 			},
 			Scopes:    scopes,
 			Token:     c.Token,
-			GrantUrl:  "/oidc/authorize-grant", // TODO: get this from some URL resolver service thingie
+			GrantUrl:  fmt.Sprintf("/oidc/{%s}/authorize-grant", c.Client.RealmId.String()), // TODO: get this from some URL resolver service thingie
 			RefuseUrl: c.RedirectUri,
 			LogoutUrl: "/oidc/logout",
 		},
@@ -182,16 +183,17 @@ type RefreshTokenRequest struct {
 	RefreshToken string
 	ClientId     string
 	ClientSecret string
+	ScopeNames   []string
 }
 
 type TokenResponse struct {
 	TokenType string `json:"token_type"`
 
-	IdToken      *string `json:"id_token"`
-	AccessToken  string  `json:"access_token"`
-	RefreshToken string  `json:"refresh_token"`
+	IdToken      string `json:"id_token"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 
-	Scope string `json:"scope"`
+	Scope *string `json:"scope"`
 
 	ExpiresIn int `json:"expires_in"`
 }
@@ -235,24 +237,38 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 		return nil, httpErrors.Unauthorized()
 	}
 
-	// generate jwt
-
-	refreshTokenService := ioc.Get[RefreshTokenService](scope)
-	refreshToken, err := refreshTokenService.CreateRefreshToken(ctx, CreateRefreshTokenRequest{
-		ClientId: client.Id,
+	claimsService := ioc.Get[ClaimsService](scope)
+	claims, err := claimsService.GetClaims(ctx, GetClaimsRequest{
 		UserId:   codeInfo.UserId,
-		RealmId:  client.RealmId,
+		ScopeIds: codeInfo.GrantedScopeIds,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	// access token
-	// scopes
-
+	idTokenValidTime := time.Hour * 1     //TODO: add this to realm and maybe to scopes
 	accessTokenValidTime := time.Hour * 1 //TODO: add this to realm and maybe to scopes
 
-	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.MapClaims{
+	issuer := "http://localhost:8080/oidc" //TODO: this needs to be in the config (external url)
+	audience := client.ClientId
+
+	idTokenClaims := jwt.MapClaims{
+		"sub": codeInfo.UserId.String(),
+		"iss": issuer,
+		"aud": audience,
+		"iat": time.Now().Unix(),
+		"exp": time.Now().Add(idTokenValidTime).Unix(),
+	}
+
+	for _, claim := range claims {
+		idTokenClaims[claim.Name] = claim.Claim
+	}
+
+	subject := idTokenClaims["sub"].(string)
+
+	idToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, idTokenClaims)
+
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.MapClaims{
 		"sub":    codeInfo.UserId,
 		"scopes": codeInfo.GrantedScopes,
 		"iat":    time.Now().Unix(),
@@ -260,25 +276,138 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	})
 
 	keyCache := ioc.Get[cache.KeyCache](scope)
-	// Sign and get the complete encoded token as a string using the secret
 	key, ok := keyCache.Get(client.RealmId)
 	if !ok {
 		return nil, httpErrors.Unauthorized()
 	}
-	tokenString, err := token.SignedString(key)
 
+	idTokenString, err := idToken.SignedString(key)
+	if err != nil {
+		return nil, err
+	}
+
+	accessTokenString, err := accessToken.SignedString(key)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshTokenService := ioc.Get[RefreshTokenService](scope)
+	refreshTokenString, _, err := refreshTokenService.CreateRefreshToken(ctx, CreateRefreshTokenRequest{
+		ClientId: client.Id,
+		UserId:   codeInfo.UserId,
+		RealmId:  client.RealmId,
+		Issuer:   issuer,
+		Subject:  subject,
+		Audience: audience,
+		Scopes:   codeInfo.GrantedScopes,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	scopeString := strings.Join(codeInfo.GrantedScopes, " ")
 	return &TokenResponse{
 		TokenType:    "Bearer",
-		IdToken:      nil,
-		AccessToken:  tokenString,
-		RefreshToken: refreshToken,
-		Scope:        strings.Join(codeInfo.GrantedScopes, " "),
+		IdToken:      idTokenString,
+		AccessToken:  accessTokenString,
+		RefreshToken: refreshTokenString,
+		Scope:        &scopeString,
 		ExpiresIn:    int(accessTokenValidTime / time.Second),
 	}, nil
 }
 
 func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request RefreshTokenRequest) (*TokenResponse, error) {
-	return &TokenResponse{}, nil
+	scope := middlewares.GetScope(ctx)
+
+	clientService := ioc.Get[ClientService](scope)
+	client, err := clientService.Authenticate(ctx, AuthenticateClientRequest{
+		ClientId:     request.ClientId,
+		ClientSecret: request.ClientSecret,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	refreshTokenService := ioc.Get[RefreshTokenService](scope)
+	refreshTokenString, refreshToken, err := refreshTokenService.ValidateAndRefresh(ctx, request.RefreshToken, client.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	if !utils.IsSliceSubset(refreshToken.Scopes, request.ScopeNames) {
+		return nil, httpErrors.Unauthorized()
+	}
+
+	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
+	scopes, _, err := scopeRepository.FindScopes(ctx, repositories.ScopeFilter{
+		RealmId: refreshToken.RealmId,
+		Names:   request.ScopeNames,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	grantedScopeIds := make([]uuid.UUID, 0)
+	for _, dbScope := range scopes {
+		grantedScopeIds = append(grantedScopeIds, dbScope.Id)
+	}
+
+	claimsService := ioc.Get[ClaimsService](scope)
+	claims, err := claimsService.GetClaims(ctx, GetClaimsRequest{
+		UserId:   refreshToken.UserId,
+		ScopeIds: grantedScopeIds,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	accessTokenValidTime := time.Hour * 1 //TODO: add this to realm and maybe to scopes
+	idTokenValidTime := time.Hour * 1     //TODO: add this to realm and maybe to scopes
+
+	idTokenClaims := jwt.MapClaims{
+		"sub": refreshToken.Subject,
+		"iss": refreshToken.Issuer,
+		"aud": refreshToken.Audience,
+		"iat": time.Now().Unix(),
+		"exp": time.Now().Add(idTokenValidTime).Unix(),
+	}
+
+	for _, claim := range claims {
+		idTokenClaims[claim.Name] = claim.Claim
+	}
+
+	idToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, idTokenClaims)
+
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.MapClaims{
+		"sub":    refreshToken.UserId,
+		"scopes": request.ScopeNames,
+		"iat":    time.Now().Unix(),
+		"exp":    time.Now().Add(accessTokenValidTime).Unix(),
+	})
+
+	keyCache := ioc.Get[cache.KeyCache](scope)
+	key, ok := keyCache.Get(client.RealmId)
+	if !ok {
+		return nil, httpErrors.Unauthorized()
+	}
+
+	idTokenString, err := idToken.SignedString(key)
+	if err != nil {
+		return nil, err
+	}
+
+	accessTokenString, err := accessToken.SignedString(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TokenResponse{
+		TokenType:    "Bearer",
+		IdToken:      idTokenString,
+		AccessToken:  accessTokenString,
+		RefreshToken: refreshTokenString,
+		ExpiresIn:    int(accessTokenValidTime / time.Second),
+	}, nil
 }
 
 func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) (AuthorizationResponse, error) {
@@ -409,9 +538,11 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	}
 
 	grantedScopes := make([]string, 0, len(scopes))
+	grantedScopeIds := make([]uuid.UUID, 0, len(scopes))
 	for _, oidcScope := range scopes {
 		if oidcScope.Grant != nil {
 			grantedScopes = append(grantedScopes, oidcScope.Name)
+			grantedScopeIds = append(grantedScopeIds, oidcScope.Id)
 		}
 	}
 
@@ -438,13 +569,6 @@ func validateResponseMode(responseMode string) error {
 	if responseMode == constants.AuthorizationResponseModeQuery {
 		return nil
 	}
-	//TODO: add these when we support more response modes
-	/*if responseMode == constants.AuthorizationResponseModeFragment {
-		return nil
-	}
-	if responseMode == constants.AuthorizationResponseModeFormPost {
-		return nil
-	}*/
 	if responseMode == "" {
 		return nil
 	}

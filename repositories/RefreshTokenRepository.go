@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/lib/pq"
 	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/logging"
@@ -21,6 +22,11 @@ type RefreshToken struct {
 
 	HashedToken string
 	ValidUntil  time.Time
+
+	Issuer   string
+	Subject  string
+	Audience string
+	Scopes   []string
 }
 
 type RefreshTokenFilter struct {
@@ -73,7 +79,7 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
-		"id", "user_id", "client_id", "realm_id", "hashed_token", "valid_until").
+		"id", "user_id", "client_id", "realm_id", "hashed_token", "valid_until", "issuer", "subject", "audience", "scopes").
 		From("refresh_tokens")
 
 	if filter.HashedToken != nil {
@@ -107,7 +113,11 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 			&row.ClientId,
 			&row.RealmId,
 			&row.HashedToken,
-			&row.ValidUntil)
+			&row.ValidUntil,
+			&row.Issuer,
+			&row.Subject,
+			&row.Audience,
+			pq.Array(&row.Scopes))
 		if err != nil {
 			return nil, 0, err
 		}
@@ -128,15 +138,22 @@ func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, ref
 		return resultingId, err
 	}
 
-	err = tx.QueryRow(`insert into "refresh_tokens"
-    			("user_id", "client_id", "realm_id", "hashed_token", "valid_until")
-    			values ($1, $2, $3, $4, $5)
-    			returning "id"`,
+	sqlString := `insert into "refresh_tokens"
+    			("user_id", "client_id", "realm_id", "hashed_token", "valid_until", "issuer", "subject", "audience", "scopes")
+    			values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    			returning "id"`
+	logging.Logger.Debugf("executing sql: %s", sqlString)
+
+	err = tx.QueryRow(sqlString,
 		refreshToken.UserId,
 		refreshToken.ClientId,
 		refreshToken.RealmId,
 		refreshToken.HashedToken,
-		refreshToken.ValidUntil).
+		refreshToken.ValidUntil,
+		refreshToken.Issuer,
+		refreshToken.Subject,
+		refreshToken.Audience,
+		pq.Array(refreshToken.Scopes)).
 		Scan(&resultingId)
 
 	return resultingId, err

@@ -26,10 +26,11 @@ alter table "clients"
 
 create table "users"
 (
-    "id"       uuid not null default gen_random_uuid(),
-    "realm_id" uuid not null,
-    "username" text,
-    "email"    text,
+    "id"             uuid not null default gen_random_uuid(),
+    "realm_id"       uuid not null,
+    "username"       text,
+    "email"          text,
+    "email_verified" bool not null default false,
     primary key ("id")
 );
 
@@ -103,6 +104,10 @@ create table "refresh_tokens"
     "realm_id"     uuid      not null,
     "hashed_token" text      not null,
     "valid_until"  timestamp not null,
+    "issuer"       text      not null,
+    "subject"      text      not null,
+    "audience"     text      not null,
+    "scopes"       text[]    not null,
     primary key ("id")
 );
 
@@ -113,6 +118,33 @@ alter table "refresh_tokens"
 alter table "refresh_tokens"
     add constraint "fk_refresh_tokens_realms" foreign key ("realm_id") references "realms";
 
+create table "claim_mappers"
+(
+    "id"           uuid  not null default gen_random_uuid(),
+    "realm_id"     uuid  not null,
+    "display_name" text  not null,
+    "description"  text  not null,
+    "type"         text  not null,
+    "details"      jsonb not null,
+    primary key ("id")
+);
+
+create unique index "idx_unique_realm_claim" on "claim_mappers" ("display_name", "realm_id");
+
+alter table "claim_mappers"
+    add constraint "fk_claim_mappers_realms" foreign key ("realm_id") references "realms";
+
+create table "scope_claims"
+(
+    "id"              uuid not null default gen_random_uuid(),
+    "scope_id"        uuid not null,
+    "claim_mapper_id" uuid not null,
+    primary key ("id")
+);
+
+alter table "scope_claims"
+    add constraint "fk_scope_claims_scopes" foreign key ("scope_id") references "scopes";
+
 -- +migrate Down
 drop table "sessions" cascade;
 drop table "grants" cascade;
@@ -121,3 +153,5 @@ drop table "credentials" cascade;
 drop table "clients" cascade;
 drop table "users" cascade;
 drop table "realms" cascade;
+drop table "claim_mappers" cascade;
+drop table "scope_claims" cascade;

@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"holvit/cache"
 	"holvit/config"
+	"holvit/constants"
 	"holvit/ioc"
 	"holvit/middlewares"
 	"holvit/repositories"
@@ -61,33 +62,17 @@ func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 		return nil, err
 	}
 
-	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
-	_, err = scopeRepository.CreateScope(ctx, &repositories.Scope{
-		RealmId:     realmId,
-		Name:        "openid",
-		DisplayName: "OpenId Connect",
-		Description: "Sign you in",
-	})
+	err = s.createOpenIdScope(ctx, realmId)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = scopeRepository.CreateScope(ctx, &repositories.Scope{
-		RealmId:     realmId,
-		Name:        "email",
-		DisplayName: "Email",
-		Description: "Access your email address",
-	})
+	err = s.createEmailScope(ctx, realmId)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = scopeRepository.CreateScope(ctx, &repositories.Scope{
-		RealmId:     realmId,
-		Name:        "profile",
-		DisplayName: "Profile",
-		Description: "Access your name",
-	})
+	err = s.createProfileScope(ctx, realmId)
 	if err != nil {
 		return nil, err
 	}
@@ -98,6 +83,158 @@ func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 	return &CreateRealmResponse{
 		Id: realmId,
 	}, nil
+}
+
+func (s *RealmServiceImpl) createProfileScope(ctx context.Context, realmId uuid.UUID) error {
+	scope := middlewares.GetScope(ctx)
+
+	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
+	claimMapperRepository := ioc.Get[repositories.ClaimMapperRepository](scope)
+
+	scopeId, err := scopeRepository.CreateScope(ctx, &repositories.Scope{
+		RealmId:     realmId,
+		Name:        "profile",
+		DisplayName: "Profile",
+		Description: "Access your name",
+	})
+	if err != nil {
+		return err
+	}
+
+	var claimId uuid.UUID
+	claimId, err = claimMapperRepository.CreateClaimMapper(ctx, &repositories.ClaimMapper{
+		BaseModel:   repositories.BaseModel{},
+		RealmId:     realmId,
+		DisplayName: "Username",
+		Description: "The username of the user",
+		Type:        constants.ClaimMapperUserInfo,
+		Details: repositories.UserInfoClaimMapperDetails{
+			ClaimName: "preferred_username",
+			Property:  constants.UserInfoPropertyUsername,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = claimMapperRepository.AssociateClaimMapper(ctx, repositories.AssociateScopeClaimRequest{
+		ClaimMapperId: claimId,
+		ScopeId:       scopeId,
+	})
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (s *RealmServiceImpl) createEmailScope(ctx context.Context, realmId uuid.UUID) error {
+	scope := middlewares.GetScope(ctx)
+
+	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
+	claimMapperRepository := ioc.Get[repositories.ClaimMapperRepository](scope)
+
+	scopeId, err := scopeRepository.CreateScope(ctx, &repositories.Scope{
+		RealmId:     realmId,
+		Name:        "email",
+		DisplayName: "Email",
+		Description: "Access your email address",
+	})
+	if err != nil {
+		return err
+	}
+
+	var claimId uuid.UUID
+	claimId, err = claimMapperRepository.CreateClaimMapper(ctx, &repositories.ClaimMapper{
+		BaseModel:   repositories.BaseModel{},
+		RealmId:     realmId,
+		DisplayName: "Email address",
+		Description: "The primary email address of the user",
+		Type:        constants.ClaimMapperUserInfo,
+		Details: repositories.UserInfoClaimMapperDetails{
+			ClaimName: "email",
+			Property:  constants.UserInfoPropertyEmail,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = claimMapperRepository.AssociateClaimMapper(ctx, repositories.AssociateScopeClaimRequest{
+		ClaimMapperId: claimId,
+		ScopeId:       scopeId,
+	})
+	if err != nil {
+		return err
+	}
+
+	claimId, err = claimMapperRepository.CreateClaimMapper(ctx, &repositories.ClaimMapper{
+		BaseModel:   repositories.BaseModel{},
+		RealmId:     realmId,
+		DisplayName: "Email address verified",
+		Description: "Whether the email address was verified or not",
+		Type:        constants.ClaimMapperUserInfo,
+		Details: repositories.UserInfoClaimMapperDetails{
+			ClaimName: "email_verified",
+			Property:  constants.UserInfoPropertyEmailVerified,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = claimMapperRepository.AssociateClaimMapper(ctx, repositories.AssociateScopeClaimRequest{
+		ClaimMapperId: claimId,
+		ScopeId:       scopeId,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *RealmServiceImpl) createOpenIdScope(ctx context.Context, realmId uuid.UUID) error {
+	scope := middlewares.GetScope(ctx)
+
+	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
+	claimMapperRepository := ioc.Get[repositories.ClaimMapperRepository](scope)
+
+	scopeId, err := scopeRepository.CreateScope(ctx, &repositories.Scope{
+		RealmId:     realmId,
+		Name:        "openid",
+		DisplayName: "OpenId Connect",
+		Description: "Sign you in",
+	})
+	if err != nil {
+		return err
+	}
+
+	var claimId uuid.UUID
+	claimId, err = claimMapperRepository.CreateClaimMapper(ctx, &repositories.ClaimMapper{
+		BaseModel:   repositories.BaseModel{},
+		RealmId:     realmId,
+		DisplayName: "Subject Identifier",
+		Description: "The id of the user",
+		Type:        constants.ClaimMapperUserInfo,
+		Details: repositories.UserInfoClaimMapperDetails{
+			ClaimName: "sub",
+			Property:  constants.UserInfoPropertyId,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = claimMapperRepository.AssociateClaimMapper(ctx, repositories.AssociateScopeClaimRequest{
+		ClaimMapperId: claimId,
+		ScopeId:       scopeId,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *RealmServiceImpl) InitializeRealmKeys(ctx context.Context) error {

@@ -177,6 +177,9 @@ func configureServices() *ioc.DependencyProvider {
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.RefreshTokenRepository {
 		return repositories.NewRefreshTokenRepository()
 	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.ClaimMapperRepository {
+		return repositories.NewClaimMapperRepository()
+	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.UserService {
 		return services.NewUserService()
@@ -189,6 +192,9 @@ func configureServices() *ioc.DependencyProvider {
 	})
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.RefreshTokenService {
 		return services.NewRefreshTokenService()
+	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.ClaimsService {
+		return services.NewClaimsService()
 	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.OidcService {

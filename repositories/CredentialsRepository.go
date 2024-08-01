@@ -77,14 +77,16 @@ func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credent
 		return resultingId, err
 	}
 
-	err = tx.QueryRow(`insert into "credentials"
+	sqlString := `insert into "credentials"
     			("user_id", "type", "details")
     			values ($1, $2, $3)
-    			returning "id"`,
+    			returning "id"`
+	logging.Logger.Debugf("executing sql: %s", sqlString)
+
+	err = tx.QueryRow(sqlString,
 		credential.UserId,
 		credential.Type,
-		credential.Details).
-		Scan(&resultingId)
+		credential.Details).Scan(&resultingId)
 
 	return resultingId, err
 }

@@ -139,8 +139,7 @@ func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client)
 		client.DisplayName,
 		client.ClientId,
 		client.ClientSecret,
-		pq.Array(client.RedirectUris)).
-		Scan(&resultingId)
+		pq.Array(client.RedirectUris)).Scan(&resultingId)
 
 	return resultingId, err
 }

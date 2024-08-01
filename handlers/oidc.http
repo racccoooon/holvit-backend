@@ -1,6 +1,6 @@
 ###
 # @no-redirect
-GET localhost:8080/oidc/authorize/admin?state=test&scope=openid&response_type=code&client_id={{client_id}}&
+GET localhost:8080/oidc/admin/authorize?state=test&scope={{scope}}&response_type=code&client_id={{client_id}}&
     redirect_uri={{redirect_uri}}
 
 > {%
@@ -8,12 +8,36 @@ GET localhost:8080/oidc/authorize/admin?state=test&scope=openid&response_type=co
     client.global.set('code', code);
 %}
 
-###
 
-POST localhost:8080/oidc/token
+### get tokens using authorization code
+POST localhost:8080/oidc/admin/token
 Content-Type: application/x-www-form-urlencoded
 Authorization: Basic {{client_id}} {{client_secret}}
 
 grant_type = authorization_code &
 redirect_uri = {{redirect_uri}} &
 code = {{code}}
+
+> {%
+    const refreshToken = response.body.refresh_token;
+    client.global.set('refreshToken', refreshToken)
+%}
+
+
+### get tokens using refresh token
+POST localhost:8080/oidc/admin/token
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic {{client_id}} {{client_secret}}
+
+grant_type = refresh_token &
+scope = {{scope}} &
+redirect_uri = {{redirect_uri}} &
+refresh_token = {{refreshToken}}
+
+> {%
+    if (response.status === 200) {
+        const refreshToken = response.body.refresh_token;
+        client.global.set('refreshToken', refreshToken)
+    }
+%}
+

@@ -1,16 +1,17 @@
 package constants
 
-const RegistrationModeEmail = "email"
-const RegistrationModeUsername = "username"
-const RegistrationModeBoth = "both"
-
 const CredentialTypePassword = "password"
+
+const ClaimMapperUserInfo = "user_info"
+
+const UserInfoPropertyId = "id"
+const UserInfoPropertyEmail = "email"
+const UserInfoPropertyEmailVerified = "email_verified"
+const UserInfoPropertyUsername = "username"
 
 const HashAlgorithmBCrypt = "bcrypt"
 
 const AuthorizationResponseModeQuery = "query"
-const AuthorizationResponseModeFragment = "fragment"
-const AuthorizationResponseModeFormPost = "form_post"
 
 const AuthorizationResponseTypeCode = "code"
 

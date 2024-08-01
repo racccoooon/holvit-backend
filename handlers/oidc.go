@@ -123,6 +123,7 @@ func Token(w http.ResponseWriter, r *http.Request) {
 			RefreshToken: r.Form.Get("refresh_token"),
 			ClientId:     clientId,
 			ClientSecret: clientSecret,
+			ScopeNames:   strings.Split(r.Form.Get("scope"), " "),
 		})
 		break
 	default:

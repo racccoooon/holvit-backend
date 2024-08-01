@@ -15,11 +15,16 @@ type CreateRefreshTokenRequest struct {
 	ClientId uuid.UUID
 	UserId   uuid.UUID
 	RealmId  uuid.UUID
+
+	Issuer   string
+	Subject  string
+	Audience string
+	Scopes   []string
 }
 
 type RefreshTokenService interface {
-	ValidateAndRefresh(ctx context.Context, token string, clientId uuid.UUID) (string, error)
-	CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (string, error)
+	ValidateAndRefresh(ctx context.Context, token string, clientId uuid.UUID) (string, *repositories.RefreshToken, error)
+	CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (string, *repositories.RefreshToken, error)
 }
 
 func NewRefreshTokenService() RefreshTokenService {
@@ -28,7 +33,7 @@ func NewRefreshTokenService() RefreshTokenService {
 
 type RefreshTokenServiceImpl struct{}
 
-func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token string, clientId uuid.UUID) (string, error) {
+func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token string, clientId uuid.UUID) (string, *repositories.RefreshToken, error) {
 	scope := middlewares.GetScope(ctx)
 
 	hashedToken := utils.CheapHash(token)
@@ -38,47 +43,61 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 		HashedToken: &hashedToken,
 	})
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if count == 0 {
-		return "", httpErrors.Unauthorized()
+		return "", nil, httpErrors.Unauthorized()
 	}
 
 	refreshToken := tokens[0]
 	if refreshToken.ValidUntil.Compare(time.Now()) < 0 {
-		return "", httpErrors.Unauthorized()
+		return "", nil, httpErrors.Unauthorized()
 	}
 
-	refreshTokenRepository.DeleteRefreshToken(ctx, refreshToken.Id)
+	err = refreshTokenRepository.DeleteRefreshToken(ctx, refreshToken.Id)
+	if err != nil {
+		return "", nil, err
+	}
 
 	return r.CreateRefreshToken(ctx, CreateRefreshTokenRequest{
 		ClientId: clientId,
 		UserId:   refreshToken.UserId,
 		RealmId:  refreshToken.RealmId,
+		Issuer:   refreshToken.Issuer,
+		Subject:  refreshToken.Subject,
+		Audience: refreshToken.Audience,
+		Scopes:   refreshToken.Scopes,
 	})
 }
 
-func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (refreshTokenId string, err error) {
+func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (string, *repositories.RefreshToken, error) {
 	scope := middlewares.GetScope(ctx)
 
 	token, err := utils.GenerateRandomString(32)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	hashedToken := utils.CheapHash(token)
 
 	refreshTokenRepository := ioc.Get[repositories.RefreshTokenRepository](scope)
-	_, err = refreshTokenRepository.CreateRefreshToken(ctx, &repositories.RefreshToken{
+	refreshToken := repositories.RefreshToken{
 		UserId:      request.UserId,
 		ClientId:    request.ClientId,
 		RealmId:     request.RealmId,
 		HashedToken: hashedToken,
 		ValidUntil:  time.Now().Add(time.Hour), //TODO: make configurable
-	})
+		Issuer:      request.Issuer,
+		Subject:     request.Subject,
+		Audience:    request.Audience,
+		Scopes:      request.Scopes,
+	}
+	tokenId, err := refreshTokenRepository.CreateRefreshToken(ctx, &refreshToken)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	return token, nil
+	refreshToken.Id = tokenId
+
+	return token, &refreshToken, nil
 }

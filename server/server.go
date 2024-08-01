@@ -31,13 +31,13 @@ func ServeApi(dp *ioc.DependencyProvider) {
 
 	r.HandleFunc("/api/health", handlers.Health).Methods("GET")
 
-	r.HandleFunc("/oidc/authorize/{realmName}", handlers.Authorize).Methods("GET", "POST")
-	r.HandleFunc("/oidc/authorize-grant", handlers.AuthorizeGrant).Methods("POST")
+	r.HandleFunc("/oidc/{realmName}/authorize", handlers.Authorize).Methods("GET", "POST")
+	r.HandleFunc("/oidc/{realmName}/authorize-grant", handlers.AuthorizeGrant).Methods("POST")
 
-	r.HandleFunc("/oidc/token", handlers.Token)
-	r.HandleFunc("/oidc/userinfo", handlers.Token)
-	r.HandleFunc("/oidc/jwks", handlers.Token)
-	r.HandleFunc("/oidc/logout", handlers.Token)
+	r.HandleFunc("/oidc/{realmName}/token", handlers.Token)
+	r.HandleFunc("/oidc/{realmName}/userinfo", handlers.Token)
+	r.HandleFunc("/oidc/{realmName}/jwks", handlers.Token)
+	r.HandleFunc("/oidc/{realmName}/logout", handlers.Token)
 
 	srv := &http.Server{
 		Handler:      r,

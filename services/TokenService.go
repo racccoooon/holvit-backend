@@ -20,11 +20,12 @@ type GrantInfo struct {
 }
 
 type CodeInfo struct {
-	RealmId       uuid.UUID `json:"realm_id"`
-	ClientId      string    `json:"client_id"`
-	UserId        uuid.UUID `json:"user_id"`
-	RedirectUri   string    `json:"redirect_uri"`
-	GrantedScopes []string  `json:"granted_scopes"`
+	RealmId         uuid.UUID   `json:"realm_id"`
+	ClientId        string      `json:"client_id"`
+	UserId          uuid.UUID   `json:"user_id"`
+	RedirectUri     string      `json:"redirect_uri"`
+	GrantedScopes   []string    `json:"granted_scopes"`
+	GrantedScopeIds []uuid.UUID `json:"granted_scope_ids"`
 }
 
 type TokenService interface {

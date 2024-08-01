@@ -1,10 +1,19 @@
 ###
 # @no-redirect
-GET localhost:8080/oidc/authorize/admin?state=test&scope=openid&response_type=code&client_id={{client_id}}&redirect_uri={{redirect_uri}}
+GET localhost:8080/oidc/authorize/admin?state=test&scope=openid&response_type=code&client_id={{client_id}}&
+    redirect_uri={{redirect_uri}}
+
+> {%
+    const code = response.headers.valueOf('Location').match(/code=(.*?)&/)[1];
+    client.global.set('code', code);
+%}
 
 ###
+
 POST localhost:8080/oidc/token
 Content-Type: application/x-www-form-urlencoded
 Authorization: Basic {{client_id}} {{client_secret}}
 
-grant_type=authorization_code&redirect_uri={{redirect_uri}}&code=PFHe6mQ4nzCXc5MjrPK7cho8%2B1HPAh6ygI2AEa%2FYR0s%3D
+grant_type = authorization_code &
+redirect_uri = {{redirect_uri}} &
+code = {{code}}

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -33,8 +34,41 @@ type AuthorizationResponse interface {
 }
 
 type ScopeConsentResponse struct {
-	RequiredGrants []string
+	RequiredGrants []*repositories.Scope
+	Client         *repositories.Client
+	User           *repositories.User
 	Token          string
+	RedirectUri    string
+}
+
+type AuthFrontendUser struct {
+	Name string `json:"name"`
+}
+
+type AuthFrontendScope struct {
+	Required    bool   `json:"required"`
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+	Description string `json:"description"`
+}
+
+type AuthFrontendDataAuthorize struct {
+	ClientName string              `json:"client_name"`
+	User       AuthFrontendUser    `json:"user"`
+	Scopes     []AuthFrontendScope `json:"scopes"`
+	Token      string              `json:"token"`
+	GrantUrl   string              `json:"grant_url"`
+	RefuseUrl  string              `json:"refuse_url"`
+	LogoutUrl  string              `json:"logout_url"`
+}
+
+type AuthFrontendDataAuthenticate struct {
+}
+
+type AuthFrontendData struct {
+	Mode         string                        `json:"mode"`
+	Authorize    *AuthFrontendDataAuthorize    `json:"authorize"`
+	Authenticate *AuthFrontendDataAuthenticate `json:"authenticate"`
 }
 
 func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request) {
@@ -45,17 +79,49 @@ func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "text/html")
 
-	list := "<ul>"
-	fields := ""
-	for _, missingGrant := range c.RequiredGrants {
-		list += "<li>" + missingGrant + "</li>"
-		fields += "<input type='hidden' name='grant' value='" + missingGrant + "'/>"
+	scopes := make([]AuthFrontendScope, 0, len(c.RequiredGrants))
+	for _, grant := range c.RequiredGrants {
+		scopes = append(scopes, AuthFrontendScope{
+			Required:    grant.Name == "openid", // TODO: idk what lol
+			Name:        grant.Name,
+			DisplayName: grant.DisplayName,
+			Description: grant.Description,
+		})
 	}
-	list += "</ul>"
 
-	_, err := w.Write([]byte("<html><h1>Consent Required!</h1>" + list +
-		"<form action='/oidc/authorize-grant' method='post'><input type='hidden' name='token' value='" + c.Token + "'/>" +
-		fields + "<input type='submit' value='gib'/></form></html>"))
+	frontendData := AuthFrontendData{
+		Mode: "authorize",
+		Authorize: &AuthFrontendDataAuthorize{
+			ClientName: c.Client.DisplayName,
+			User: AuthFrontendUser{
+				Name: *c.User.Username, // TODO: handle the case that there is no username
+			},
+			Scopes:    scopes,
+			Token:     c.Token,
+			GrantUrl:  "/oidc/authorize-grant", // TODO: get this from some URL resolver service thingie
+			RefuseUrl: c.RedirectUri,
+			LogoutUrl: "/oidc/logout",
+		},
+		Authenticate: nil,
+	}
+
+	_, err := w.Write([]byte("<!doctype html><html><head><script>window.auth_info="))
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(frontendData)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	html := "</script></head><body><div id='app'></div>"
+	html += "<script type=\"module\" src=\"http://localhost:5173/@vite/client\"></script>"
+	html += "<script type=\"module\" src=\"http://localhost:5173/src/main.js\"></script>"
+	html += "</body></html>"
+	_, err = w.Write([]byte(html))
 	if err != nil {
 		rcs.Error(err)
 		return
@@ -300,10 +366,13 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	}
 	adminUser := users[0]
 
+	// TODO: get this from the login stuff
+	user := adminUser
+
 	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
 	scopes, count, err := scopeRepository.FindScopes(ctx, repositories.ScopeFilter{
 		Names:         authorizationRequest.Scopes,
-		UserId:        &adminUser.Id,
+		UserId:        &user.Id,
 		ClientId:      &client.Id,
 		RealmId:       realm.Id,
 		IncludeGrants: true,
@@ -312,10 +381,10 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 		return nil, err
 	}
 
-	missingGrants := make([]string, 0, len(scopes))
+	missingGrants := make([]*repositories.Scope, 0, len(scopes))
 	for _, oidcScope := range scopes {
 		if oidcScope.Grant == nil {
-			missingGrants = append(missingGrants, oidcScope.Name)
+			missingGrants = append(missingGrants, oidcScope)
 		}
 	}
 
@@ -333,6 +402,9 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 		return &ScopeConsentResponse{
 			RequiredGrants: missingGrants,
 			Token:          token,
+			Client:         client,
+			User:           user,
+			RedirectUri:    authorizationRequest.RedirectUri,
 		}, nil
 	}
 
@@ -347,7 +419,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	code, err := tokenService.StoreOidcCode(ctx, CodeInfo{
 		RealmId:       realm.Id,
 		ClientId:      client.ClientId,
-		UserId:        adminUser.Id,
+		UserId:        user.Id,
 		RedirectUri:   authorizationRequest.RedirectUri,
 		GrantedScopes: grantedScopes,
 	})

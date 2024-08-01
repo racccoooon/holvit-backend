@@ -136,6 +136,7 @@ func Token(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 
 	err = json.NewEncoder(w).Encode(response)
 	if err != nil {
@@ -143,7 +144,6 @@ func Token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(200)
 }
 
 func UserInfo(w http.ResponseWriter, r *http.Request) {

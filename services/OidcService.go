@@ -127,7 +127,7 @@ type TokenResponse struct {
 
 	Scope string `json:"scope"`
 
-	ExpiresIn time.Duration `json:"expires_in"`
+	ExpiresIn int `json:"expires_in"`
 }
 
 type OidcService interface {
@@ -207,7 +207,7 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 		AccessToken:  tokenString,
 		RefreshToken: refreshToken,
 		Scope:        strings.Join(codeInfo.GrantedScopes, " "),
-		ExpiresIn:    accessTokenValidTime,
+		ExpiresIn:    int(accessTokenValidTime / time.Second),
 	}, nil
 }
 

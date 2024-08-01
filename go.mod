@@ -4,6 +4,7 @@ go 1.22
 
 require (
 	github.com/go-crypt/crypt v0.2.25
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.4.0
 	github.com/gorilla/mux v1.8.1
 	github.com/huandu/go-sqlbuilder v1.28.0

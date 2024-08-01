@@ -97,7 +97,7 @@ alter table "sessions"
 
 create table "refresh_tokens"
 (
-    "id"           uuid      not null,
+    "id"           uuid      not null default gen_random_uuid(),
     "user_id"      uuid      not null,
     "client_id"    uuid      not null,
     "realm_id"     uuid      not null,

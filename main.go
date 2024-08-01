@@ -115,13 +115,14 @@ func seedData(ctx context.Context) {
 	}
 
 	clientService := ioc.Get[services.ClientService](scope)
-	_, err = clientService.CreateClient(ctx, services.CreateClientRequest{
+	clientResponse, err := clientService.CreateClient(ctx, services.CreateClientRequest{
 		RealmId:     masterRealm.Id,
 		DisplayName: "Holvit Admin",
 	})
 	if err != nil {
 		logging.Logger.Fatal(err)
 	}
+	logging.Logger.Infof("admin client id=%s secret=%s", clientResponse.ClientId, clientResponse.ClientSecret)
 
 	userService := ioc.Get[services.UserService](scope)
 	adminUser, err := userService.CreateUser(ctx, services.CreateUserRequest{

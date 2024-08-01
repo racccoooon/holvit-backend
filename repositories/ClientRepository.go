@@ -80,7 +80,7 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
-		"id", "realm_id", "display_name", "client_id", "client_secret", "redirect_uris").
+		"id", "realm_id", "display_name", "client_id", "hashed_client_secret", "redirect_uris").
 		From("clients")
 
 	if filter.ClientId != nil {
@@ -132,7 +132,7 @@ func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client)
 	}
 
 	err = tx.QueryRow(`insert into "clients"
-    			("realm_id", "display_name", "client_id", "client_secret", "redirect_uris")
+    			("realm_id", "display_name", "client_id", "hashed_client_secret", "redirect_uris")
     			values ($1, $2, $3, $4, $5)
     			returning "id"`,
 		client.RealmId,

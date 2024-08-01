@@ -1,3 +1,10 @@
 ###
 # @no-redirect
-GET localhost:8080/oidc/authorize/admin?state=test&scope=openid&response_type=code&client_id=0de94625-f4ed-4d24-a4fa-962c6e89e9a7
+GET localhost:8080/oidc/authorize/admin?state=test&scope=openid&response_type=code&client_id={{client_id}}&redirect_uri={{redirect_uri}}
+
+###
+POST localhost:8080/oidc/token
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic {{client_id}} {{client_secret}}
+
+grant_type=authorization_code&redirect_uri={{redirect_uri}}&code=PFHe6mQ4nzCXc5MjrPK7cho8%2B1HPAh6ygI2AEa%2FYR0s%3D

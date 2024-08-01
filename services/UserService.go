@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/base64"
 	"github.com/google/uuid"
 	"holvit/config"
 	"holvit/constants"
@@ -75,12 +74,10 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 		return err
 	}
 
-	passwordBytes := []byte(request.Password)
-
 	if credentials != nil {
 		credential := credentials[0]
 
-		err = verifyPassword(credential, passwordBytes)
+		err = verifyPassword(credential, request.Password)
 		if err != nil {
 			return err
 		}
@@ -92,7 +89,7 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 	}
 
 	hashAlgorithm := config.C.GetHashAlgorithm()
-	hashed, err := hashAlgorithm.Hash(passwordBytes)
+	hashed, err := hashAlgorithm.Hash(request.Password)
 	if err != nil {
 		return err
 	}
@@ -101,7 +98,7 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 		UserId: request.UserId,
 		Type:   constants.CredentialTypePassword,
 		Details: repositories.CredentialPasswordDetails{
-			HashedPassword: base64.StdEncoding.EncodeToString(hashed),
+			HashedPassword: hashed,
 			Temporary:      request.Temporary,
 		},
 	})
@@ -112,15 +109,10 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 	return nil
 }
 
-func verifyPassword(credential *repositories.Credential, password []byte) error {
+func verifyPassword(credential *repositories.Credential, password string) error {
 	details := credential.Details.(repositories.CredentialPasswordDetails)
 
-	hashedPassword, err := base64.StdEncoding.DecodeString(details.HashedPassword)
-	if err != nil {
-		return err
-	}
-
-	err = utils.CompareHash(password, hashedPassword)
+	err := utils.CompareHash(password, details.HashedPassword)
 	if err != nil {
 		return err
 	}

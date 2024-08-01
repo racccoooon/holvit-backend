@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"holvit/cache"
 	"holvit/constants"
 	"holvit/httpErrors"
 	"holvit/ioc"
@@ -13,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 type AuthorizationRequest struct {
@@ -124,7 +127,7 @@ type TokenResponse struct {
 
 	Scope string `json:"scope"`
 
-	ExpiresIn int `json:"expires_in"`
+	ExpiresIn time.Duration `json:"expires_in"`
 }
 
 type OidcService interface {
@@ -142,16 +145,6 @@ func NewOidcService() OidcService {
 
 func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request AuthorizationCodeTokenRequest) (*TokenResponse, error) {
 	scope := middlewares.GetScope(ctx)
-
-	// assume we are already logged in
-	userRepository := ioc.Get[repositories.UserRepository](scope)
-	users, _, err := userRepository.FindUsers(ctx, repositories.UserFilter{
-		BaseFilter: repositories.BaseFilter{},
-	})
-	if err != nil {
-		return nil, err
-	}
-	adminUser := users[0]
 
 	tokenService := ioc.Get[TokenService](scope)
 	codeInfo, err := tokenService.RetrieveOidcCode(ctx, request.Code)
@@ -172,7 +165,7 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 		return nil, err
 	}
 
-	if codeInfo.ClientId != client.Id {
+	if codeInfo.ClientId != client.ClientId {
 		return nil, httpErrors.Unauthorized()
 	}
 
@@ -181,20 +174,40 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	refreshTokenService := ioc.Get[RefreshTokenService](scope)
 	refreshToken, err := refreshTokenService.CreateRefreshToken(ctx, CreateRefreshTokenRequest{
 		ClientId: client.Id,
-		UserId:   adminUser.Id,
+		UserId:   codeInfo.UserId,
 		RealmId:  client.RealmId,
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	// access token
+	// scopes
+
+	accessTokenValidTime := time.Hour * 1 //TODO: add this to realm and maybe to scopes
+
+	token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.MapClaims{
+		"sub":    codeInfo.UserId,
+		"scopes": codeInfo.GrantedScopes,
+		"iat":    time.Now().Unix(),
+		"exp":    time.Now().Add(accessTokenValidTime).Unix(),
+	})
+
+	keyCache := ioc.Get[cache.KeyCache](scope)
+	// Sign and get the complete encoded token as a string using the secret
+	key, ok := keyCache.Get(client.RealmId)
+	if !ok {
+		return nil, httpErrors.Unauthorized()
+	}
+	tokenString, err := token.SignedString(key)
+
 	return &TokenResponse{
 		TokenType:    "Bearer",
 		IdToken:      nil,
-		AccessToken:  "",
+		AccessToken:  tokenString,
 		RefreshToken: refreshToken,
 		Scope:        strings.Join(codeInfo.GrantedScopes, " "),
-		ExpiresIn:    3600, //TODO: add this to realm and maybe to scopes
+		ExpiresIn:    accessTokenValidTime,
 	}, nil
 }
 
@@ -333,7 +346,8 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	tokenService := ioc.Get[TokenService](scope)
 	code, err := tokenService.StoreOidcCode(ctx, CodeInfo{
 		RealmId:       realm.Id,
-		ClientId:      client.Id,
+		ClientId:      client.ClientId,
+		UserId:        adminUser.Id,
 		RedirectUri:   authorizationRequest.RedirectUri,
 		GrantedScopes: grantedScopes,
 	})

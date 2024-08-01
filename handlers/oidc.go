@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"holvit/constants"
 	"holvit/httpErrors"
@@ -125,7 +126,7 @@ func Token(w http.ResponseWriter, r *http.Request) {
 		})
 		break
 	default:
-		rcs.Error(httpErrors.BadRequest().WithMessage("Unsupported grant_type"))
+		rcs.Error(httpErrors.BadRequest().WithMessage(fmt.Sprintf("Unsupported grant_type '%s'", grantType)))
 	}
 
 	if err != nil {
@@ -136,7 +137,11 @@ func Token(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 
-	json.NewEncoder(w).Encode(response)
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
 
 	w.WriteHeader(200)
 }

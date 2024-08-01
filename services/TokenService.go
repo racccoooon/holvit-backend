@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"holvit/config"
 	"holvit/ioc"
 	"holvit/middlewares"
 	"holvit/utils"
@@ -20,7 +21,8 @@ type GrantInfo struct {
 
 type CodeInfo struct {
 	RealmId       uuid.UUID `json:"realm_id"`
-	ClientId      uuid.UUID `json:"client_id"`
+	ClientId      string    `json:"client_id"`
+	UserId        uuid.UUID `json:"user_id"`
 	RedirectUri   string    `json:"redirect_uri"`
 	GrantedScopes []string  `json:"granted_scopes"`
 }
@@ -85,6 +87,9 @@ func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name
 
 	data := string(dataBytes)
 
+	if config.C.IsDevelopment() {
+		expiration = time.Hour * 24
+	}
 	if err := redisClient.Set(ctx, name+":"+token, data, expiration).Err(); err != nil {
 		return "", err
 	}

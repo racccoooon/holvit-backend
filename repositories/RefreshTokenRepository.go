@@ -130,7 +130,7 @@ func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, ref
 
 	err = tx.QueryRow(`insert into "refresh_tokens"
     			("user_id", "client_id", "realm_id", "hashed_token", "valid_until")
-    			values ($1, $2, $3)
+    			values ($1, $2, $3, $4, $5)
     			returning "id"`,
 		refreshToken.UserId,
 		refreshToken.ClientId,

@@ -15,6 +15,11 @@ import (
 type CreateRealmRequest struct {
 	Name        string
 	DisplayName string
+
+	RequireUsername  *bool
+	RequireEmail     *bool
+	RequireTotp      *bool
+	EnableRememberMe *bool
 }
 
 type CreateRealmResponse struct {
@@ -26,8 +31,7 @@ type RealmService interface {
 	InitializeRealmKeys(ctx context.Context) error
 }
 
-type RealmServiceImpl struct {
-}
+type RealmServiceImpl struct{}
 
 func NewRealmService() RealmService {
 	return &RealmServiceImpl{}
@@ -57,6 +61,10 @@ func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 		Name:                request.Name,
 		DisplayName:         request.DisplayName,
 		EncryptedPrivateKey: encryptedPrivateKeyBytes,
+		RequireUsername:     utils.GetOrDefault(request.RequireUsername, true),
+		RequireEmail:        utils.GetOrDefault(request.RequireUsername, false),
+		RequireTotp:         utils.GetOrDefault(request.RequireTotp, false),
+		EnableRememberMe:    utils.GetOrDefault(request.EnableRememberMe, false),
 	})
 	if err != nil {
 		return nil, err

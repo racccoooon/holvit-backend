@@ -18,6 +18,11 @@ type Realm struct {
 	DisplayName string
 
 	EncryptedPrivateKey []byte
+
+	RequireUsername  bool
+	RequireEmail     bool
+	RequireTotp      bool
+	EnableRememberMe bool
 }
 
 type RealmFilter struct {
@@ -29,6 +34,11 @@ type RealmFilter struct {
 type RealmUpdate struct {
 	DisplayName *string
 	Name        *string
+
+	RequireUsername  *bool
+	RequireEmail     *bool
+	RequireTotp      *bool
+	EnableRememberMe *bool
 }
 
 type RealmRepository interface {
@@ -75,7 +85,7 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
-		"id", "name", "display_name", "encrypted_private_key").
+		"id", "name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_totp", "enable_remember_me").
 		From("realms")
 
 	if filter.Name != nil {
@@ -103,7 +113,11 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 			&row.Id,
 			&row.Name,
 			&row.DisplayName,
-			&row.EncryptedPrivateKey)
+			&row.EncryptedPrivateKey,
+			&row.RequireUsername,
+			&row.RequireEmail,
+			&row.RequireTotp,
+			&row.EnableRememberMe)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -125,13 +139,16 @@ func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm *Realm) (uu
 	}
 
 	err = tx.QueryRow(`insert into "realms"
-    			("name", "display_name", "encrypted_private_key")
-    			values ($1, $2, $3)
+    			("name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_totp", "enable_remember_me")
+    			values ($1, $2, $3, $4, $5, $6, $7)
     			returning "id"`,
 		realm.Name,
 		realm.DisplayName,
-		realm.EncryptedPrivateKey).
-		Scan(&resultingId)
+		realm.EncryptedPrivateKey,
+		realm.RequireUsername,
+		realm.RequireEmail,
+		realm.RequireTotp,
+		realm.EnableRememberMe).Scan(&resultingId)
 
 	return resultingId, err
 }
@@ -153,6 +170,22 @@ func (r *RealmRepositoryImpl) UpdateRealm(ctx context.Context, id uuid.UUID, upd
 
 	if upd.DisplayName != nil {
 		sb.Set(sb.Assign("display_name", *upd.DisplayName))
+	}
+
+	if upd.RequireUsername != nil {
+		sb.Set(sb.Assign("require_username", *upd.RequireUsername))
+	}
+
+	if upd.RequireEmail != nil {
+		sb.Set(sb.Assign("require_email", *upd.RequireEmail))
+	}
+
+	if upd.RequireTotp != nil {
+		sb.Set(sb.Assign("require_totp", *upd.RequireTotp))
+	}
+
+	if upd.EnableRememberMe != nil {
+		sb.Set(sb.Assign("enable_remember_me", *upd.EnableRememberMe))
 	}
 
 	sb.Where(sb.Equal("id", id))

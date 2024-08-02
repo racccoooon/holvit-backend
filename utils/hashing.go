@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"github.com/go-crypt/crypt"
 	"golang.org/x/crypto/bcrypt"
@@ -40,4 +41,18 @@ func (b *BCryptHashAlgorithm) Hash(plain string) (string, error) {
 		return "", err
 	}
 	return string(hashBytes), nil
+}
+
+func CheapHash(input string) string {
+	// Create a new SHA-256 hash
+	hash := sha256.New()
+
+	// Write the input data to the hash
+	hash.Write([]byte(input))
+
+	// Calculate the SHA-256 hash and get the result as a byte slice
+	hashedData := hash.Sum(nil)
+
+	// Convert the byte slice to a hexadecimal string
+	return fmt.Sprintf("%x", hashedData)
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"holvit/config"
 	"holvit/constants"
+	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
 	"holvit/repositories"
@@ -29,9 +30,20 @@ type SetPasswordRequest struct {
 	Temporary   bool
 }
 
+type LoginRequest struct {
+	UsernameOrEmail string
+	Password        string
+	RealmId         uuid.UUID
+}
+
+type LoginResponse struct {
+	RequireTotp bool
+}
+
 type UserService interface {
 	CreateUser(ctx context.Context, request CreateUserRequest) (*CreateUserResponse, error)
 	SetPassword(ctx context.Context, request SetPasswordRequest) error
+	Login(ctx context.Context, request LoginRequest) (*LoginResponse, error)
 }
 
 type UserServiceImpl struct {
@@ -67,7 +79,7 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 
 	credentials, _, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
 		BaseFilter: repositories.BaseFilter{},
-		UserId:     utils.Ptr(request.UserId),
+		UserId:     &request.UserId,
 		Type:       utils.Ptr(constants.CredentialTypePassword),
 	})
 	if err != nil {
@@ -114,8 +126,63 @@ func verifyPassword(credential *repositories.Credential, password string) error 
 
 	err := utils.CompareHash(password, details.HashedPassword)
 	if err != nil {
-		return err
+		return httpErrors.Unauthorized()
 	}
 
 	return nil
+}
+
+func (u *UserServiceImpl) Login(ctx context.Context, request LoginRequest) (*LoginResponse, error) {
+	scope := middlewares.GetScope(ctx)
+
+	userRepository := ioc.Get[repositories.UserRepository](scope)
+	users, count, err := userRepository.FindUsers(ctx, repositories.UserFilter{
+		RealmId:            request.RealmId,
+		UsernameOrPassword: &request.UsernameOrEmail,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return nil, httpErrors.Unauthorized()
+	}
+	user := users[0]
+
+	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+
+	credentials, count, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
+		BaseFilter: repositories.BaseFilter{},
+		UserId:     &user.Id,
+		Type:       utils.Ptr(constants.CredentialTypePassword),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return nil, httpErrors.Unauthorized()
+	}
+	credential := credentials[0]
+
+	err = verifyPassword(credential, request.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	_, totpCount, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
+		BaseFilter: repositories.BaseFilter{
+			PagingInfo: repositories.PagingInfo{
+				PageSize:   1,
+				PageNumber: 0,
+			},
+		},
+		UserId: &user.Id,
+		Type:   utils.Ptr(constants.CredentialTypeTotp),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &LoginResponse{
+		RequireTotp: totpCount > 0,
+	}, nil
 }

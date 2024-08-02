@@ -5,6 +5,12 @@ create table "realms"
     "name"                  text  not null,
     "display_name"          text  not null,
     "encrypted_private_key" bytea not null,
+    
+    "require_username" bool not null,
+    "require_email" bool not null,
+    "require_totp" bool not null,
+    "enable_remember_me" bool not null,
+    
     primary key ("id")
 );
 

@@ -8,6 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"holvit/config"
 	"holvit/ioc"
+	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/utils"
 	"time"
@@ -29,6 +30,8 @@ type CodeInfo struct {
 }
 
 type LoginInfo struct {
+	RealmId uuid.UUID            `json:"realm_id"`
+	Request AuthorizationRequest `json:"request"`
 }
 
 type TokenService interface {
@@ -37,6 +40,7 @@ type TokenService interface {
 	StoreOidcCode(ctx context.Context, info CodeInfo) (string, error)
 	RetrieveOidcCode(ctx context.Context, token string) (*CodeInfo, error)
 	StoreLoginCode(ctx context.Context, info LoginInfo) (string, error)
+	PeekLoginCode(ctx context.Context, token string) (*LoginInfo, error)
 	RetrieveLoginCode(ctx context.Context, token string) (*LoginInfo, error)
 }
 
@@ -50,9 +54,18 @@ func (s *TokenServiceImpl) StoreLoginCode(ctx context.Context, info LoginInfo) (
 	return token, nil
 }
 
+func (s *TokenServiceImpl) PeekLoginCode(ctx context.Context, token string) (*LoginInfo, error) {
+	var result LoginInfo
+	err := s.peekInfo(ctx, "loginCode", token, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 func (s *TokenServiceImpl) RetrieveLoginCode(ctx context.Context, token string) (*LoginInfo, error) {
 	var result LoginInfo
-	err := s.retrieveInfo(ctx, token, "loginCode", &result)
+	err := s.retrieveInfo(ctx, "loginCode", token, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +115,7 @@ func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name
 	}
 
 	token := base64.StdEncoding.EncodeToString(tokenBytes)
+	logging.Logger.Infof("storing redis: %s:%s", name, token)
 
 	dataBytes, err := json.Marshal(info)
 	if err != nil {
@@ -121,9 +135,26 @@ func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name
 }
 
 func (s *TokenServiceImpl) retrieveInfo(ctx context.Context, name string, token string, info interface{}) error {
+	logging.Logger.Infof("retrieving redis: %s:%s", name, token)
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)
 	val, err := redisClient.GetDel(ctx, name+":"+token).Result()
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal([]byte(val), info)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *TokenServiceImpl) peekInfo(ctx context.Context, name string, token string, info interface{}) error {
+	logging.Logger.Infof("peeking redis: %s:%s", name, token)
+	scope := middlewares.GetScope(ctx)
+	redisClient := ioc.Get[*redis.Client](scope)
+	val, err := redisClient.Get(ctx, name+":"+token).Result()
 	if err != nil {
 		return err
 	}

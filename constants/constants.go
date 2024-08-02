@@ -1,6 +1,7 @@
 package constants
 
 const CredentialTypePassword = "password"
+const CredentialTypeTotp = "totp"
 
 const ClaimMapperUserInfo = "user_info"
 
@@ -17,3 +18,6 @@ const AuthorizationResponseTypeCode = "code"
 
 const TokenGrantTypeAuthorizationCode = "authorization_code"
 const TokenGrantTypeRefreshToken = "refresh_token"
+
+const FrontendModeAuthenticate = "authenticate"
+const FrontendModeAuthorize = "authorize"

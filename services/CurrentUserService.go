@@ -1,11 +1,13 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"holvit/ioc"
 	"holvit/middlewares"
+	"holvit/repositories"
 	"net/http"
 )
 
@@ -18,8 +20,37 @@ func NewCurrentUserService() CurrentUserService {
 }
 
 type CurrentUser struct {
-	UserId  uuid.UUID
+	UserId uuid.UUID
+	user   *repositories.User
+
 	RealmId uuid.UUID
+	realm   *repositories.Realm
+}
+
+func (s *CurrentUser) GetUser(ctx context.Context) (*repositories.User, error) {
+	if s.user == nil {
+		scope := middlewares.GetScope(ctx)
+		userRepository := ioc.Get[repositories.UserRepository](scope)
+		user, err := userRepository.FindUserById(ctx, s.UserId)
+		if err != nil {
+			return nil, err
+		}
+		s.user = user
+	}
+	return s.user, nil
+}
+
+func (s *CurrentUser) GetRealm(ctx context.Context) (*repositories.Realm, error) {
+	if s.realm == nil {
+		scope := middlewares.GetScope(ctx)
+		realmRepository := ioc.Get[repositories.RealmRepository](scope)
+		realm, err := realmRepository.FindRealmById(ctx, s.RealmId)
+		if err != nil {
+			return nil, err
+		}
+		s.realm = realm
+	}
+	return s.realm, nil
 }
 
 type CurrentUserServiceImpl struct {

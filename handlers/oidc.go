@@ -8,11 +8,55 @@ import (
 	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
+	"holvit/repositories"
 	"holvit/requestContext"
 	"holvit/services"
+	"holvit/utils"
 	"net/http"
 	"strings"
 )
+
+func login(w http.ResponseWriter, r *http.Request, realmName string, request services.AuthorizationRequest) error {
+	ctx := r.Context()
+	scope := middlewares.GetScope(ctx)
+
+	if err := r.ParseForm(); err != nil {
+		return err
+	}
+
+	realmRepository := ioc.Get[repositories.RealmRepository](scope)
+	realms, _, err := realmRepository.FindRealms(ctx, repositories.RealmFilter{
+		Name: &realmName,
+	})
+	if err != nil {
+		return err
+	}
+	realm := realms[0]
+
+	tokenService := ioc.Get[services.TokenService](scope)
+	loginToken, err := tokenService.StoreLoginCode(ctx, services.LoginInfo{
+		RealmId: realm.Id,
+		Request: request,
+	})
+	if err != nil {
+		return err
+	}
+
+	frontendData := utils.AuthFrontendData{
+		Mode: constants.FrontendModeAuthenticate,
+		Authenticate: &utils.AuthFrontendDataAuthenticate{
+			Token:         loginToken,
+			UseRememberMe: realm.EnableRememberMe,
+		},
+	}
+
+	err = utils.ServeAuthFrontend(w, frontendData)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func Authorize(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -22,27 +66,11 @@ func Authorize(w http.ResponseWriter, r *http.Request) {
 	routeParams := mux.Vars(r)
 	realmName := routeParams["realmName"]
 
-	currentUserService := ioc.Get[services.CurrentUserService](scope)
-
-	if currentUserService.GetCurrentUser() == nil {
-		tokenService := ioc.Get[services.TokenService](scope)
-		loginToken, err := tokenService.StoreLoginCode(ctx, services.LoginInfo{
-			//TODO
-		})
-		if err != nil {
-			rcs.Error(err)
-			return
-		}
-		http.Redirect(w, r, fmt.Sprintf("/oidc/%s/login?token=%s", realmName, loginToken), http.StatusFound)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		rcs.Error(err)
 		return
 	}
 	request := services.AuthorizationRequest{
-		//TODO: sessionToken
 		ResponseTypes: strings.Split(r.Form.Get("response_type"), " "),
 		RealmName:     realmName,
 		ClientId:      r.Form.Get("client_id"),
@@ -50,6 +78,17 @@ func Authorize(w http.ResponseWriter, r *http.Request) {
 		Scopes:        strings.Split(r.Form.Get("scope"), " "),
 		State:         r.Form.Get("state"),
 		ResponseMode:  r.Form.Get("response_mode"),
+	}
+
+	currentUserService := ioc.Get[services.CurrentUserService](scope)
+
+	if currentUserService.GetCurrentUser() == nil {
+		err := login(w, r, realmName, request)
+		if err != nil {
+			rcs.Error(err)
+			return
+		}
+		return
 	}
 
 	oidcService := ioc.Get[services.OidcService](scope)
@@ -180,12 +219,67 @@ func UserInfo(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	bytes, err := json.Marshal(response)
+	encoder := json.NewEncoder(w)
+	err := encoder.Encode(response)
 	if err != nil {
 		return
 	}
+}
 
-	w.Write(bytes)
+type VerifyPasswordRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Token    string `json:"token"`
+}
+
+type VerifyPasswordResponse struct {
+	Success     bool `json:"success"`
+	RequireTotp bool `json:"require_totp"`
+	NewDevice   bool `json:"new_device"`
+}
+
+func VerifyPassword(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	scope := middlewares.GetScope(ctx)
+	rcs := ioc.Get[requestContext.RequestContextService](scope)
+
+	var request VerifyPasswordRequest
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	tokenService := ioc.Get[services.TokenService](scope)
+	loginInfo, err := tokenService.PeekLoginCode(ctx, request.Token)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	userService := ioc.Get[services.UserService](scope)
+	loginResponse, err := userService.Login(ctx, services.LoginRequest{
+		UsernameOrEmail: request.Username,
+		Password:        request.Password,
+		RealmId:         loginInfo.RealmId,
+	})
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	encoder := json.NewEncoder(w)
+	err = encoder.Encode(VerifyPasswordResponse{
+		Success:     true,
+		RequireTotp: loginResponse.RequireTotp,
+		NewDevice:   false, //TODO: implement devices
+	})
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
 }
 
 func Jwks(w http.ResponseWriter, r *http.Request) {

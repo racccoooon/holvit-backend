@@ -23,6 +23,9 @@ type User struct {
 
 type UserFilter struct {
 	BaseFilter
+
+	RealmId            uuid.UUID
+	UsernameOrPassword *string
 }
 
 type UserRepository interface {
@@ -66,8 +69,18 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) (
 		return nil, 0, err
 	}
 
-	sb := sqlbuilder.Select("count(*) over()", "id", "username", "email", "email_verified").
+	sb := sqlbuilder.Select("count(*) over()", "id", "realm_id", "username", "email", "email_verified").
 		From("users")
+
+	sb.Where(sb.Equal("realm_id", filter.RealmId))
+
+	if filter.UsernameOrPassword != nil {
+		sb.Where(
+			sb.Or(
+				sb.Equal("username", *filter.UsernameOrPassword),
+				sb.Equal("email", *filter.UsernameOrPassword),
+			))
+	}
 
 	if filter.PagingInfo.PageSize > 0 {
 		sb.Limit(filter.PagingInfo.PageSize).
@@ -88,6 +101,7 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) (
 		var row User
 		err := rows.Scan(&totalCount,
 			&row.Id,
+			&row.RealmId,
 			&row.Username,
 			&row.Email,
 			&row.EmailVerified)

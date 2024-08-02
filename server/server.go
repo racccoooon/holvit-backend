@@ -9,6 +9,7 @@ import (
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
+	"holvit/services"
 	"net/http"
 	"os"
 	"os/signal"
@@ -25,9 +26,9 @@ func ServeApi(dp *ioc.DependencyProvider) {
 	r.Use(middlewares.ErrorHandlingMiddleware)
 
 	r.Use(middlewares.AccessLogMiddleware)
-
 	r.Use(middlewares.MaxReadBytesMiddleware)
-	// r.Use(middlewares.EnforceJsonMiddleware)
+
+	r.Use(services.CurrentUserMiddleware)
 
 	r.HandleFunc("/api/health", handlers.Health).Methods("GET")
 
@@ -35,7 +36,7 @@ func ServeApi(dp *ioc.DependencyProvider) {
 	r.HandleFunc("/oidc/{realmName}/authorize-grant", handlers.AuthorizeGrant).Methods("POST")
 
 	r.HandleFunc("/oidc/{realmName}/token", handlers.Token)
-	r.HandleFunc("/oidc/{realmName}/userinfo", handlers.Token)
+	r.HandleFunc("/oidc/{realmName}/userinfo", handlers.Token).Methods("GET", "POST")
 	r.HandleFunc("/oidc/{realmName}/jwks", handlers.Token)
 	r.HandleFunc("/oidc/{realmName}/logout", handlers.Token)
 

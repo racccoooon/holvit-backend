@@ -21,6 +21,8 @@ type Scope struct {
 	DisplayName string
 	Description string
 
+	SortIndex int
+
 	Grant *Grant
 }
 
@@ -125,6 +127,8 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 		sql += fmt.Sprintf(" and (g.client_id = $%d or g.client_id is null)", len(parameters))
 	}
 
+	sql += ` order by "sort_index" asc`
+
 	logging.Logger.Debugf("executing sql: %s", sql)
 	rows, err := tx.Query(sql, parameters...)
 	if err != nil {
@@ -175,13 +179,14 @@ func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope *Scope) (uu
 	}
 
 	err = tx.QueryRow(`insert into "scopes"
-    			("realm_id", "name", "display_name", "description")
-    			values ($1, $2, $3, $4)
+    			("realm_id", "name", "display_name", "description", "sort_index")
+    			values ($1, $2, $3, $4, $5)
     			returning "id"`,
 		scope.RealmId,
 		scope.Name,
 		scope.DisplayName,
-		scope.Description).
+		scope.Description,
+		scope.SortIndex).
 		Scan(&resultingId)
 
 	return resultingId, err

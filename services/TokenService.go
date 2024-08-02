@@ -28,14 +28,36 @@ type CodeInfo struct {
 	GrantedScopeIds []uuid.UUID `json:"granted_scope_ids"`
 }
 
+type LoginInfo struct {
+}
+
 type TokenService interface {
 	StoreGrantInfo(ctx context.Context, info GrantInfo) (string, error)
 	RetrieveGrantInfo(ctx context.Context, token string) (*GrantInfo, error)
 	StoreOidcCode(ctx context.Context, info CodeInfo) (string, error)
 	RetrieveOidcCode(ctx context.Context, token string) (*CodeInfo, error)
+	StoreLoginCode(ctx context.Context, info LoginInfo) (string, error)
+	RetrieveLoginCode(ctx context.Context, token string) (*LoginInfo, error)
 }
 
 type TokenServiceImpl struct{}
+
+func (s *TokenServiceImpl) StoreLoginCode(ctx context.Context, info LoginInfo) (string, error) {
+	token, err := s.storeInfo(ctx, info, "loginCode", time.Minute*30) // TODO config
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func (s *TokenServiceImpl) RetrieveLoginCode(ctx context.Context, token string) (*LoginInfo, error) {
+	var result LoginInfo
+	err := s.retrieveInfo(ctx, token, "loginCode", &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
 
 func (s *TokenServiceImpl) StoreOidcCode(ctx context.Context, info CodeInfo) (string, error) {
 	token, err := s.storeInfo(ctx, info, "oidcCode", time.Second*30)

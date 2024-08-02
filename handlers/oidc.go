@@ -19,16 +19,32 @@ func Authorize(w http.ResponseWriter, r *http.Request) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
+	routeParams := mux.Vars(r)
+	realmName := routeParams["realmName"]
+
+	currentUserService := ioc.Get[services.CurrentUserService](scope)
+
+	if currentUserService.GetCurrentUser() == nil {
+		tokenService := ioc.Get[services.TokenService](scope)
+		loginToken, err := tokenService.StoreLoginCode(ctx, services.LoginInfo{
+			//TODO
+		})
+		if err != nil {
+			rcs.Error(err)
+			return
+		}
+		http.Redirect(w, r, fmt.Sprintf("/oidc/%s/login?token=%s", realmName, loginToken), http.StatusFound)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		rcs.Error(err)
 		return
 	}
-
-	routeParams := mux.Vars(r)
-
 	request := services.AuthorizationRequest{
+		//TODO: sessionToken
 		ResponseTypes: strings.Split(r.Form.Get("response_type"), " "),
-		RealmName:     routeParams["realmName"],
+		RealmName:     realmName,
 		ClientId:      r.Form.Get("client_id"),
 		RedirectUri:   r.Form.Get("redirect_uri"),
 		Scopes:        strings.Split(r.Form.Get("scope"), " "),
@@ -148,6 +164,28 @@ func Token(w http.ResponseWriter, r *http.Request) {
 }
 
 func UserInfo(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	scope := middlewares.GetScope(ctx)
+	rcs := ioc.Get[requestContext.RequestContextService](scope)
+
+	if err := r.ParseForm(); err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	bearer := r.Header.Get("Authorization")
+
+	oidcService := ioc.Get[services.OidcService](scope)
+	response := oidcService.UserInfo(bearer)
+
+	w.Header().Set("Content-Type", "application/json")
+
+	bytes, err := json.Marshal(response)
+	if err != nil {
+		return
+	}
+
+	w.Write(bytes)
 }
 
 func Jwks(w http.ResponseWriter, r *http.Request) {

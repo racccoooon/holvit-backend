@@ -151,12 +151,18 @@ func configureServices() *ioc.DependencyProvider {
 	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) *sql.DB {
 		return db
 	})
+	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) services.ClockService {
+		return services.NewClockService()
+	})
 
 	ioc.AddScoped(builder, func(dp *ioc.DependencyProvider) requestContext.RequestContextService {
 		return requestContext.NewRequestContextService(dp)
 	})
 	ioc.AddCloseHandler[requestContext.RequestContextService](builder, func(rcs requestContext.RequestContextService) error {
 		return rcs.Close()
+	})
+	ioc.AddScoped(builder, func(dp *ioc.DependencyProvider) services.CurrentUserService {
+		return services.NewCurrentUserService()
 	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.RealmRepository {
@@ -195,6 +201,9 @@ func configureServices() *ioc.DependencyProvider {
 	})
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.ClaimsService {
 		return services.NewClaimsService()
+	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.SessionService {
+		return services.NewSessionService()
 	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.OidcService {

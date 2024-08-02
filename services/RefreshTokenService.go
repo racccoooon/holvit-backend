@@ -38,6 +38,9 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 
 	hashedToken := utils.CheapHash(token)
 
+	clockService := ioc.Get[ClockService](scope)
+	now := clockService.Now()
+
 	refreshTokenRepository := ioc.Get[repositories.RefreshTokenRepository](scope)
 	tokens, count, err := refreshTokenRepository.FindRefreshTokens(ctx, repositories.RefreshTokenFilter{
 		HashedToken: &hashedToken,
@@ -50,7 +53,7 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 	}
 
 	refreshToken := tokens[0]
-	if refreshToken.ValidUntil.Compare(time.Now()) < 0 {
+	if refreshToken.ValidUntil.Compare(now) < 0 {
 		return "", nil, httpErrors.Unauthorized()
 	}
 
@@ -73,6 +76,9 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (string, *repositories.RefreshToken, error) {
 	scope := middlewares.GetScope(ctx)
 
+	clockService := ioc.Get[ClockService](scope)
+	now := clockService.Now()
+
 	token, err := utils.GenerateRandomString(32)
 	if err != nil {
 		return "", nil, err
@@ -86,7 +92,7 @@ func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, reques
 		ClientId:    request.ClientId,
 		RealmId:     request.RealmId,
 		HashedToken: hashedToken,
-		ValidUntil:  time.Now().Add(time.Hour), //TODO: make configurable
+		ValidUntil:  now.Add(time.Hour), //TODO: make configurable
 		Issuer:      request.Issuer,
 		Subject:     request.Subject,
 		Audience:    request.Audience,

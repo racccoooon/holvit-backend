@@ -203,6 +203,7 @@ type OidcService interface {
 	Grant(ctx context.Context, grantRequest GrantRequest) (AuthorizationResponse, error)
 	HandleAuthorizationCode(ctx context.Context, request AuthorizationCodeTokenRequest) (*TokenResponse, error)
 	HandleRefreshToken(ctx context.Context, request RefreshTokenRequest) (*TokenResponse, error)
+	UserInfo(bearer string) map[string]interface{}
 }
 
 type OidcServiceImpl struct{}
@@ -213,6 +214,9 @@ func NewOidcService() OidcService {
 
 func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request AuthorizationCodeTokenRequest) (*TokenResponse, error) {
 	scope := middlewares.GetScope(ctx)
+
+	clockService := ioc.Get[ClockService](scope)
+	now := clockService.Now()
 
 	tokenService := ioc.Get[TokenService](scope)
 	codeInfo, err := tokenService.RetrieveOidcCode(ctx, request.Code)
@@ -256,8 +260,8 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 		"sub": codeInfo.UserId.String(),
 		"iss": issuer,
 		"aud": audience,
-		"iat": time.Now().Unix(),
-		"exp": time.Now().Add(idTokenValidTime).Unix(),
+		"iat": now.Unix(),
+		"exp": now.Add(idTokenValidTime).Unix(),
 	}
 
 	for _, claim := range claims {
@@ -271,8 +275,8 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.MapClaims{
 		"sub":    codeInfo.UserId,
 		"scopes": codeInfo.GrantedScopes,
-		"iat":    time.Now().Unix(),
-		"exp":    time.Now().Add(accessTokenValidTime).Unix(),
+		"iat":    now.Unix(),
+		"exp":    now.Add(accessTokenValidTime).Unix(),
 	})
 
 	keyCache := ioc.Get[cache.KeyCache](scope)
@@ -318,6 +322,9 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 
 func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request RefreshTokenRequest) (*TokenResponse, error) {
 	scope := middlewares.GetScope(ctx)
+
+	clockService := ioc.Get[ClockService](scope)
+	now := clockService.Now()
 
 	clientService := ioc.Get[ClientService](scope)
 	client, err := clientService.Authenticate(ctx, AuthenticateClientRequest{
@@ -368,8 +375,8 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 		"sub": refreshToken.Subject,
 		"iss": refreshToken.Issuer,
 		"aud": refreshToken.Audience,
-		"iat": time.Now().Unix(),
-		"exp": time.Now().Add(idTokenValidTime).Unix(),
+		"iat": now.Unix(),
+		"exp": now.Add(idTokenValidTime).Unix(),
 	}
 
 	for _, claim := range claims {
@@ -381,8 +388,8 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.MapClaims{
 		"sub":    refreshToken.UserId,
 		"scopes": request.ScopeNames,
-		"iat":    time.Now().Unix(),
-		"exp":    time.Now().Add(accessTokenValidTime).Unix(),
+		"iat":    now.Unix(),
+		"exp":    now.Add(accessTokenValidTime).Unix(),
 	})
 
 	keyCache := ioc.Get[cache.KeyCache](scope)
@@ -573,4 +580,9 @@ func validateResponseMode(responseMode string) error {
 		return nil
 	}
 	return httpErrors.BadRequest().WithMessage(fmt.Sprintf("Unsupported response mode %v", responseMode))
+}
+
+func (o *OidcServiceImpl) UserInfo(bearer string) map[string]interface{} {
+
+	return nil
 }

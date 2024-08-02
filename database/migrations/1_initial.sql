@@ -56,6 +56,7 @@ create table "scopes"
     "name"         text not null,
     "display_name" text not null,
     "description"  text not null,
+    "sort_index"   int  not null,
     primary key ("id")
 );
 
@@ -84,10 +85,11 @@ create unique index "idx_unique_grants" on "grants" ("scope_id", "user_id", "cli
 
 create table "sessions"
 (
-    "id"           uuid not null,
-    "user_id"      uuid not null,
-    "realm_id"     uuid not null,
-    "hashed_token" text not null,
+    "id"           uuid      not null,
+    "user_id"      uuid      not null,
+    "realm_id"     uuid      not null,
+    "hashed_token" text      not null,
+    "valid_until"  timestamp not null,
     primary key ("id")
 );
 

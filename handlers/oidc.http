@@ -20,7 +20,11 @@ code = {{code}}
 
 > {%
     const refreshToken = response.body.refresh_token;
+    const accessToken = response.body.access_token;
+    const idToken = response.body.id_token;
     client.global.set('refreshToken', refreshToken)
+    client.global.set('access_token', accessToken)
+    client.global.set('id_token', idToken)
 %}
 
 
@@ -40,4 +44,9 @@ refresh_token = {{refreshToken}}
         client.global.set('refreshToken', refreshToken)
     }
 %}
+
+
+### get userinfo
+GET localhost:8080/oidc/admin/userinfo
+Authorization: Bearer {{accessToken}}
 

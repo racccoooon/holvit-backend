@@ -96,6 +96,7 @@ func (s *RealmServiceImpl) createProfileScope(ctx context.Context, realmId uuid.
 		Name:        "profile",
 		DisplayName: "Profile",
 		Description: "Access your name",
+		SortIndex:   3,
 	})
 	if err != nil {
 		return err
@@ -139,6 +140,7 @@ func (s *RealmServiceImpl) createEmailScope(ctx context.Context, realmId uuid.UU
 		Name:        "email",
 		DisplayName: "Email",
 		Description: "Access your email address",
+		SortIndex:   2,
 	})
 	if err != nil {
 		return err
@@ -205,6 +207,7 @@ func (s *RealmServiceImpl) createOpenIdScope(ctx context.Context, realmId uuid.U
 		Name:        "openid",
 		DisplayName: "OpenId Connect",
 		Description: "Sign you in",
+		SortIndex:   1,
 	})
 	if err != nil {
 		return err

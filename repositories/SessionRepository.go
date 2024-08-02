@@ -9,6 +9,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"time"
 )
 
 type Session struct {
@@ -17,6 +18,7 @@ type Session struct {
 	UserId  uuid.UUID
 	RealmId uuid.UUID
 
+	ValidUntil  time.Time
 	HashedToken string
 }
 
@@ -71,7 +73,7 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
-		"id", "user_id", "realm_id", "hashed_token").
+		"id", "user_id", "realm_id", "hashed_token", "valid_until").
 		From("sessions")
 
 	if filter.RealmId != nil {
@@ -102,7 +104,8 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 			&row.Id,
 			&row.UserId,
 			&row.RealmId,
-			&row.HashedToken)
+			&row.HashedToken,
+			&row.ValidUntil)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -124,12 +127,13 @@ func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Sess
 	}
 
 	err = tx.QueryRow(`insert into "sessions"
-    			("user_id", "realm_id", "hashed_token")
-    			values ($1, $2, $3, $4)
+    			("user_id", "realm_id", "hashed_token", "valid_until")
+    			values ($1, $2, $3, $4, $5)
     			returning "id"`,
 		session.UserId,
 		session.RealmId,
-		session.HashedToken).
+		session.HashedToken,
+		session.ValidUntil).
 		Scan(&resultingId)
 
 	return resultingId, err

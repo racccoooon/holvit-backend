@@ -1,6 +1,4 @@
 -- +migrate Up
-create extension "citext";
-
 create table "realms"
 (
     "id"                          uuid  not null default gen_random_uuid(),
@@ -174,7 +172,22 @@ create table "scope_claims"
 alter table "scope_claims"
     add constraint "fk_scope_claims_scopes" foreign key ("scope_id") references "scopes";
 
+CREATE TYPE job_status AS ENUM ('pending', 'completed', 'failed');
+
+create table "queued_jobs"
+(
+    "id" uuid not null default gen_random_uuid(),
+    "status" job_status default 'pending',
+    "type" text not null,
+    "details" jsonb not null,
+    "failure_count" int not null,
+    "error" text,
+    primary key ("id")
+);
+
 -- +migrate Down
+drop table "queued_jobs" cascade;
+drop table "user_devices" cascade;
 drop table "sessions" cascade;
 drop table "grants" cascade;
 drop table "scopes" cascade;

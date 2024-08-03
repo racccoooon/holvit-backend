@@ -34,6 +34,11 @@ type LoginInfo struct {
 	Request AuthorizationRequest `json:"request"`
 }
 
+type AdditionalLoginInfo struct {
+	OriginalToken string `json:"original_token"`
+	NewDevice     bool   `json:"new_device"`
+}
+
 type TokenService interface {
 	StoreGrantInfo(ctx context.Context, info GrantInfo) (string, error)
 	RetrieveGrantInfo(ctx context.Context, token string) (*GrantInfo, error)

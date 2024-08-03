@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/redis/go-redis/v9"
+	"github.com/robfig/cron/v3"
 	"holvit/cache"
 	"holvit/config"
 	"holvit/database"
@@ -16,7 +17,6 @@ import (
 	"holvit/requestContext"
 	"holvit/server"
 	"holvit/services"
-	"holvit/utils"
 	"os"
 )
 
@@ -31,39 +31,13 @@ func main() {
 
 	database.Migrate()
 
-	dependencyProvider := configureServices()
-	initialize(dependencyProvider)
-	server.ServeApi(dependencyProvider)
+	ioc.RootScope = configureServices()
+
+	initialize(ioc.RootScope)
+	server.ServeApi(ioc.RootScope)
 
 	logging.Logger.Info("Application shutting down...")
 	os.Exit(0)
-}
-
-func demo() {
-	keyStr := "thisis32bitlongpassphraseimusing!"
-	key, err := utils.GenerateSymmetricKeyFromText(keyStr)
-	if err != nil {
-		fmt.Printf("Error generating key: %v\n", err)
-		return
-	}
-
-	plainText := []byte("Hello, world!")
-
-	// Encrypt the plaintext
-	cipherText, err := utils.EncryptSymmetric(plainText, key)
-	if err != nil {
-		fmt.Printf("Error encrypting plaintext: %v\n", err)
-		return
-	}
-	fmt.Printf("Ciphertext: %x\n", cipherText)
-
-	// Decrypt the ciphertext
-	decryptedText, err := utils.DecryptSymmetric(cipherText, key)
-	if err != nil {
-		fmt.Printf("Error decrypting ciphertext: %v\n", err)
-		return
-	}
-	fmt.Printf("Decrypted text: %s\n", decryptedText)
 }
 
 func initialize(dp *ioc.DependencyProvider) {
@@ -147,12 +121,16 @@ func seedData(ctx context.Context) {
 func configureServices() *ioc.DependencyProvider {
 	builder := ioc.NewDependencyProviderBuilder()
 	db := database.ConnectToDatabase()
+	c := cron.New()
 
 	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) *sql.DB {
 		return db
 	})
 	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) services.ClockService {
 		return services.NewClockService()
+	})
+	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) *cron.Cron {
+		return c
 	})
 
 	ioc.AddScoped(builder, func(dp *ioc.DependencyProvider) requestContext.RequestContextService {
@@ -189,6 +167,9 @@ func configureServices() *ioc.DependencyProvider {
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.UserDeviceRepository {
 		return repositories.NewUserDeviceRepository()
 	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.QueuedJobRepository {
+		return repositories.NewQueuedJobRepository()
+	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.UserService {
 		return services.NewUserService()
@@ -213,6 +194,10 @@ func configureServices() *ioc.DependencyProvider {
 		return services.NewOidcService()
 	})
 
+	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) services.JobService {
+		return services.NewJobService(c)
+	})
+
 	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) cache.KeyCache {
 		return cache.NewInMemoryKeyCache()
 	})
@@ -229,6 +214,8 @@ func configureServices() *ioc.DependencyProvider {
 			Protocol: config.C.Redis.Protocol,
 		})
 	})
+
+	c.Start()
 
 	return builder.Build()
 }

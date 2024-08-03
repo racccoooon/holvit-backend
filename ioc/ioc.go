@@ -7,6 +7,8 @@ import (
 	"reflect"
 )
 
+var RootScope *DependencyProvider
+
 type ProviderFunc[T any] func(dc *DependencyProvider) T
 
 func (pf ProviderFunc[T]) untyped() ProviderFunc[any] {
@@ -65,12 +67,19 @@ func (dp *DependencyProvider) Close() []error {
 }
 
 func newDependencyProvider(dependencies *dependencyCollection, closeHandlers map[reflect.Type]CloseHandler[any]) *DependencyProvider {
+
+	singletonInstances := map[reflect.Type]any{}
+
+	for t, p := range dependencies.singletonProviders {
+		singletonInstances[t] = p(nil)
+	}
+
 	return &DependencyProvider{
 		id:                   uuid.New().String(),
 		parentScope:          nil,
 		rootScope:            nil,
 		dependencyCollection: dependencies,
-		singletonInstances:   map[reflect.Type]any{},
+		singletonInstances:   singletonInstances,
 		scopedInstances:      map[reflect.Type]any{},
 		closeHandlers:        closeHandlers,
 	}

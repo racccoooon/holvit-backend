@@ -1,7 +1,17 @@
 ---
 Environment: Development
+
 Secret: test
 InitialAdminPassword: password
+
+UseMailServer: true
+MailServer:
+  From: Holvit Develop <no-reply@holvit.develop>
+  Host: localhost
+  Port: 1025
+  StartTls:      false
+  AllowInsecure: true
+
 Database:
 #  Database: holvit
   Username: user

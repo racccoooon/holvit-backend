@@ -3,30 +3,47 @@ package requestContext
 import (
 	"database/sql"
 	"github.com/google/uuid"
+	"holvit/events"
 	"holvit/ioc"
 )
+
+type AfterTxEventArgs struct {
+	Commit   bool
+	Rollback bool
+}
 
 type RequestContextService interface {
 	Errors() []error
 	Error(err error)
 	GetTx() (*sql.Tx, error)
 	Close() error
+	OnAfterTx(handler events.EventHandler[AfterTxEventArgs])
 }
+
 type RequestContextServiceImpl struct {
 	id string
 
 	scope  *ioc.DependencyProvider
 	errors []error
 
+	afterTxEvent *events.Event[AfterTxEventArgs]
+
 	tx *sql.Tx
 }
 
 func NewRequestContextService(scope *ioc.DependencyProvider) RequestContextService {
-	return &RequestContextServiceImpl{
-		id:     uuid.New().String(),
-		scope:  scope,
-		errors: []error{},
+	service := RequestContextServiceImpl{
+		id:           uuid.New().String(),
+		scope:        scope,
+		errors:       []error{},
+		afterTxEvent: events.NewEvent[AfterTxEventArgs](),
 	}
+
+	return &service
+}
+
+func (rcs *RequestContextServiceImpl) OnAfterTx(handler events.EventHandler[AfterTxEventArgs]) {
+	events.Subscribe(rcs.afterTxEvent, handler)
 }
 
 func (rcs *RequestContextServiceImpl) Errors() []error {
@@ -51,15 +68,19 @@ func (rcs *RequestContextServiceImpl) GetTx() (*sql.Tx, error) {
 }
 
 func (rcs *RequestContextServiceImpl) Close() error {
-	if len(rcs.errors) == 0 {
-		if rcs.tx != nil {
-			return rcs.tx.Commit()
-		}
-	} else {
-		if rcs.tx != nil {
-			return rcs.tx.Rollback()
+	var err error = nil
+	args := AfterTxEventArgs{}
+
+	if rcs.tx != nil {
+		if len(rcs.errors) == 0 {
+			err = rcs.tx.Commit()
+			args.Commit = true
+		} else {
+			err = rcs.tx.Rollback()
+			args.Rollback = true
 		}
 	}
 
-	return nil
+	events.Publish(rcs.afterTxEvent, args)
+	return err
 }

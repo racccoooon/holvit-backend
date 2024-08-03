@@ -16,10 +16,11 @@ type CreateRealmRequest struct {
 	Name        string
 	DisplayName string
 
-	RequireUsername  *bool
-	RequireEmail     *bool
-	RequireTotp      *bool
-	EnableRememberMe *bool
+	RequireUsername           *bool
+	RequireEmail              *bool
+	RequireDeviceVerification *bool
+	RequireTotp               *bool
+	EnableRememberMe          *bool
 }
 
 type CreateRealmResponse struct {
@@ -58,13 +59,14 @@ func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 
 	realmRepository := ioc.Get[repositories.RealmRepository](scope)
 	realmId, err := realmRepository.CreateRealm(ctx, &repositories.Realm{
-		Name:                request.Name,
-		DisplayName:         request.DisplayName,
-		EncryptedPrivateKey: encryptedPrivateKeyBytes,
-		RequireUsername:     utils.GetOrDefault(request.RequireUsername, true),
-		RequireEmail:        utils.GetOrDefault(request.RequireUsername, false),
-		RequireTotp:         utils.GetOrDefault(request.RequireTotp, false),
-		EnableRememberMe:    utils.GetOrDefault(request.EnableRememberMe, false),
+		Name:                      request.Name,
+		DisplayName:               request.DisplayName,
+		EncryptedPrivateKey:       encryptedPrivateKeyBytes,
+		RequireUsername:           utils.GetOrDefault(request.RequireUsername, true),
+		RequireEmail:              utils.GetOrDefault(request.RequireUsername, false),
+		RequireDeviceVerification: utils.GetOrDefault(request.RequireDeviceVerification, false),
+		RequireTotp:               utils.GetOrDefault(request.RequireTotp, false),
+		EnableRememberMe:          utils.GetOrDefault(request.EnableRememberMe, false),
 	})
 	if err != nil {
 		return nil, err

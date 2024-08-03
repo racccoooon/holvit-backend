@@ -33,6 +33,17 @@ type HolvitConfig struct {
 		MaxReadBytes    int64
 	}
 
+	UseMailServer bool
+	MailServer    struct {
+		From          string
+		Host          string
+		Port          int
+		User          string
+		Password      string
+		StartTls      bool
+		AllowInsecure bool
+	}
+
 	Database struct {
 		Host     string
 		Port     int
@@ -48,6 +59,10 @@ type HolvitConfig struct {
 		Password string
 		Db       int
 		Protocol int
+	}
+
+	Crons struct {
+		JobScheduler string
 	}
 }
 
@@ -127,6 +142,8 @@ func setDefaultConfigValues() {
 	C.Redis.Password = ""
 	C.Redis.Db = 0
 	C.Redis.Protocol = 3
+
+	C.Crons.JobScheduler = "* * * * *"
 }
 
 func readConfigValues() {

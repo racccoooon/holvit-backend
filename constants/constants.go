@@ -3,6 +3,8 @@ package constants
 const CredentialTypePassword = "password"
 const CredentialTypeTotp = "totp"
 
+const QueuedJobSendMail = "send_mail"
+
 const ClaimMapperUserInfo = "user_info"
 
 const UserInfoPropertyId = "id"

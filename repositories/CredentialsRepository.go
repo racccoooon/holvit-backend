@@ -29,17 +29,17 @@ type CredentialPasswordDetails struct {
 	Temporary      bool   `json:"temporary"`
 }
 
-func (c CredentialPasswordDetails) Value() (driver.Value, error) {
-	return json.Marshal(c)
+func (d CredentialPasswordDetails) Value() (driver.Value, error) {
+	return json.Marshal(d)
 }
 
-func (c *CredentialPasswordDetails) Scan(value interface{}) error {
+func (d *CredentialPasswordDetails) Scan(value interface{}) error {
 	b, ok := value.([]byte)
 	if !ok {
 		return errors.New("type assertion to []byte failed")
 	}
 
-	return json.Unmarshal(b, &c)
+	return json.Unmarshal(b, &d)
 }
 
 type CredentialFilter struct {
@@ -168,7 +168,7 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 			row.Details = passwordDetails
 			break
 		default:
-			logging.Logger.Fatalf("Unsupported hash algorithm %v in password credential %v", row.Type, row.Id.String())
+			logging.Logger.Fatalf("Unsupported hash algorithm '%v' in password credential '%v'", row.Type, row.Id.String())
 		}
 
 		result = append(result, &row)

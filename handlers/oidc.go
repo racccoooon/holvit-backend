@@ -293,9 +293,9 @@ func VerifyTotp(w http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(w)
 	err = encoder.Encode(VerifyLoginStepResponse{
-		Success:     true,
-		RequireTotp: false,
-		NewDevice:   false,
+		RequireTotp:   false,
+		NewDevice:     false,
+		EmailVerified: true,
 	})
 	if err != nil {
 		rcs.Error(err)
@@ -366,9 +366,9 @@ func VerifyDevice(w http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(w)
 	err = encoder.Encode(VerifyLoginStepResponse{
-		Success:     true,
-		RequireTotp: false,
-		NewDevice:   deviceVerificationRequired,
+		RequireTotp:   false,
+		NewDevice:     deviceVerificationRequired,
+		EmailVerified: true,
 	})
 	if err != nil {
 		rcs.Error(err)
@@ -384,9 +384,9 @@ type VerifyPasswordRequest struct {
 }
 
 type VerifyLoginStepResponse struct {
-	Success     bool `json:"success"`
-	RequireTotp bool `json:"require_totp"`
-	NewDevice   bool `json:"new_device"`
+	RequireTotp   bool `json:"require_totp"`
+	NewDevice     bool `json:"new_device"`
+	EmailVerified bool `json:"email_verified"`
 }
 
 func VerifyPassword(w http.ResponseWriter, r *http.Request) {
@@ -419,9 +419,11 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loginInfo.UserId = loginResponse.UserId
-	loginInfo.PasswordVerified = true
-	loginInfo.TotpVerified = !loginResponse.RequireTotp
+	if !loginResponse.RequireEmailVerification {
+		loginInfo.UserId = loginResponse.UserId
+		loginInfo.PasswordVerified = true
+		loginInfo.TotpVerified = !loginResponse.RequireTotp
+	}
 
 	deviceVerificationRequired, err := doesDeviceRequireVerification(r, loginResponse.UserId, request.DeviceId, loginInfo)
 	if err != nil {
@@ -439,9 +441,9 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(w)
 	err = encoder.Encode(VerifyLoginStepResponse{
-		Success:     true,
-		RequireTotp: loginResponse.RequireTotp,
-		NewDevice:   deviceVerificationRequired,
+		RequireTotp:   loginResponse.RequireTotp,
+		NewDevice:     deviceVerificationRequired,
+		EmailVerified: !loginResponse.RequireEmailVerification,
 	})
 	if err != nil {
 		rcs.Error(err)
@@ -481,6 +483,10 @@ func doesDeviceRequireVerification(r *http.Request, userId uuid.UUID, deviceId s
 	}
 
 	return !loginInfo.DeviceVerified, nil
+}
+
+func Login(w http.ResponseWriter, r *http.Request) {
+
 }
 
 func Jwks(w http.ResponseWriter, r *http.Request) {

@@ -40,8 +40,9 @@ type VerifyLoginRequest struct {
 }
 
 type VerifyLoginResponse struct {
-	UserId      uuid.UUID
-	RequireTotp bool
+	UserId                   uuid.UUID
+	RequireEmailVerification bool
+	RequireTotp              bool
 }
 
 type VerifyTotpRequest struct {
@@ -193,8 +194,9 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 	}
 
 	return &VerifyLoginResponse{
-		RequireTotp: totpCount > 0,
-		UserId:      user.Id,
+		RequireTotp:              totpCount > 0,
+		UserId:                   user.Id,
+		RequireEmailVerification: user.Email != nil && user.EmailVerified,
 	}, nil
 }
 

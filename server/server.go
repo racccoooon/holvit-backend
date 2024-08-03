@@ -39,6 +39,7 @@ func ServeApi(dp *ioc.DependencyProvider) {
 	r.HandleFunc("/oidc/{realmName}/logout", handlers.Token)
 
 	r.HandleFunc("/api/auth/authorize-grant", handlers.AuthorizeGrant).Methods("POST")
+	r.HandleFunc("/api/auth/login", handlers.Login).Methods("POST")
 	r.HandleFunc("/api/auth/verify-password", handlers.VerifyPassword).Methods("POST")
 	r.HandleFunc("/api/auth/verify-totp", handlers.VerifyTotp).Methods("POST")
 	r.HandleFunc("/api/auth/verify-device", handlers.VerifyDevice).Methods("POST")

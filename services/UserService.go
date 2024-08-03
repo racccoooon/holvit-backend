@@ -2,7 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"github.com/google/uuid"
+	"github.com/pquerna/otp"
+	"github.com/pquerna/otp/totp"
 	"holvit/config"
 	"holvit/constants"
 	"holvit/httpErrors"
@@ -41,10 +44,16 @@ type VerifyLoginResponse struct {
 	RequireTotp bool
 }
 
+type VerifyTotpRequest struct {
+	UserId uuid.UUID
+	Code   string
+}
+
 type UserService interface {
 	CreateUser(ctx context.Context, request CreateUserRequest) (*CreateUserResponse, error)
 	SetPassword(ctx context.Context, request SetPasswordRequest) error
 	VerifyLogin(ctx context.Context, request VerifyLoginRequest) (*VerifyLoginResponse, error)
+	VerifyTotp(ctx context.Context, request VerifyTotpRequest) error
 }
 
 type UserServiceImpl struct {
@@ -187,4 +196,67 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 		RequireTotp: totpCount > 0,
 		UserId:      user.Id,
 	}, nil
+}
+
+func (u *UserServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequest) error {
+	scope := middlewares.GetScope(ctx)
+
+	userRepository := ioc.Get[repositories.UserRepository](scope)
+	user, err := userRepository.FindUserById(ctx, request.UserId)
+	if err != nil {
+		return err
+	}
+
+	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+
+	credentials, count, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
+		BaseFilter: repositories.BaseFilter{},
+		UserId:     &user.Id,
+		Type:       utils.Ptr(constants.CredentialTypeTotp),
+	})
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return httpErrors.Unauthorized()
+	}
+
+	key, err := config.C.GetSymmetricEncryptionKey()
+	if err != nil {
+		return err
+	}
+
+	clockService := ioc.Get[ClockService](scope)
+	now := clockService.Now()
+
+	for _, credential := range credentials {
+		details := credential.Details.(repositories.CredentialTotpDetails)
+
+		encryptedSecret, err := base64.StdEncoding.DecodeString(details.EncryptedSecretBase64)
+		if err != nil {
+			return err
+		}
+
+		secret, err := utils.DecryptSymmetric(encryptedSecret, key)
+		if err != nil {
+			return err
+		}
+
+		isValid, err := totp.ValidateCustom(request.Code, string(secret), now, totp.ValidateOpts{
+			Period:    config.C.Totp.Period,
+			Skew:      config.C.Totp.Skew,
+			Digits:    otp.DigitsSix,
+			Algorithm: otp.AlgorithmSHA1,
+		})
+		if err != nil {
+			return err
+		}
+
+		if isValid {
+			// we found a matching totp for the user
+			return nil
+		}
+	}
+
+	return httpErrors.Unauthorized()
 }

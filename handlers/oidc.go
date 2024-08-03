@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"holvit/constants"
 	"holvit/httpErrors"
@@ -226,19 +227,166 @@ func UserInfo(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type VerifyPasswordRequest struct {
-	Username  string `json:"username"`
-	Password  string `json:"password"`
-	Token     string `json:"token"`
-	DeviceId  string `json:"device_id"`
-	UserAgent string `json:"user_agent"`
+type VerifyTotpRequest struct {
+	Token    string `json:"token"`
+	Code     string `json:"code"`
+	DeviceId string `json:"device_id"`
 }
 
-type VerifyPasswordResponse struct {
-	Success     bool    `json:"success"`
-	RequireTotp bool    `json:"require_totp"`
-	NewDevice   bool    `json:"new_device"`
-	Token       *string `json:"token"`
+func VerifyTotp(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	scope := middlewares.GetScope(ctx)
+	rcs := ioc.Get[requestContext.RequestContextService](scope)
+
+	var request VerifyTotpRequest
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	tokenService := ioc.Get[services.TokenService](scope)
+	loginInfo, err := tokenService.PeekLoginCode(ctx, request.Token)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	if !loginInfo.PasswordVerified {
+		rcs.Error(httpErrors.Unauthorized())
+		return
+	}
+
+	if !loginInfo.TotpVerified {
+		rcs.Error(httpErrors.Unauthorized())
+		return
+	}
+
+	if loginInfo.DeviceVerified {
+		rcs.Error(httpErrors.Unauthorized())
+		return
+	}
+
+	if loginInfo.DeviceVerificationCode != request.Code {
+		rcs.Error(httpErrors.Unauthorized())
+		return
+	}
+
+	if loginInfo.DeviceId != request.DeviceId {
+		rcs.Error(httpErrors.Unauthorized())
+		return
+	}
+
+	deviceService := ioc.Get[services.DeviceService](scope)
+	err = deviceService.AddKnownDevice(ctx, services.AddDeviceRequest{
+		UserId:    loginInfo.UserId,
+		DeviceId:  loginInfo.DeviceId,
+		UserAgent: r.UserAgent(),
+		Ip:        utils.GetRequestIp(r),
+	})
+	if err != nil {
+		rcs.Error(httpErrors.Unauthorized())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	encoder := json.NewEncoder(w)
+	err = encoder.Encode(VerifyLoginStepResponse{
+		Success:     true,
+		RequireTotp: false,
+		NewDevice:   false,
+	})
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+}
+
+type VerifyDeviceRequest struct {
+	Token    string `json:"token"`
+	DeviceId string `json:"device_id"`
+	Code     string `json:"code"`
+}
+
+func VerifyDevice(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	scope := middlewares.GetScope(ctx)
+	rcs := ioc.Get[requestContext.RequestContextService](scope)
+
+	var request VerifyDeviceRequest
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	tokenService := ioc.Get[services.TokenService](scope)
+	loginInfo, err := tokenService.PeekLoginCode(ctx, request.Token)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	if !loginInfo.PasswordVerified {
+		rcs.Error(httpErrors.Unauthorized())
+		return
+	}
+
+	if loginInfo.TotpVerified {
+		rcs.Error(httpErrors.Unauthorized())
+		return
+	}
+
+	userService := ioc.Get[services.UserService](scope)
+	err = userService.VerifyTotp(ctx, services.VerifyTotpRequest{
+		UserId: loginInfo.UserId,
+		Code:   request.Code,
+	})
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	loginInfo.TotpVerified = true
+
+	deviceVerificationRequired, err := doesDeviceRequireVerification(r, loginInfo.UserId, request.DeviceId, loginInfo)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	err = tokenService.OverwriteLoginCode(ctx, request.Token, *loginInfo)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	encoder := json.NewEncoder(w)
+	err = encoder.Encode(VerifyLoginStepResponse{
+		Success:     true,
+		RequireTotp: false,
+		NewDevice:   deviceVerificationRequired,
+	})
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+}
+
+type VerifyPasswordRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Token    string `json:"token"`
+	DeviceId string `json:"device_id"`
+}
+
+type VerifyLoginStepResponse struct {
+	Success     bool `json:"success"`
+	RequireTotp bool `json:"require_totp"`
+	NewDevice   bool `json:"new_device"`
 }
 
 func VerifyPassword(w http.ResponseWriter, r *http.Request) {
@@ -271,33 +419,68 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//TODO: validate request parameters (device id must be a uuid)
+	loginInfo.UserId = loginResponse.UserId
+	loginInfo.PasswordVerified = true
+	loginInfo.TotpVerified = !loginResponse.RequireTotp
 
-	sessionService := ioc.Get[services.SessionService](scope)
-	isKnownUserDevice, err := sessionService.IsKnownUserDevice(ctx, services.IsKnownDeviceRequest{
-		UserId:   loginResponse.UserId,
-		DeviceId: request.DeviceId,
-	})
+	deviceVerificationRequired, err := doesDeviceRequireVerification(r, loginResponse.UserId, request.DeviceId, loginInfo)
 	if err != nil {
 		rcs.Error(err)
 		return
 	}
 
-	//TODO: trigger device verification logic
-	//TODO: create a new token that stores the required steps
+	err = tokenService.OverwriteLoginCode(ctx, request.Token, *loginInfo)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 
 	encoder := json.NewEncoder(w)
-	err = encoder.Encode(VerifyPasswordResponse{
+	err = encoder.Encode(VerifyLoginStepResponse{
 		Success:     true,
 		RequireTotp: loginResponse.RequireTotp,
-		NewDevice:   !isKnownUserDevice.IsKnown && isKnownUserDevice.RequiresVerification,
+		NewDevice:   deviceVerificationRequired,
 	})
 	if err != nil {
 		rcs.Error(err)
 		return
 	}
+}
+
+func doesDeviceRequireVerification(r *http.Request, userId uuid.UUID, deviceId string, loginInfo *services.LoginInfo) (bool, error) {
+	//TODO: validate request parameters (device id must be a uuid)
+
+	ctx := r.Context()
+	scope := middlewares.GetScope(ctx)
+
+	deviceService := ioc.Get[services.DeviceService](scope)
+	isKnownUserDevice, err := deviceService.IsKnownUserDevice(ctx, services.IsKnownDeviceRequest{
+		UserId:   userId,
+		DeviceId: deviceId,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	loginInfo.DeviceVerified = isKnownUserDevice.IsKnown || !isKnownUserDevice.RequiresVerification
+
+	if !loginInfo.DeviceVerified {
+		deviceCode, err := deviceService.SendVerificationEmail(ctx, services.SendVerificationRequest{
+			UserId:    userId,
+			DeviceId:  deviceId,
+			UserAgent: r.UserAgent(),
+		})
+		if err != nil {
+			return false, err
+		}
+
+		loginInfo.DeviceId = deviceId
+		loginInfo.DeviceVerificationCode = deviceCode.Code
+	}
+
+	return !loginInfo.DeviceVerified, nil
 }
 
 func Jwks(w http.ResponseWriter, r *http.Request) {

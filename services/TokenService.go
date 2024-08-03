@@ -30,8 +30,14 @@ type CodeInfo struct {
 }
 
 type LoginInfo struct {
-	RealmId uuid.UUID            `json:"realm_id"`
-	Request AuthorizationRequest `json:"request"`
+	RealmId                uuid.UUID            `json:"realm_id"`
+	PasswordVerified       bool                 `json:"password_verified"`
+	UserId                 uuid.UUID            `json:"user_id"`
+	TotpVerified           bool                 `json:"totp_verified"`
+	DeviceVerified         bool                 `json:"device_verified"`
+	DeviceVerificationCode string               `json:"device_verification_code"`
+	DeviceId               string               `json:"device_id"`
+	Request                AuthorizationRequest `json:"request"`
 }
 
 type AdditionalLoginInfo struct {
@@ -42,14 +48,25 @@ type AdditionalLoginInfo struct {
 type TokenService interface {
 	StoreGrantInfo(ctx context.Context, info GrantInfo) (string, error)
 	RetrieveGrantInfo(ctx context.Context, token string) (*GrantInfo, error)
+
 	StoreOidcCode(ctx context.Context, info CodeInfo) (string, error)
 	RetrieveOidcCode(ctx context.Context, token string) (*CodeInfo, error)
+
 	StoreLoginCode(ctx context.Context, info LoginInfo) (string, error)
+	OverwriteLoginCode(ctx context.Context, token string, info LoginInfo) error
 	PeekLoginCode(ctx context.Context, token string) (*LoginInfo, error)
 	RetrieveLoginCode(ctx context.Context, token string) (*LoginInfo, error)
 }
 
 type TokenServiceImpl struct{}
+
+func (s *TokenServiceImpl) OverwriteLoginCode(ctx context.Context, token string, info LoginInfo) error {
+	err := s.overwriteInfo(ctx, info, token, time.Minute*30) // TODO config
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func (s *TokenServiceImpl) StoreLoginCode(ctx context.Context, info LoginInfo) (string, error) {
 	token, err := s.storeInfo(ctx, info, "loginCode", time.Minute*30) // TODO config
@@ -137,6 +154,29 @@ func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name
 	}
 
 	return token, nil
+}
+
+func (s *TokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, token string, expiration time.Duration) error {
+	scope := middlewares.GetScope(ctx)
+	redisClient := ioc.Get[*redis.Client](scope)
+
+	logging.Logger.Debugf("overwriting redis: %s", token)
+
+	dataBytes, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+
+	data := string(dataBytes)
+
+	if config.C.IsDevelopment() {
+		expiration = time.Hour * 24
+	}
+	if err := redisClient.Set(ctx, token, data, expiration).Err(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *TokenServiceImpl) retrieveInfo(ctx context.Context, name string, token string, info interface{}) error {

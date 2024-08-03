@@ -189,6 +189,9 @@ func configureServices() *ioc.DependencyProvider {
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.SessionService {
 		return services.NewSessionService()
 	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.DeviceService {
+		return services.NewDeviceService()
+	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.OidcService {
 		return services.NewOidcService()

@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math/big"
 )
 
 func GenerateRandomBytes(length int) ([]byte, error) {
@@ -19,6 +20,14 @@ func GenerateRandomBytes(length int) ([]byte, error) {
 	}
 
 	return bytes, nil
+}
+
+func GenerateRandomNumber(max int64) (int, error) {
+	i, err := rand.Int(rand.Reader, big.NewInt(max))
+	if err != nil {
+		return 0, err
+	}
+	return int(i.Int64()), nil
 }
 
 func GenerateRandomString(length int) (string, error) {

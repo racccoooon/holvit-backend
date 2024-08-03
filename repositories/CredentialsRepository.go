@@ -42,6 +42,24 @@ func (d *CredentialPasswordDetails) Scan(value interface{}) error {
 	return json.Unmarshal(b, &d)
 }
 
+type CredentialTotpDetails struct {
+	DisplayName           string `json:"display_name"`
+	EncryptedSecretBase64 string `json:"encrypted_secret_base64"`
+}
+
+func (d CredentialTotpDetails) Value() (driver.Value, error) {
+	return json.Marshal(d)
+}
+
+func (d *CredentialTotpDetails) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &d)
+}
+
 type CredentialFilter struct {
 	BaseFilter
 	UserId *uuid.UUID
@@ -166,6 +184,14 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 				return nil, 0, err
 			}
 			row.Details = passwordDetails
+			break
+		case constants.CredentialTypeTotp:
+			var totpDetails CredentialTotpDetails
+			err := json.Unmarshal(detailsRaw, &totpDetails)
+			if err != nil {
+				return nil, 0, err
+			}
+			row.Details = totpDetails
 			break
 		default:
 			logging.Logger.Fatalf("Unsupported hash algorithm '%v' in password credential '%v'", row.Type, row.Id.String())

@@ -19,10 +19,11 @@ type Realm struct {
 
 	EncryptedPrivateKey []byte
 
-	RequireUsername  bool
-	RequireEmail     bool
-	RequireTotp      bool
-	EnableRememberMe bool
+	RequireUsername           bool
+	RequireEmail              bool
+	RequireDeviceVerification bool
+	RequireTotp               bool
+	EnableRememberMe          bool
 }
 
 type RealmFilter struct {
@@ -35,10 +36,11 @@ type RealmUpdate struct {
 	DisplayName *string
 	Name        *string
 
-	RequireUsername  *bool
-	RequireEmail     *bool
-	RequireTotp      *bool
-	EnableRememberMe *bool
+	RequireUsername           *bool
+	RequireEmail              *bool
+	RequireDeviceVerification *bool
+	RequireTotp               *bool
+	EnableRememberMe          *bool
 }
 
 type RealmRepository interface {
@@ -85,7 +87,7 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
-		"id", "name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_totp", "enable_remember_me").
+		"id", "name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_device_verification", "require_totp", "enable_remember_me").
 		From("realms")
 
 	if filter.Name != nil {
@@ -116,6 +118,7 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 			&row.EncryptedPrivateKey,
 			&row.RequireUsername,
 			&row.RequireEmail,
+			&row.RequireDeviceVerification,
 			&row.RequireTotp,
 			&row.EnableRememberMe)
 		if err != nil {
@@ -138,15 +141,19 @@ func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm *Realm) (uu
 		return resultingId, err
 	}
 
-	err = tx.QueryRow(`insert into "realms"
-    			("name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_totp", "enable_remember_me")
-    			values ($1, $2, $3, $4, $5, $6, $7)
-    			returning "id"`,
+	sqlString := `insert into "realms"
+    			("name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_device_verification", "require_totp", "enable_remember_me")
+    			values ($1, $2, $3, $4, $5, $6, $7, $8)
+    			returning "id"`
+	logging.Logger.Debugf("executing sql: %s", sqlString)
+
+	err = tx.QueryRow(sqlString,
 		realm.Name,
 		realm.DisplayName,
 		realm.EncryptedPrivateKey,
 		realm.RequireUsername,
 		realm.RequireEmail,
+		realm.RequireDeviceVerification,
 		realm.RequireTotp,
 		realm.EnableRememberMe).Scan(&resultingId)
 
@@ -186,6 +193,10 @@ func (r *RealmRepositoryImpl) UpdateRealm(ctx context.Context, id uuid.UUID, upd
 
 	if upd.EnableRememberMe != nil {
 		sb.Set(sb.Assign("enable_remember_me", *upd.EnableRememberMe))
+	}
+
+	if upd.RequireDeviceVerification != nil {
+		sb.Set(sb.Assign("require_device_verification", *upd.RequireDeviceVerification))
 	}
 
 	sb.Where(sb.Equal("id", id))

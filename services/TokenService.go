@@ -115,7 +115,7 @@ func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name
 	}
 
 	token := base64.StdEncoding.EncodeToString(tokenBytes)
-	logging.Logger.Infof("storing redis: %s:%s", name, token)
+	logging.Logger.Debugf("storing redis: %s:%s", name, token)
 
 	dataBytes, err := json.Marshal(info)
 	if err != nil {
@@ -135,7 +135,7 @@ func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name
 }
 
 func (s *TokenServiceImpl) retrieveInfo(ctx context.Context, name string, token string, info interface{}) error {
-	logging.Logger.Infof("retrieving redis: %s:%s", name, token)
+	logging.Logger.Debugf("retrieving redis: %s:%s", name, token)
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)
 	val, err := redisClient.GetDel(ctx, name+":"+token).Result()
@@ -151,7 +151,7 @@ func (s *TokenServiceImpl) retrieveInfo(ctx context.Context, name string, token 
 }
 
 func (s *TokenServiceImpl) peekInfo(ctx context.Context, name string, token string, info interface{}) error {
-	logging.Logger.Infof("peeking redis: %s:%s", name, token)
+	logging.Logger.Debugf("peeking redis: %s:%s", name, token)
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)
 	val, err := redisClient.Get(ctx, name+":"+token).Result()

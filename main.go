@@ -186,6 +186,9 @@ func configureServices() *ioc.DependencyProvider {
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.ClaimMapperRepository {
 		return repositories.NewClaimMapperRepository()
 	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.UserDeviceRepository {
+		return repositories.NewUserDeviceRepository()
+	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.UserService {
 		return services.NewUserService()

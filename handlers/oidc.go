@@ -227,15 +227,18 @@ func UserInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 type VerifyPasswordRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Token    string `json:"token"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	Token     string `json:"token"`
+	DeviceId  string `json:"device_id"`
+	UserAgent string `json:"user_agent"`
 }
 
 type VerifyPasswordResponse struct {
-	Success     bool `json:"success"`
-	RequireTotp bool `json:"require_totp"`
-	NewDevice   bool `json:"new_device"`
+	Success     bool    `json:"success"`
+	RequireTotp bool    `json:"require_totp"`
+	NewDevice   bool    `json:"new_device"`
+	Token       *string `json:"token"`
 }
 
 func VerifyPassword(w http.ResponseWriter, r *http.Request) {
@@ -258,7 +261,7 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userService := ioc.Get[services.UserService](scope)
-	loginResponse, err := userService.Login(ctx, services.LoginRequest{
+	loginResponse, err := userService.VerifyLogin(ctx, services.VerifyLoginRequest{
 		UsernameOrEmail: request.Username,
 		Password:        request.Password,
 		RealmId:         loginInfo.RealmId,
@@ -268,13 +271,28 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//TODO: validate request parameters (device id must be a uuid)
+
+	sessionService := ioc.Get[services.SessionService](scope)
+	isKnownUserDevice, err := sessionService.IsKnownUserDevice(ctx, services.IsKnownDeviceRequest{
+		UserId:   loginResponse.UserId,
+		DeviceId: request.DeviceId,
+	})
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	//TODO: trigger device verification logic
+	//TODO: create a new token that stores the required steps
+
 	w.Header().Set("Content-Type", "application/json")
 
 	encoder := json.NewEncoder(w)
 	err = encoder.Encode(VerifyPasswordResponse{
 		Success:     true,
 		RequireTotp: loginResponse.RequireTotp,
-		NewDevice:   false, //TODO: implement devices
+		NewDevice:   !isKnownUserDevice.IsKnown && isKnownUserDevice.RequiresVerification,
 	})
 	if err != nil {
 		rcs.Error(err)

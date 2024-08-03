@@ -15,8 +15,9 @@ import (
 type Session struct {
 	BaseModel
 
-	UserId  uuid.UUID
-	RealmId uuid.UUID
+	UserId       uuid.UUID
+	UserDeviceId uuid.UUID
+	RealmId      uuid.UUID
 
 	ValidUntil  time.Time
 	HashedToken string
@@ -73,7 +74,7 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
-		"id", "user_id", "realm_id", "hashed_token", "valid_until").
+		"id", "user_id", "user_device_id", "realm_id", "hashed_token", "valid_until").
 		From("sessions")
 
 	if filter.RealmId != nil {
@@ -103,6 +104,7 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 		err := rows.Scan(&totalCount,
 			&row.Id,
 			&row.UserId,
+			&row.UserDeviceId,
 			&row.RealmId,
 			&row.HashedToken,
 			&row.ValidUntil)
@@ -126,15 +128,18 @@ func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Sess
 		return resultingId, err
 	}
 
-	err = tx.QueryRow(`insert into "sessions"
-    			("user_id", "realm_id", "hashed_token", "valid_until")
+	sqlString := `insert into "sessions"
+    			("user_id", "user_device_id", "realm_id", "hashed_token", "valid_until")
     			values ($1, $2, $3, $4, $5)
-    			returning "id"`,
+    			returning "id"`
+	logging.Logger.Debugf("Executing sql: %s", sqlString)
+
+	err = tx.QueryRow(sqlString,
 		session.UserId,
+		session.UserDeviceId,
 		session.RealmId,
 		session.HashedToken,
-		session.ValidUntil).
-		Scan(&resultingId)
+		session.ValidUntil).Scan(&resultingId)
 
 	return resultingId, err
 }

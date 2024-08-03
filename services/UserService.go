@@ -30,20 +30,21 @@ type SetPasswordRequest struct {
 	Temporary   bool
 }
 
-type LoginRequest struct {
+type VerifyLoginRequest struct {
 	UsernameOrEmail string
 	Password        string
 	RealmId         uuid.UUID
 }
 
-type LoginResponse struct {
+type VerifyLoginResponse struct {
+	UserId      uuid.UUID
 	RequireTotp bool
 }
 
 type UserService interface {
 	CreateUser(ctx context.Context, request CreateUserRequest) (*CreateUserResponse, error)
 	SetPassword(ctx context.Context, request SetPasswordRequest) error
-	Login(ctx context.Context, request LoginRequest) (*LoginResponse, error)
+	VerifyLogin(ctx context.Context, request VerifyLoginRequest) (*VerifyLoginResponse, error)
 }
 
 type UserServiceImpl struct {
@@ -132,7 +133,7 @@ func verifyPassword(credential *repositories.Credential, password string) error 
 	return nil
 }
 
-func (u *UserServiceImpl) Login(ctx context.Context, request LoginRequest) (*LoginResponse, error) {
+func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRequest) (*VerifyLoginResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
 	userRepository := ioc.Get[repositories.UserRepository](scope)
@@ -182,7 +183,8 @@ func (u *UserServiceImpl) Login(ctx context.Context, request LoginRequest) (*Log
 		return nil, err
 	}
 
-	return &LoginResponse{
+	return &VerifyLoginResponse{
 		RequireTotp: totpCount > 0,
+		UserId:      user.Id,
 	}, nil
 }

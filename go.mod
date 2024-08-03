@@ -8,6 +8,7 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/gorilla/mux v1.8.1
 	github.com/huandu/go-sqlbuilder v1.28.0
+	github.com/jackc/pgtype v1.14.3
 	github.com/lib/pq v1.10.9
 	github.com/redis/go-redis/v9 v9.6.1
 	github.com/rubenv/sql-migrate v1.7.0
@@ -24,6 +25,7 @@ require (
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
+	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect

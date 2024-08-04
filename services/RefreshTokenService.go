@@ -38,7 +38,7 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 
 	hashedToken := utils.CheapHash(token)
 
-	clockService := ioc.Get[ClockService](scope)
+	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
 	refreshTokenRepository := ioc.Get[repositories.RefreshTokenRepository](scope)
@@ -76,7 +76,7 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (string, *repositories.RefreshToken, error) {
 	scope := middlewares.GetScope(ctx)
 
-	clockService := ioc.Get[ClockService](scope)
+	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
 	token, err := utils.GenerateRandomString(32)

@@ -172,7 +172,13 @@ create table "scope_claims"
 alter table "scope_claims"
     add constraint "fk_scope_claims_scopes" foreign key ("scope_id") references "scopes";
 
-CREATE TYPE job_status AS ENUM ('pending', 'completed', 'failed');
+-- +migrate StatementBegin
+do $$ begin
+    create type job_status as enum ('pending', 'completed', 'failed');
+exception
+    when duplicate_object then null;
+end $$;
+-- +migrate StatementEnd
 
 create table "queued_jobs"
 (

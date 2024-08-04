@@ -18,6 +18,7 @@ import (
 	"holvit/requestContext"
 	"holvit/server"
 	"holvit/services"
+	"holvit/utils"
 	"os"
 )
 
@@ -127,8 +128,8 @@ func configureServices() *ioc.DependencyProvider {
 	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) *sql.DB {
 		return db
 	})
-	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) services.ClockService {
-		return services.NewClockService()
+	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) utils.ClockService {
+		return utils.NewClockService()
 	})
 	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) *cron.Cron {
 		return c

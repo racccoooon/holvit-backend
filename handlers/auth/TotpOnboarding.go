@@ -60,7 +60,7 @@ func TotpOnboarding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clockService := ioc.Get[services.ClockService](scope)
+	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
 	isValid, err := totp.ValidateCustom(request.Code, loginInfo.EncryptedTotpOnboardingSecretBase64, now, totp.ValidateOpts{

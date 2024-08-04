@@ -70,7 +70,7 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 	browser, browserVersion := ua.Browser()
 	displayName := fmt.Sprintf("%s %s", browser, browserVersion)
 
-	clockService := ioc.Get[ClockService](scope)
+	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
 	_, err = userDeviceRepository.CreateUserDevice(ctx, &repositories.UserDevice{

@@ -241,7 +241,7 @@ func (u *UserServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequ
 		return err
 	}
 
-	clockService := ioc.Get[ClockService](scope)
+	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
 	for _, credential := range credentials {

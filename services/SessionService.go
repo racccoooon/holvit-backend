@@ -22,7 +22,7 @@ type SessionServiceImpl struct{}
 func (s *SessionServiceImpl) ValidateSession(ctx context.Context, token string) (*repositories.Session, error) {
 	scope := middlewares.GetScope(ctx)
 
-	clockService := ioc.Get[ClockService](scope)
+	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
 	hashedToken := utils.CheapHash(token)

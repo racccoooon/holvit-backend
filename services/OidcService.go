@@ -166,7 +166,7 @@ func NewOidcService() OidcService {
 func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request AuthorizationCodeTokenRequest) (*TokenResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
-	clockService := ioc.Get[ClockService](scope)
+	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
 	tokenService := ioc.Get[TokenService](scope)
@@ -274,7 +274,7 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request RefreshTokenRequest) (*TokenResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
-	clockService := ioc.Get[ClockService](scope)
+	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
 	clientService := ioc.Get[ClientService](scope)

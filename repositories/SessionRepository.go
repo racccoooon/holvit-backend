@@ -9,7 +9,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
-	"holvit/services"
+	"holvit/utils"
 	"time"
 )
 
@@ -55,7 +55,7 @@ func (s *SessionRepositoryImpl) DeleteOldSessions(ctx context.Context) error {
 		return err
 	}
 
-	clockService := ioc.Get[services.ClockService](scope)
+	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
 	sb := sqlbuilder.DeleteFrom("sessions")

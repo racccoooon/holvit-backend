@@ -83,7 +83,7 @@ func Authorize(w http.ResponseWriter, r *http.Request) {
 
 	currentUserService := ioc.Get[services.CurrentUserService](scope)
 
-	if err := currentUserService.VerifyAuthorized(); err == nil {
+	if err := currentUserService.VerifyAuthorized(); err != nil {
 		err := login(w, r, realmName, request)
 		if err != nil {
 			rcs.Error(err)

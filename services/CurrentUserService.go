@@ -170,28 +170,27 @@ func CurrentUserMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
-		deviceId, err := r.Cookie(constants.DeviceCookieName)
-		if err == nil {
-			var deviceIdString = deviceId.Value
-			if deviceIdString == "" {
-				uuid, err := uuid.NewRandom()
-				if err != nil {
-					logging.Logger.Fatal(err)
-				}
-				deviceIdString = base64.StdEncoding.EncodeToString([]byte(uuid.String()))
-
-				http.SetCookie(w, &http.Cookie{
-					Name:     constants.DeviceCookieName,
-					Value:    deviceIdString,
-					Path:     "/",
-					Domain:   "localhost", //TODO: get from config
-					MaxAge:   0,
-					Secure:   true,
-					HttpOnly: true,
-					SameSite: http.SameSiteLaxMode,
-				})
+		deviceIdCookie, err := r.Cookie(constants.DeviceCookieName)
+		if err != nil {
+			deviceUuid, err := uuid.NewRandom()
+			if err != nil {
+				logging.Logger.Fatal(err)
 			}
+			deviceIdString := base64.StdEncoding.EncodeToString([]byte(deviceUuid.String()))
+
+			http.SetCookie(w, &http.Cookie{
+				Name:     constants.DeviceCookieName,
+				Value:    deviceIdString,
+				Path:     "/",
+				Domain:   "localhost", //TODO: get from config
+				MaxAge:   0,
+				Secure:   true,
+				HttpOnly: true,
+				SameSite: http.SameSiteLaxMode,
+			})
 			serviceImpl.deviceIdString = &deviceIdString
+		} else {
+			serviceImpl.deviceIdString = &deviceIdCookie.Value
 		}
 
 		next.ServeHTTP(w, r)

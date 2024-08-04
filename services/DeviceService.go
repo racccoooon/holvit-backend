@@ -20,6 +20,7 @@ type IsKnownDeviceRequest struct {
 type IsKnownDeviceResponse struct {
 	IsKnown              bool
 	RequiresVerification bool
+	Id                   *uuid.UUID
 }
 
 type SendVerificationRequest struct {
@@ -42,7 +43,7 @@ type AddDeviceRequest struct {
 type DeviceService interface {
 	IsKnownUserDevice(ctx context.Context, request IsKnownDeviceRequest) (*IsKnownDeviceResponse, error)
 	SendVerificationEmail(ctx context.Context, request SendVerificationRequest) (*SendVerificationResponse, error)
-	AddKnownDevice(ctx context.Context, request AddDeviceRequest) error
+	AddKnownDevice(ctx context.Context, request AddDeviceRequest) (*uuid.UUID, error)
 }
 
 func NewDeviceService() DeviceService {
@@ -51,7 +52,7 @@ func NewDeviceService() DeviceService {
 
 type DeviceServiceImpl struct{}
 
-func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDeviceRequest) error {
+func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDeviceRequest) (*uuid.UUID, error) {
 	scope := middlewares.GetScope(ctx)
 
 	userDeviceRepository := ioc.Get[repositories.UserDeviceRepository](scope)
@@ -60,10 +61,10 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 		DeviceId: &request.DeviceId,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(devices) > 0 {
-		return nil
+		return &devices[0].Id, nil
 	}
 
 	ua := user_agent.New(request.UserAgent)
@@ -73,7 +74,7 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
-	_, err = userDeviceRepository.CreateUserDevice(ctx, &repositories.UserDevice{
+	id, err := userDeviceRepository.CreateUserDevice(ctx, &repositories.UserDevice{
 		UserId:      request.UserId,
 		DisplayName: displayName,
 		DeviceId:    request.DeviceId,
@@ -82,10 +83,10 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 		LastLoginAt: now,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &id, nil
 }
 
 func (d *DeviceServiceImpl) SendVerificationEmail(ctx context.Context, request SendVerificationRequest) (*SendVerificationResponse, error) {
@@ -127,6 +128,7 @@ func (d *DeviceServiceImpl) IsKnownUserDevice(ctx context.Context, request IsKno
 		return &IsKnownDeviceResponse{
 			IsKnown:              true,
 			RequiresVerification: false,
+			Id:                   &devices[0].Id,
 		}, nil
 	}
 
@@ -145,5 +147,6 @@ func (d *DeviceServiceImpl) IsKnownUserDevice(ctx context.Context, request IsKno
 	return &IsKnownDeviceResponse{
 		IsKnown:              false,
 		RequiresVerification: realm.RequireDeviceVerification,
+		Id:                   nil,
 	}, nil
 }

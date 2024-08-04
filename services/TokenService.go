@@ -34,6 +34,7 @@ type LoginInfo struct {
 	RealmId                             uuid.UUID            `json:"realm_id"`
 	UserId                              uuid.UUID            `json:"user_id"`
 	DeviceId                            string               `json:"device_id"`
+	RememberMe                          bool                 `json:"remember_me"`
 	Request                             AuthorizationRequest `json:"request"`
 	EncryptedTotpOnboardingSecretBase64 string               `json:"totp_secret"`
 }

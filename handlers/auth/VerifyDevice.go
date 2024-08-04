@@ -55,7 +55,7 @@ func VerifyDevice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deviceService := ioc.Get[services.DeviceService](scope)
-	err = deviceService.AddKnownDevice(ctx, services.AddDeviceRequest{
+	_, err = deviceService.AddKnownDevice(ctx, services.AddDeviceRequest{
 		UserId:   loginInfo.UserId,
 		DeviceId: deviceIdString,
 	})

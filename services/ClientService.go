@@ -74,7 +74,7 @@ func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClie
 	}
 	clientIdString := clientId.String()
 
-	clientSecret, err := utils.GenerateRandomString(32)
+	clientSecret, err := utils.GenerateRandomStringBase64(32)
 	if err != nil {
 		return nil, err
 	}

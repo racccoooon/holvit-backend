@@ -79,7 +79,7 @@ func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, reques
 	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
-	token, err := utils.GenerateRandomString(32)
+	token, err := utils.GenerateRandomStringBase64(32)
 	if err != nil {
 		return "", nil, err
 	}

@@ -30,7 +30,7 @@ func GenerateRandomNumber(max int64) (int, error) {
 	return int(i.Int64()), nil
 }
 
-func GenerateRandomString(length int) (string, error) {
+func GenerateRandomStringBase64(length int) (string, error) {
 	bytes, err := GenerateRandomBytes(length)
 	if err != nil {
 		return "", err

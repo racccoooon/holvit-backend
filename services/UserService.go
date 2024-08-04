@@ -40,11 +40,7 @@ type VerifyLoginRequest struct {
 }
 
 type VerifyLoginResponse struct {
-	UserId                   uuid.UUID
-	RequireEmailVerification bool
-	RequireTotpOnboarding    bool
-	RequireNewPassword       bool
-	RequireTotp              bool
+	UserId uuid.UUID
 }
 
 type VerifyTotpRequest struct {
@@ -52,11 +48,21 @@ type VerifyTotpRequest struct {
 	Code   string
 }
 
+type AddTotpRequest struct {
+	UserId                uuid.UUID
+	EncryptedSecretBase64 *string
+	DisplayName           *string
+}
+
 type UserService interface {
 	CreateUser(ctx context.Context, request CreateUserRequest) (*CreateUserResponse, error)
 	SetPassword(ctx context.Context, request SetPasswordRequest) error
 	VerifyLogin(ctx context.Context, request VerifyLoginRequest) (*VerifyLoginResponse, error)
+	IsPasswordTemporary(ctx context.Context, userId uuid.UUID) (bool, error)
+	RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) (bool, error)
+	RequiresTotp(ctx context.Context, userId uuid.UUID) (bool, error)
 	VerifyTotp(ctx context.Context, request VerifyTotpRequest) error
+	AddTotp(ctx context.Context, request AddTotpRequest) error
 }
 
 type UserServiceImpl struct {
@@ -83,6 +89,27 @@ func (u *UserServiceImpl) CreateUser(ctx context.Context, request CreateUserRequ
 	return &CreateUserResponse{
 		Id: userId,
 	}, nil
+}
+
+func (u *UserServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.UUID) (bool, error) {
+	scope := middlewares.GetScope(ctx)
+
+	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+
+	credentials, count, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
+		BaseFilter: repositories.BaseFilter{},
+		UserId:     &userId,
+		Type:       utils.Ptr(constants.CredentialTypePassword),
+	})
+	if err != nil {
+		return false, err
+	}
+	if count == 0 {
+		return false, nil
+	}
+	credential := credentials[0]
+
+	return credential.Details.(repositories.CredentialPasswordDetails).Temporary, nil
 }
 
 func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRequest) error {
@@ -181,32 +208,8 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 		return nil, err
 	}
 
-	_, totpCount, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
-		BaseFilter: repositories.BaseFilter{
-			PagingInfo: repositories.PagingInfo{
-				PageSize:   1,
-				PageNumber: 0,
-			},
-		},
-		UserId: &user.Id,
-		Type:   utils.Ptr(constants.CredentialTypeTotp),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	realmRepository := ioc.Get[repositories.RealmRepository](scope)
-	realm, err := realmRepository.FindRealmById(ctx, user.RealmId)
-	if err != nil {
-		return nil, err
-	}
-
 	return &VerifyLoginResponse{
-		RequireTotp:              totpCount > 0,
-		UserId:                   user.Id,
-		RequireEmailVerification: user.Email != nil && user.EmailVerified,
-		RequireTotpOnboarding:    totpCount == 0 && realm.RequireTotp,
-		RequireNewPassword:       credential.Details.(repositories.CredentialPasswordDetails).Temporary,
+		UserId: user.Id,
 	}, nil
 }
 
@@ -271,4 +274,101 @@ func (u *UserServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequ
 	}
 
 	return httpErrors.Unauthorized()
+}
+
+func (s *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest) error {
+	scope := middlewares.GetScope(ctx)
+
+	encryptedSecretBase64 := request.EncryptedSecretBase64
+
+	if encryptedSecretBase64 == nil {
+		secret, err := utils.GenerateRandomBytes(constants.TotpSecretLength)
+		if err != nil {
+			return err
+		}
+
+		key, err := config.C.GetSymmetricEncryptionKey()
+		if err != nil {
+			return err
+		}
+
+		encryptedSecret, err := utils.EncryptSymmetric(secret, key)
+		if err != nil {
+			return err
+		}
+
+		encryptedSecretBase64 = utils.Ptr(base64.StdEncoding.EncodeToString(encryptedSecret))
+	}
+
+	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+
+	_, err := credentialRepository.CreateCredential(ctx, &repositories.Credential{
+		UserId: request.UserId,
+		Type:   constants.CredentialTypeTotp,
+		Details: repositories.CredentialTotpDetails{
+			DisplayName:           utils.GetOrDefault(request.DisplayName, "New Totp"),
+			EncryptedSecretBase64: *encryptedSecretBase64,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *UserServiceImpl) RequiresTotp(ctx context.Context, userId uuid.UUID) (bool, error) {
+	scope := middlewares.GetScope(ctx)
+
+	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+
+	_, totpCount, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
+		BaseFilter: repositories.BaseFilter{
+			PagingInfo: repositories.PagingInfo{
+				PageSize:   1,
+				PageNumber: 0,
+			},
+		},
+		UserId: &userId,
+		Type:   utils.Ptr(constants.CredentialTypeTotp),
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return totpCount > 0, nil
+}
+
+func (s *UserServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) (bool, error) {
+	scope := middlewares.GetScope(ctx)
+
+	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+
+	_, totpCount, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
+		BaseFilter: repositories.BaseFilter{
+			PagingInfo: repositories.PagingInfo{
+				PageSize:   1,
+				PageNumber: 0,
+			},
+		},
+		UserId: &userId,
+		Type:   utils.Ptr(constants.CredentialTypeTotp),
+	})
+	if err != nil {
+		return false, err
+	}
+
+	userRpository := ioc.Get[repositories.UserRepository](scope)
+	user, err := userRpository.FindUserById(ctx, userId)
+	if err != nil {
+		return false, err
+	}
+
+	realmRepository := ioc.Get[repositories.RealmRepository](scope)
+	realm, err := realmRepository.FindRealmById(ctx, user.RealmId)
+	if err != nil {
+		return false, err
+	}
+
+	return totpCount == 0 && realm.RequireTotp, nil
 }

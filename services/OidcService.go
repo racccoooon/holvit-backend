@@ -371,8 +371,7 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) (AuthorizationResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
-	currentUserService := ioc.Get[CurrentUserService](scope)
-	currentUser := currentUserService.GetCurrentUser()
+	currentUser := ioc.Get[CurrentUserService](scope)
 
 	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
 	scopes, _, err := scopeRepository.FindScopes(ctx, repositories.ScopeFilter{
@@ -388,7 +387,12 @@ func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) 
 		scopeIds = append(scopeIds, scope.Id)
 	}
 
-	err = scopeRepository.CreateGrants(ctx, currentUser.UserId, grantRequest.ClientId, scopeIds)
+	userId, err := currentUser.UserId()
+	if err != nil {
+		return nil, err
+	}
+
+	err = scopeRepository.CreateGrants(ctx, userId, grantRequest.ClientId, scopeIds)
 	if err != nil {
 		return nil, err
 	}
@@ -436,13 +440,17 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	}
 	client := clients[0]
 
-	currentUserService := ioc.Get[CurrentUserService](scope)
-	currentUser := currentUserService.GetCurrentUser()
+	currentUser := ioc.Get[CurrentUserService](scope)
 
 	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
+	userid, err := currentUser.UserId()
+	if err != nil {
+		return nil, err
+	}
+
 	scopes, count, err := scopeRepository.FindScopes(ctx, repositories.ScopeFilter{
 		Names:         authorizationRequest.Scopes,
-		UserId:        &currentUser.UserId,
+		UserId:        &userid,
 		ClientId:      &client.Id,
 		RealmId:       realm.Id,
 		IncludeGrants: true,
@@ -470,7 +478,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 			return nil, err
 		}
 
-		user, err := currentUser.GetUser(ctx)
+		user, err := currentUser.User(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -497,7 +505,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	code, err := tokenService.StoreOidcCode(ctx, CodeInfo{
 		RealmId:       realm.Id,
 		ClientId:      client.ClientId,
-		UserId:        currentUser.UserId,
+		UserId:        userid,
 		RedirectUri:   authorizationRequest.RedirectUri,
 		GrantedScopes: grantedScopes,
 	})

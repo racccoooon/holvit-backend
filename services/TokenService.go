@@ -30,19 +30,12 @@ type CodeInfo struct {
 }
 
 type LoginInfo struct {
-	RealmId                uuid.UUID            `json:"realm_id"`
-	PasswordVerified       bool                 `json:"password_verified"`
-	UserId                 uuid.UUID            `json:"user_id"`
-	TotpVerified           bool                 `json:"totp_verified"`
-	DeviceVerified         bool                 `json:"device_verified"`
-	DeviceVerificationCode string               `json:"device_verification_code"`
-	DeviceId               string               `json:"device_id"`
-	Request                AuthorizationRequest `json:"request"`
-}
-
-type AdditionalLoginInfo struct {
-	OriginalToken string `json:"original_token"`
-	NewDevice     bool   `json:"new_device"`
+	NextStep                            string               `json:"next_step"`
+	RealmId                             uuid.UUID            `json:"realm_id"`
+	UserId                              uuid.UUID            `json:"user_id"`
+	DeviceId                            string               `json:"device_id"`
+	Request                             AuthorizationRequest `json:"request"`
+	EncryptedTotpOnboardingSecretBase64 string               `json:"totp_secret"`
 }
 
 type TokenService interface {
@@ -172,6 +165,7 @@ func (s *TokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, 
 	if config.C.IsDevelopment() {
 		expiration = time.Hour * 24
 	}
+	//TODO: check if it was in redis to begin with
 	if err := redisClient.Set(ctx, token, data, expiration).Err(); err != nil {
 		return err
 	}

@@ -2,14 +2,15 @@ package services
 
 import (
 	"context"
-	"fmt"
+	"encoding/base64"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"holvit/constants"
 	"holvit/httpErrors"
 	"holvit/ioc"
+	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/repositories"
-	"holvit/utils"
 	"net/http"
 )
 
@@ -159,7 +160,7 @@ func CurrentUserMiddleware(next http.Handler) http.Handler {
 		routeParams := mux.Vars(r)
 		realmName := routeParams["realmName"]
 
-		sessionToken, err := r.Cookie(fmt.Sprintf("holvit_%s_session", realmName))
+		sessionToken, err := r.Cookie(constants.SessionCookieName(realmName))
 		if err == nil {
 			sessionService := ioc.Get[SessionService](scope)
 			session, err := sessionService.ValidateSession(ctx, sessionToken.Value)
@@ -169,9 +170,28 @@ func CurrentUserMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
-		deviceId, err := r.Cookie("holvit_device_id")
+		deviceId, err := r.Cookie(constants.DeviceCookieName)
 		if err == nil {
-			serviceImpl.deviceIdString = utils.NilIfDefault(&deviceId.Value)
+			var deviceIdString = deviceId.Value
+			if deviceIdString == "" {
+				uuid, err := uuid.NewRandom()
+				if err != nil {
+					logging.Logger.Fatal(err)
+				}
+				deviceIdString = base64.StdEncoding.EncodeToString([]byte(uuid.String()))
+
+				http.SetCookie(w, &http.Cookie{
+					Name:     constants.DeviceCookieName,
+					Value:    deviceIdString,
+					Path:     "/",
+					Domain:   "localhost", //TODO: get from config
+					MaxAge:   0,
+					Secure:   true,
+					HttpOnly: true,
+					SameSite: http.SameSiteLaxMode,
+				})
+			}
+			serviceImpl.deviceIdString = &deviceIdString
 		}
 
 		next.ServeHTTP(w, r)

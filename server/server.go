@@ -48,7 +48,7 @@ func ServeApi(dp *ioc.DependencyProvider) {
 	r.HandleFunc("/api/auth/verify-totp", auth.VerifyTotp).Methods("POST")
 	r.HandleFunc("/api/auth/verify-device", auth.VerifyDevice).Methods("POST")
 	r.HandleFunc("/api/auth/login", auth.Login).Methods("POST")
-	// TODO: r.HandleFunc("/api/auth/get-onboarding-totp", auth.GetOnboardingTotp).Methods("POST")
+	r.HandleFunc("/api/auth/get-onboarding-totp", auth.GetOnboardingTotp).Methods("POST")
 	// TODO: r.HandleFunc("/api/auth/resend-email-verification", auth.ResendEmailVerification).Methods("POST")
 
 	srv := &http.Server{

@@ -42,6 +42,8 @@ type VerifyLoginRequest struct {
 type VerifyLoginResponse struct {
 	UserId                   uuid.UUID
 	RequireEmailVerification bool
+	RequireTotpOnboarding    bool
+	RequireNewPassword       bool
 	RequireTotp              bool
 }
 
@@ -193,10 +195,18 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 		return nil, err
 	}
 
+	realmRepository := ioc.Get[repositories.RealmRepository](scope)
+	realm, err := realmRepository.FindRealmById(ctx, user.RealmId)
+	if err != nil {
+		return nil, err
+	}
+
 	return &VerifyLoginResponse{
 		RequireTotp:              totpCount > 0,
 		UserId:                   user.Id,
 		RequireEmailVerification: user.Email != nil && user.EmailVerified,
+		RequireTotpOnboarding:    totpCount == 0 && realm.RequireTotp,
+		RequireNewPassword:       credential.Details.(repositories.CredentialPasswordDetails).Temporary,
 	}, nil
 }
 

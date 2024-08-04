@@ -176,7 +176,7 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	}
 
 	if request.RedirectUri != codeInfo.RedirectUri {
-		return nil, httpErrors.Unauthorized()
+		return nil, httpErrors.Unauthorized().WithMessage("invalid redirect uri")
 	}
 
 	clientService := ioc.Get[ClientService](scope)
@@ -189,7 +189,7 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	}
 
 	if codeInfo.ClientId != client.ClientId {
-		return nil, httpErrors.Unauthorized()
+		return nil, httpErrors.Unauthorized().WithMessage("invalid client id")
 	}
 
 	claimsService := ioc.Get[ClaimsService](scope)
@@ -233,7 +233,7 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	keyCache := ioc.Get[cache.KeyCache](scope)
 	key, ok := keyCache.Get(client.RealmId)
 	if !ok {
-		return nil, httpErrors.Unauthorized()
+		return nil, httpErrors.Unauthorized().WithMessage("could not get realm key")
 	}
 
 	idTokenString, err := idToken.SignedString(key)
@@ -293,7 +293,7 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 	}
 
 	if !utils.IsSliceSubset(refreshToken.Scopes, request.ScopeNames) {
-		return nil, httpErrors.Unauthorized()
+		return nil, httpErrors.Unauthorized().WithMessage("too many scopes")
 	}
 
 	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
@@ -346,7 +346,7 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 	keyCache := ioc.Get[cache.KeyCache](scope)
 	key, ok := keyCache.Get(client.RealmId)
 	if !ok {
-		return nil, httpErrors.Unauthorized()
+		return nil, httpErrors.Unauthorized().WithMessage("could not get realm key")
 	}
 
 	idTokenString, err := idToken.SignedString(key)

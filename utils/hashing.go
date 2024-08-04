@@ -30,7 +30,7 @@ func CompareHash(plain string, hash string) error {
 		return err
 	}
 	if !valid {
-		return httpErrors.Unauthorized()
+		return httpErrors.Unauthorized().WithMessage("wrong hash")
 	}
 	return nil
 }

@@ -46,7 +46,7 @@ type CurrentUserServiceImpl struct {
 
 func (s *CurrentUserServiceImpl) VerifyAuthorized() error {
 	if s.userId == nil {
-		return httpErrors.Unauthorized()
+		return httpErrors.Unauthorized().WithMessage("not authorized")
 	}
 
 	return nil

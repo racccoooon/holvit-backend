@@ -166,7 +166,7 @@ func verifyPassword(credential *repositories.Credential, password string) error 
 
 	err := utils.CompareHash(password, details.HashedPassword)
 	if err != nil {
-		return httpErrors.Unauthorized()
+		return httpErrors.Unauthorized().WithMessage("failed to verify password")
 	}
 
 	return nil
@@ -184,7 +184,7 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 		return nil, err
 	}
 	if count == 0 {
-		return nil, httpErrors.Unauthorized()
+		return nil, httpErrors.Unauthorized().WithMessage("user does not exist")
 	}
 	user := users[0]
 
@@ -199,7 +199,7 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 		return nil, err
 	}
 	if count == 0 {
-		return nil, httpErrors.Unauthorized()
+		return nil, httpErrors.Unauthorized().WithMessage("user is not allowed to log in")
 	}
 	credential := credentials[0]
 
@@ -233,7 +233,7 @@ func (u *UserServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequ
 		return err
 	}
 	if count == 0 {
-		return httpErrors.Unauthorized()
+		return httpErrors.Unauthorized().WithMessage("no totp configured")
 	}
 
 	key, err := config.C.GetSymmetricEncryptionKey()
@@ -273,7 +273,7 @@ func (u *UserServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequ
 		}
 	}
 
-	return httpErrors.Unauthorized()
+	return httpErrors.Unauthorized().WithMessage("no matching totp found")
 }
 
 func (s *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest) error {

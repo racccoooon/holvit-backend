@@ -49,12 +49,12 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 		return "", nil, err
 	}
 	if count == 0 {
-		return "", nil, httpErrors.Unauthorized()
+		return "", nil, httpErrors.Unauthorized().WithMessage("token not found")
 	}
 
 	refreshToken := tokens[0]
 	if refreshToken.ValidUntil.Compare(now) < 0 {
-		return "", nil, httpErrors.Unauthorized()
+		return "", nil, httpErrors.Unauthorized().WithMessage("token not valid")
 	}
 
 	err = refreshTokenRepository.DeleteRefreshToken(ctx, refreshToken.Id)

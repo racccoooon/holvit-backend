@@ -35,12 +35,12 @@ func (s *SessionServiceImpl) ValidateSession(ctx context.Context, token string) 
 		return nil, err
 	}
 	if count == 0 {
-		return nil, httpErrors.Unauthorized()
+		return nil, httpErrors.Unauthorized().WithMessage("session not found")
 	}
 	session := sessions[0]
 
 	if session.ValidUntil.Compare(now) < 0 {
-		return nil, httpErrors.Unauthorized()
+		return nil, httpErrors.Unauthorized().WithMessage("session not valid")
 	}
 
 	return session, nil

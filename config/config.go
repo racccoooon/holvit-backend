@@ -67,7 +67,8 @@ type HolvitConfig struct {
 	}
 
 	Crons struct {
-		JobScheduler string
+		JobScheduler   string
+		SessionCleanup string
 	}
 }
 

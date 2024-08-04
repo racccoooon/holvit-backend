@@ -9,6 +9,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/services"
 	"time"
 )
 
@@ -36,12 +37,38 @@ type SessionRepository interface {
 	FindSessionById(ctx context.Context, id uuid.UUID) (*Session, error)
 	FindSessions(ctx context.Context, filter SessionFilter) ([]*Session, int, error)
 	CreateSession(ctx context.Context, session *Session) (uuid.UUID, error)
+	DeleteOldSessions(ctx context.Context) error
 }
 
 type SessionRepositoryImpl struct{}
 
 func NewSessionRepository() SessionRepository {
 	return &SessionRepositoryImpl{}
+}
+
+func (s *SessionRepositoryImpl) DeleteOldSessions(ctx context.Context) error {
+	scope := middlewares.GetScope(ctx)
+	rcs := ioc.Get[requestContext.RequestContextService](scope)
+
+	tx, err := rcs.GetTx()
+	if err != nil {
+		return err
+	}
+
+	clockService := ioc.Get[services.ClockService](scope)
+	now := clockService.Now()
+
+	sb := sqlbuilder.DeleteFrom("sessions")
+	sb.Where(sb.LessThan("valid_until", now))
+
+	sqlString, args := sb.Build()
+	logging.Logger.Debugf("executing sql: %s", sqlString)
+	_, err = tx.Exec(sqlString, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *SessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUID) (*Session, error) {

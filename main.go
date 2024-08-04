@@ -9,6 +9,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"holvit/cache"
 	"holvit/config"
+	"holvit/crons"
 	"holvit/database"
 	"holvit/ioc"
 	"holvit/logging"
@@ -217,6 +218,9 @@ func configureServices() *ioc.DependencyProvider {
 			Protocol: config.C.Redis.Protocol,
 		})
 	})
+
+	// configure crons
+	c.AddFunc(config.C.Crons.SessionCleanup, crons.SessionCleanup)
 
 	c.Start()
 

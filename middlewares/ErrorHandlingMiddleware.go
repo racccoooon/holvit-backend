@@ -21,7 +21,13 @@ func ErrorHandlingMiddleware(next http.Handler) http.Handler {
 			switch err.(type) {
 			case *httpErrors.HttpError:
 				httpErr := err.(*httpErrors.HttpError)
-				http.Error(w, httpErr.Message(), httpErr.Status())
+
+				message := httpErr.Message()
+				if config.C.IsProduction() && httpErr.Status() == http.StatusUnauthorized {
+					message = ""
+				}
+
+				http.Error(w, message, httpErr.Status())
 				break
 
 			default:

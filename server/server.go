@@ -6,6 +6,8 @@ import (
 	"github.com/gorilla/mux"
 	"holvit/config"
 	"holvit/handlers"
+	"holvit/handlers/auth"
+	"holvit/handlers/oidc"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -22,27 +24,32 @@ func ServeApi(dp *ioc.DependencyProvider) {
 
 	r := mux.NewRouter()
 
-	r.Use(middlewares.ScopeMiddleware(dp))
-	r.Use(middlewares.ErrorHandlingMiddleware)
-
 	r.Use(middlewares.AccessLogMiddleware)
 	r.Use(middlewares.MaxReadBytesMiddleware)
 
-	r.Use(services.CurrentUserMiddleware)
+	r.Use(middlewares.ScopeMiddleware(dp))
+	r.Use(middlewares.ErrorHandlingMiddleware)
 
 	r.HandleFunc("/api/health", handlers.Health).Methods("GET")
 
-	r.HandleFunc("/oidc/{realmName}/authorize", handlers.Authorize).Methods("GET", "POST")
-	r.HandleFunc("/oidc/{realmName}/token", handlers.Token)
-	r.HandleFunc("/oidc/{realmName}/userinfo", handlers.Token).Methods("GET", "POST")
-	r.HandleFunc("/oidc/{realmName}/jwks", handlers.Token)
-	r.HandleFunc("/oidc/{realmName}/logout", handlers.Token)
+	r.HandleFunc("/oidc/{realmName}/authorize", oidc.Authorize).Methods("GET", "POST")
+	r.HandleFunc("/oidc/{realmName}/token", oidc.Token)
+	r.HandleFunc("/oidc/{realmName}/userinfo", oidc.Token).Methods("GET", "POST")
+	r.HandleFunc("/oidc/{realmName}/jwks", oidc.Token)
+	r.HandleFunc("/oidc/{realmName}/logout", oidc.Token)
 
-	r.HandleFunc("/api/auth/authorize-grant", handlers.AuthorizeGrant).Methods("POST")
-	r.HandleFunc("/api/auth/login", handlers.Login).Methods("POST")
-	r.HandleFunc("/api/auth/verify-password", handlers.VerifyPassword).Methods("POST")
-	r.HandleFunc("/api/auth/verify-totp", handlers.VerifyTotp).Methods("POST")
-	r.HandleFunc("/api/auth/verify-device", handlers.VerifyDevice).Methods("POST")
+	r.Use(services.CurrentUserMiddleware)
+
+	r.HandleFunc("/api/auth/authorize-grant", auth.AuthorizeGrant).Methods("POST")
+	r.HandleFunc("/api/auth/verify-password", auth.VerifyPassword).Methods("POST")
+	r.HandleFunc("/api/auth/verify-email", auth.VerifyEmail).Methods("GET")
+	r.HandleFunc("/api/auth/reset-password", auth.ResetPassword).Methods("POST")
+	r.HandleFunc("/api/auth/totp-onboarding", auth.TotpOnboarding).Methods("POST")
+	r.HandleFunc("/api/auth/verify-totp", auth.VerifyTotp).Methods("POST")
+	r.HandleFunc("/api/auth/verify-device", auth.VerifyDevice).Methods("POST")
+	r.HandleFunc("/api/auth/login", auth.Login).Methods("POST")
+	// TODO: r.HandleFunc("/api/auth/get-onboarding-totp", auth.GetOnboardingTotp).Methods("POST")
+	// TODO: r.HandleFunc("/api/auth/resend-email-verification", auth.ResendEmailVerification).Methods("POST")
 
 	srv := &http.Server{
 		Handler:      r,

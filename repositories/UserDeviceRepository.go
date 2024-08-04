@@ -30,7 +30,6 @@ type UserDeviceFilter struct {
 
 	DeviceId *string
 	UserId   *uuid.UUID
-	LastIp   *pgtype.Inet
 }
 
 type UserDeviceRepository interface {

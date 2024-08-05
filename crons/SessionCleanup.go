@@ -5,7 +5,7 @@ import (
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 )
 
 func SessionCleanup() {
@@ -15,7 +15,7 @@ func SessionCleanup() {
 	defer scope.Close()
 	ctx := middlewares.ContextWithNewScope(context.Background(), scope)
 
-	sessionRepository := ioc.Get[repositories.SessionRepository](scope)
+	sessionRepository := ioc.Get[repos.SessionRepository](scope)
 	err := sessionRepository.DeleteOldSessions(ctx)
 
 	if err != nil {

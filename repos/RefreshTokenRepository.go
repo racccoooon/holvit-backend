@@ -1,11 +1,11 @@
-package repositories
+package repos
 
 import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/lib/pq"
-	"holvit/httpErrors"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -32,14 +32,14 @@ type RefreshToken struct {
 type RefreshTokenFilter struct {
 	BaseFilter
 
-	HashedToken *string
-	ClientId    *uuid.UUID
+	HashedToken h.Optional[string]
+	ClientId    h.Optional[uuid.UUID]
 }
 
 type RefreshTokenRepository interface {
-	FindRefreshTokenById(ctx context.Context, id uuid.UUID) (*RefreshToken, error)
-	FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) ([]*RefreshToken, int, error)
-	CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) (uuid.UUID, error)
+	FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Optional[RefreshToken]
+	FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) h.Result[FilterResult[RefreshToken]]
+	CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) h.Result[uuid.UUID]
 	DeleteRefreshToken(ctx context.Context, id uuid.UUID) error
 }
 
@@ -49,62 +49,54 @@ func NewRefreshTokenRepository() RefreshTokenRepository {
 	return &RefreshTokenRepositoryImpl{}
 }
 
-func (r *RefreshTokenRepositoryImpl) FindRefreshTokenById(ctx context.Context, id uuid.UUID) (*RefreshToken, error) {
-	result, resultCount, err := r.FindRefreshTokens(ctx, RefreshTokenFilter{
+func (r *RefreshTokenRepositoryImpl) FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Optional[RefreshToken] {
+	return r.FindRefreshTokens(ctx, RefreshTokenFilter{
 		BaseFilter: BaseFilter{
-			Id: id,
-			PagingInfo: PagingInfo{
-				PageSize:   1,
-				PageNumber: 0,
-			},
+			Id: h.Some(id),
 		},
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	if resultCount == 0 {
-		return nil, httpErrors.NotFound()
-	}
-	return result[0], nil
+	}).Unwrap().First()
 }
 
-func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) ([]*RefreshToken, int, error) {
+func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) h.Result[FilterResult[RefreshToken]] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[RefreshToken]](err)
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
 		"id", "user_id", "client_id", "realm_id", "hashed_token", "valid_until", "issuer", "subject", "audience", "scopes").
 		From("refresh_tokens")
 
-	if filter.HashedToken != nil {
-		sb.Where(sb.Equal("hashed_token", *filter.HashedToken))
-	}
+	filter.Id.IfSome(func(x uuid.UUID) {
+		sb.Where(sb.Equal("id", x))
+	})
 
-	if filter.ClientId != nil {
-		sb.Where(sb.Equal("client_id", *filter.ClientId))
-	}
+	filter.HashedToken.IfSome(func(x string) {
+		sb.Where(sb.Equal("hashed_token", x))
+	})
 
-	if filter.PagingInfo.PageSize > 0 {
-		sb.Limit(filter.PagingInfo.PageSize).
-			Offset(filter.PagingInfo.PageSize * (filter.PagingInfo.PageNumber - 1))
+	filter.ClientId.IfSome(func(x uuid.UUID) {
+		sb.Where(sb.Equal("client_id", x))
+	})
+
+	if filter.PagingInfo.IsSome() {
+		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
+			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
 	}
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[RefreshToken]](err)
 	}
 	defer rows.Close()
 
 	var totalCount int
-	var result []*RefreshToken
+	var result []RefreshToken
 	for rows.Next() {
 		var row RefreshToken
 		err := rows.Scan(&totalCount,
@@ -119,15 +111,18 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 			&row.Audience,
 			pq.Array(&row.Scopes))
 		if err != nil {
-			return nil, 0, err
+			return h.Err[FilterResult[RefreshToken]](err)
 		}
-		result = append(result, &row)
+		result = append(result, row)
 	}
 
-	return result, totalCount, nil
+	return h.Ok(pagedResult[RefreshToken]{
+		values: result,
+		count:  totalCount,
+	}.ToResult())
 }
 
-func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) (uuid.UUID, error) {
+func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -135,7 +130,7 @@ func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, ref
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return resultingId, err
+		return h.Err[uuid.UUID](err)
 	}
 
 	sqlString := `insert into "refresh_tokens"
@@ -155,8 +150,11 @@ func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, ref
 		refreshToken.Audience,
 		pq.Array(refreshToken.Scopes)).
 		Scan(&resultingId)
+	if err != nil {
+		return h.Err[uuid.UUID](err)
+	}
 
-	return resultingId, err
+	return h.Ok(resultingId)
 }
 
 func (r *RefreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id uuid.UUID) error {

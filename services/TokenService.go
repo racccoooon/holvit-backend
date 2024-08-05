@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"holvit/config"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -40,7 +41,7 @@ type LoginInfo struct {
 }
 
 type TokenService interface {
-	StoreGrantInfo(ctx context.Context, info GrantInfo) (string, error)
+	StoreGrantInfo(ctx context.Context, info GrantInfo) h.Result[string]
 	RetrieveGrantInfo(ctx context.Context, token string) (*GrantInfo, error)
 
 	StoreOidcCode(ctx context.Context, info CodeInfo) (string, error)
@@ -55,7 +56,7 @@ type TokenService interface {
 type TokenServiceImpl struct{}
 
 func (s *TokenServiceImpl) OverwriteLoginCode(ctx context.Context, token string, info LoginInfo) error {
-	err := s.overwriteInfo(ctx, info, token, time.Minute*30) // TODO config
+	err := s.overwriteInfo(ctx, info, "loginCode", token, time.Minute*30) // TODO config
 	if err != nil {
 		return err
 	}
@@ -105,12 +106,12 @@ func (s *TokenServiceImpl) RetrieveOidcCode(ctx context.Context, token string) (
 	return &result, nil
 }
 
-func (s *TokenServiceImpl) StoreGrantInfo(ctx context.Context, info GrantInfo) (string, error) {
+func (s *TokenServiceImpl) StoreGrantInfo(ctx context.Context, info GrantInfo) h.Result[string] {
 	token, err := s.storeInfo(ctx, info, "grantInfo", time.Minute*5)
 	if err != nil {
-		return "", err
+		return h.Err[string](err)
 	}
-	return token, nil
+	return h.Ok(token)
 }
 
 func (s *TokenServiceImpl) RetrieveGrantInfo(ctx context.Context, token string) (*GrantInfo, error) {
@@ -150,7 +151,7 @@ func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name
 	return token, nil
 }
 
-func (s *TokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, token string, expiration time.Duration) error {
+func (s *TokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, name string, token string, expiration time.Duration) error {
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)
 
@@ -167,7 +168,7 @@ func (s *TokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, 
 		expiration = time.Hour * 24
 	}
 	//TODO: check if it was in redis to begin with
-	if err := redisClient.Set(ctx, token, data, expiration).Err(); err != nil {
+	if err := redisClient.Set(ctx, name+":"+token, data, expiration).Err(); err != nil {
 		return err
 	}
 

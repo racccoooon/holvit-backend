@@ -4,10 +4,10 @@ import (
 	"context"
 	"github.com/google/uuid"
 	"holvit/config"
-	"holvit/httpErrors"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 	"holvit/utils"
 	"strings"
 )
@@ -30,7 +30,7 @@ type AuthenticateClientRequest struct {
 
 type ClientService interface {
 	CreateClient(ctx context.Context, request CreateClientRequest) (*CreateClientResponse, error)
-	Authenticate(ctx context.Context, request AuthenticateClientRequest) (*repositories.Client, error)
+	Authenticate(ctx context.Context, request AuthenticateClientRequest) (*repos.Client, error)
 }
 
 type ClientServiceImpl struct{}
@@ -39,34 +39,27 @@ func NewClientService() ClientService {
 	return &ClientServiceImpl{}
 }
 
-func (c *ClientServiceImpl) Authenticate(ctx context.Context, request AuthenticateClientRequest) (*repositories.Client, error) {
+func (c *ClientServiceImpl) Authenticate(ctx context.Context, request AuthenticateClientRequest) (*repos.Client, error) {
 	scope := middlewares.GetScope(ctx)
 
-	clientRepository := ioc.Get[repositories.ClientRepository](scope)
-	clients, count, err := clientRepository.FindClients(ctx, repositories.ClientFilter{
-		ClientId: &request.ClientId,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if count == 0 {
-		return nil, httpErrors.NotFound().WithMessage("Client not found")
-	}
-	client := clients[0]
+	clientRepository := ioc.Get[repos.ClientRepository](scope)
+	client := clientRepository.FindClients(ctx, repos.ClientFilter{
+		ClientId: h.Some(request.ClientId),
+	}).Unwrap().First().Unwrap()
 
 	requestClientSecret, _ := strings.CutPrefix(request.ClientSecret, "secret_")
-	err = utils.CompareHash(requestClientSecret, client.ClientSecret)
+	err := utils.CompareHash(requestClientSecret, client.ClientSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	return client, nil
+	return &client, nil
 }
 
 func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClientRequest) (*CreateClientResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
-	clientRepository := ioc.Get[repositories.ClientRepository](scope)
+	clientRepository := ioc.Get[repos.ClientRepository](scope)
 
 	clientId, err := uuid.NewRandom()
 	if err != nil {
@@ -85,7 +78,7 @@ func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClie
 		return nil, err
 	}
 
-	client := repositories.Client{
+	client := repos.Client{
 		RealmId:      request.RealmId,
 		DisplayName:  request.DisplayName,
 		ClientId:     clientIdString,
@@ -93,14 +86,10 @@ func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClie
 		RedirectUris: make([]string, 0),
 	}
 
-	clientDbId, err := clientRepository.CreateClient(ctx, &client)
-
-	if err != nil {
-		return nil, err
-	}
+	clientDbId := clientRepository.CreateClient(ctx, &client)
 
 	return &CreateClientResponse{
-		Id:           clientDbId,
+		Id:           clientDbId.Unwrap(),
 		ClientId:     clientIdString,
 		ClientSecret: "secret_" + clientSecret,
 	}, nil

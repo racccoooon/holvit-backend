@@ -3,10 +3,11 @@ package services
 import (
 	"context"
 	"github.com/google/uuid"
+	"holvit/h"
 	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 	"holvit/utils"
 	"time"
 )
@@ -23,8 +24,8 @@ type CreateRefreshTokenRequest struct {
 }
 
 type RefreshTokenService interface {
-	ValidateAndRefresh(ctx context.Context, token string, clientId uuid.UUID) (string, *repositories.RefreshToken, error)
-	CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (string, *repositories.RefreshToken, error)
+	ValidateAndRefresh(ctx context.Context, token string, clientId uuid.UUID) (string, *repos.RefreshToken, error)
+	CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (string, *repos.RefreshToken, error)
 }
 
 func NewRefreshTokenService() RefreshTokenService {
@@ -33,7 +34,7 @@ func NewRefreshTokenService() RefreshTokenService {
 
 type RefreshTokenServiceImpl struct{}
 
-func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token string, clientId uuid.UUID) (string, *repositories.RefreshToken, error) {
+func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token string, clientId uuid.UUID) (string, *repos.RefreshToken, error) {
 	scope := middlewares.GetScope(ctx)
 
 	hashedToken := utils.CheapHash(token)
@@ -41,23 +42,16 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
-	refreshTokenRepository := ioc.Get[repositories.RefreshTokenRepository](scope)
-	tokens, count, err := refreshTokenRepository.FindRefreshTokens(ctx, repositories.RefreshTokenFilter{
-		HashedToken: &hashedToken,
-	})
-	if err != nil {
-		return "", nil, err
-	}
-	if count == 0 {
-		return "", nil, httpErrors.Unauthorized().WithMessage("token not found")
-	}
+	refreshTokenRepository := ioc.Get[repos.RefreshTokenRepository](scope)
+	refreshToken := refreshTokenRepository.FindRefreshTokens(ctx, repos.RefreshTokenFilter{
+		HashedToken: h.Some(hashedToken),
+	}).Unwrap().First().Unwrap()
 
-	refreshToken := tokens[0]
 	if refreshToken.ValidUntil.Compare(now) < 0 {
 		return "", nil, httpErrors.Unauthorized().WithMessage("token not valid")
 	}
 
-	err = refreshTokenRepository.DeleteRefreshToken(ctx, refreshToken.Id)
+	err := refreshTokenRepository.DeleteRefreshToken(ctx, refreshToken.Id)
 	if err != nil {
 		return "", nil, err
 	}
@@ -73,7 +67,7 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 	})
 }
 
-func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (string, *repositories.RefreshToken, error) {
+func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (string, *repos.RefreshToken, error) {
 	scope := middlewares.GetScope(ctx)
 
 	clockService := ioc.Get[utils.ClockService](scope)
@@ -86,8 +80,8 @@ func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, reques
 
 	hashedToken := utils.CheapHash(token)
 
-	refreshTokenRepository := ioc.Get[repositories.RefreshTokenRepository](scope)
-	refreshToken := repositories.RefreshToken{
+	refreshTokenRepository := ioc.Get[repos.RefreshTokenRepository](scope)
+	refreshToken := repos.RefreshToken{
 		UserId:      request.UserId,
 		ClientId:    request.ClientId,
 		RealmId:     request.RealmId,
@@ -98,10 +92,7 @@ func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, reques
 		Audience:    request.Audience,
 		Scopes:      request.Scopes,
 	}
-	tokenId, err := refreshTokenRepository.CreateRefreshToken(ctx, &refreshToken)
-	if err != nil {
-		return "", nil, err
-	}
+	tokenId := refreshTokenRepository.CreateRefreshToken(ctx, &refreshToken).Unwrap()
 
 	refreshToken.Id = tokenId
 

@@ -1,10 +1,10 @@
-package repositories
+package repos
 
 import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
-	"holvit/httpErrors"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -27,16 +27,16 @@ type Session struct {
 type SessionFilter struct {
 	BaseFilter
 
-	RealmId *uuid.UUID
-	UserId  *uuid.UUID
+	RealmId h.Optional[uuid.UUID]
+	UserId  h.Optional[uuid.UUID]
 
-	HashedToken *string
+	HashedToken h.Optional[string]
 }
 
 type SessionRepository interface {
-	FindSessionById(ctx context.Context, id uuid.UUID) (*Session, error)
-	FindSessions(ctx context.Context, filter SessionFilter) ([]*Session, int, error)
-	CreateSession(ctx context.Context, session *Session) (uuid.UUID, error)
+	FindSessionById(ctx context.Context, id uuid.UUID) h.Optional[Session]
+	FindSessions(ctx context.Context, filter SessionFilter) h.Result[FilterResult[Session]]
+	CreateSession(ctx context.Context, session *Session) h.Result[uuid.UUID]
 	DeleteOldSessions(ctx context.Context) error
 }
 
@@ -71,61 +71,50 @@ func (s *SessionRepositoryImpl) DeleteOldSessions(ctx context.Context) error {
 	return nil
 }
 
-func (s *SessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUID) (*Session, error) {
-	result, resultCount, err := s.FindSessions(ctx, SessionFilter{
+func (s *SessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUID) h.Optional[Session] {
+	return s.FindSessions(ctx, SessionFilter{
 		BaseFilter: BaseFilter{
-			Id: id,
-			PagingInfo: PagingInfo{
-				PageSize:   1,
-				PageNumber: 0,
-			},
+			Id: h.Some(id),
 		},
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	if resultCount == 0 {
-		return nil, httpErrors.NotFound()
-	}
-	return result[0], nil
+	}).Unwrap().First()
 }
 
-func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter SessionFilter) ([]*Session, int, error) {
+func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter SessionFilter) h.Result[FilterResult[Session]] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[Session]](err)
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
 		"id", "user_id", "user_device_id", "realm_id", "hashed_token", "valid_until").
 		From("sessions")
 
-	if filter.RealmId != nil {
-		sb.Where(sb.Equal("realm_id", filter.RealmId))
-	}
-	if filter.UserId != nil {
-		sb.Where(sb.Equal("user_id", filter.UserId))
-	}
+	filter.RealmId.IfSome(func(x uuid.UUID) {
+		sb.Where(sb.Equal("realm_id", x))
+	})
 
-	if filter.PagingInfo.PageSize > 0 {
-		sb.Limit(filter.PagingInfo.PageSize).
-			Offset(filter.PagingInfo.PageSize * (filter.PagingInfo.PageNumber - 1))
+	filter.UserId.IfSome(func(x uuid.UUID) {
+		sb.Where(sb.Equal("user_id", x))
+	})
+
+	if filter.PagingInfo.IsSome() {
+		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
+			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
 	}
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[Session]](err)
 	}
 	defer rows.Close()
 
 	var totalCount int
-	var result []*Session
+	var result []Session
 	for rows.Next() {
 		var row Session
 		err := rows.Scan(&totalCount,
@@ -136,15 +125,18 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 			&row.HashedToken,
 			&row.ValidUntil)
 		if err != nil {
-			return nil, 0, err
+			return h.Err[FilterResult[Session]](err)
 		}
-		result = append(result, &row)
+		result = append(result, row)
 	}
 
-	return result, totalCount, nil
+	return h.Ok(pagedResult[Session]{
+		values: result,
+		count:  totalCount,
+	}.ToResult())
 }
 
-func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Session) (uuid.UUID, error) {
+func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Session) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -152,7 +144,7 @@ func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Sess
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return resultingId, err
+		return h.Err[uuid.UUID](err)
 	}
 
 	sqlString := `insert into "sessions"
@@ -167,6 +159,9 @@ func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Sess
 		session.RealmId,
 		session.HashedToken,
 		session.ValidUntil).Scan(&resultingId)
+	if err != nil {
+		return h.Err[uuid.UUID](err)
+	}
 
-	return resultingId, err
+	return h.Ok(resultingId)
 }

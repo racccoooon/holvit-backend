@@ -6,10 +6,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgtype"
 	"github.com/mssola/user_agent"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 	"holvit/utils"
+	"strings"
 )
 
 type IsKnownDeviceRequest struct {
@@ -55,16 +57,13 @@ type DeviceServiceImpl struct{}
 func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDeviceRequest) (*uuid.UUID, error) {
 	scope := middlewares.GetScope(ctx)
 
-	userDeviceRepository := ioc.Get[repositories.UserDeviceRepository](scope)
-	devices, _, err := userDeviceRepository.FindUserDevices(ctx, repositories.UserDeviceFilter{
-		UserId:   &request.UserId,
-		DeviceId: &request.DeviceId,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(devices) > 0 {
-		return &devices[0].Id, nil
+	userDeviceRepository := ioc.Get[repos.UserDeviceRepository](scope)
+	devices := userDeviceRepository.FindUserDevices(ctx, repos.UserDeviceFilter{
+		UserId:   h.Some(request.UserId),
+		DeviceId: h.Some(request.DeviceId),
+	}).Unwrap()
+	if devices.Count() > 0 {
+		return utils.Ptr(devices.First().Unwrap().Id), nil
 	}
 
 	ua := user_agent.New(request.UserAgent)
@@ -74,17 +73,29 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
-	id, err := userDeviceRepository.CreateUserDevice(ctx, &repositories.UserDevice{
+	lastIp := pgtype.Inet{}
+	ipStr := request.Ip
+	// Remove the port if it exists
+	if colonIndex := strings.LastIndex(ipStr, ":"); colonIndex != -1 {
+		ipStr = ipStr[:colonIndex] // Remove port part
+	}
+	if strings.HasPrefix(ipStr, "[") && strings.HasSuffix(ipStr, "]") {
+		ipStr = ipStr[1 : len(ipStr)-1] // Remove square brackets for IPv6
+	}
+
+	err := lastIp.Set(ipStr)
+	if err != nil {
+		return nil, err
+	}
+
+	id := userDeviceRepository.CreateUserDevice(ctx, &repos.UserDevice{
 		UserId:      request.UserId,
 		DisplayName: displayName,
 		DeviceId:    request.DeviceId,
 		UserAgent:   request.UserAgent,
-		LastIp:      pgtype.Inet{},
+		LastIp:      lastIp,
 		LastLoginAt: now,
-	})
-	if err != nil {
-		return nil, err
-	}
+	}).Unwrap()
 
 	return &id, nil
 }
@@ -99,7 +110,7 @@ func (d *DeviceServiceImpl) SendVerificationEmail(ctx context.Context, request S
 	}
 	code := fmt.Sprintf("%d", num)
 
-	err = jobService.QueueJob(ctx, repositories.SendMailJobDetails{
+	err = jobService.QueueJob(ctx, repos.SendMailJobDetails{
 		To:      nil,
 		Subject: "Device Verification Code",
 		Body:    fmt.Sprintf(`<html><body>Enter the following code:<br/>%v</body></html>`, code),
@@ -116,33 +127,24 @@ func (d *DeviceServiceImpl) SendVerificationEmail(ctx context.Context, request S
 func (d *DeviceServiceImpl) IsKnownUserDevice(ctx context.Context, request IsKnownDeviceRequest) (*IsKnownDeviceResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
-	userDeviceRepository := ioc.Get[repositories.UserDeviceRepository](scope)
-	devices, _, err := userDeviceRepository.FindUserDevices(ctx, repositories.UserDeviceFilter{
-		UserId:   &request.UserId,
-		DeviceId: &request.DeviceId,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(devices) > 0 {
+	userDeviceRepository := ioc.Get[repos.UserDeviceRepository](scope)
+	devices := userDeviceRepository.FindUserDevices(ctx, repos.UserDeviceFilter{
+		UserId:   h.Some(request.UserId),
+		DeviceId: h.Some(request.DeviceId),
+	}).Unwrap()
+	if devices.Count() > 0 {
 		return &IsKnownDeviceResponse{
 			IsKnown:              true,
 			RequiresVerification: false,
-			Id:                   &devices[0].Id,
+			Id:                   utils.Ptr(devices.Values()[0].Id),
 		}, nil
 	}
 
-	userRepository := ioc.Get[repositories.UserRepository](scope)
-	user, err := userRepository.FindUserById(ctx, request.UserId)
-	if err != nil {
-		return nil, err
-	}
+	userRepository := ioc.Get[repos.UserRepository](scope)
+	user := userRepository.FindUserById(ctx, request.UserId).Unwrap()
 
-	realmRepository := ioc.Get[repositories.RealmRepository](scope)
-	realm, err := realmRepository.FindRealmById(ctx, user.RealmId)
-	if err != nil {
-		return nil, err
-	}
+	realmRepository := ioc.Get[repos.RealmRepository](scope)
+	realm := realmRepository.FindRealmById(ctx, user.RealmId).Unwrap()
 
 	return &IsKnownDeviceResponse{
 		IsKnown:              false,

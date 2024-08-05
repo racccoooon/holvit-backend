@@ -5,13 +5,13 @@ import (
 	"github.com/robfig/cron/v3"
 	"holvit/config"
 	"holvit/constants"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 	"holvit/requestContext"
 	"holvit/services/jobs"
-	"holvit/utils"
 )
 
 var (
@@ -21,11 +21,11 @@ var (
 )
 
 type JobExecutor interface {
-	Execute(ctx context.Context, details repositories.QueuedJobDetails) error
+	Execute(ctx context.Context, details repos.QueuedJobDetails) error
 }
 
 type JobService interface {
-	QueueJob(ctx context.Context, job repositories.QueuedJobDetails) error
+	QueueJob(ctx context.Context, job repos.QueuedJobDetails) error
 }
 
 func NewJobService(c *cron.Cron) JobService {
@@ -44,28 +44,24 @@ func executeQueuedJobs() {
 	defer scope.Close()
 	ctx := middlewares.ContextWithNewScope(context.Background(), scope)
 
-	queuedJobRepository := ioc.Get[repositories.QueuedJobRepository](scope)
-	queuedJobs, _, err := queuedJobRepository.FindQueuedJobs(ctx, repositories.QueuedJobFilter{
+	queuedJobRepository := ioc.Get[repos.QueuedJobRepository](scope)
+	queuedJobs := queuedJobRepository.FindQueuedJobs(ctx, repos.QueuedJobFilter{
 		IgnoreLocked: true,
-		Status:       utils.Ptr("pending"),
-	})
-	if err != nil {
-		//TODO: sentry or something?
-		logging.Logger.Error(err)
-	}
+		Status:       h.Some("pending"),
+	}).Unwrap()
 
-	for _, job := range queuedJobs {
-		err = executors[job.Type].Execute(ctx, job.Details)
+	for _, job := range queuedJobs.Values() {
+		err := executors[job.Type].Execute(ctx, job.Details)
 
 		if err != nil {
-			upd := repositories.QueuedJobUpdate{
-				Error:        utils.Ptr(err.Error()),
-				FailureCount: utils.Ptr(job.FailureCount + 1),
-				Status:       utils.Ptr("pending"),
+			upd := repos.QueuedJobUpdate{
+				Error:        h.Some(err.Error()),
+				FailureCount: h.Some(job.FailureCount + 1),
+				Status:       h.Some("pending"),
 			}
 
 			if job.FailureCount == 3 { //TODO: maybe configurable
-				upd.Status = utils.Ptr("failed")
+				upd.Status = h.Some("failed")
 			}
 
 			err = queuedJobRepository.UpdateQueuedJob(ctx, job.Id, upd)
@@ -74,8 +70,8 @@ func executeQueuedJobs() {
 				continue
 			}
 		} else {
-			err := queuedJobRepository.UpdateQueuedJob(ctx, job.Id, repositories.QueuedJobUpdate{
-				Status: utils.Ptr("completed"),
+			err := queuedJobRepository.UpdateQueuedJob(ctx, job.Id, repos.QueuedJobUpdate{
+				Status: h.Some("completed"),
 			})
 			if err != nil {
 				logging.Logger.Error(err)
@@ -89,21 +85,18 @@ func executeQueuedJobs() {
 type JobServiceImpl struct {
 }
 
-func (s *JobServiceImpl) QueueJob(ctx context.Context, job repositories.QueuedJobDetails) error {
+func (s *JobServiceImpl) QueueJob(ctx context.Context, job repos.QueuedJobDetails) error {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
-	queuedJobRepository := ioc.Get[repositories.QueuedJobRepository](scope)
-	_, err := queuedJobRepository.CreateQueuedJob(ctx, &repositories.QueuedJob{
+	queuedJobRepository := ioc.Get[repos.QueuedJobRepository](scope)
+	queuedJobRepository.CreateQueuedJob(ctx, &repos.QueuedJob{
 		Status:       "pending",
 		Type:         job.Type(),
 		Details:      job,
 		FailureCount: 0,
 		Error:        nil,
-	})
-	if err != nil {
-		return err
-	}
+	}).Unwrap()
 
 	rcs.OnAfterTx(func(args requestContext.AfterTxEventArgs) {
 		if args.Commit {

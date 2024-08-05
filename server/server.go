@@ -30,6 +30,8 @@ func ServeApi(dp *ioc.DependencyProvider) {
 	r.Use(middlewares.ScopeMiddleware(dp))
 	r.Use(middlewares.ErrorHandlingMiddleware)
 
+	r.Use(services.CurrentUserMiddleware)
+
 	r.HandleFunc("/api/health", handlers.Health).Methods("GET")
 
 	r.HandleFunc("/oidc/{realmName}/authorize", oidc.Authorize).Methods("GET", "POST")
@@ -37,8 +39,6 @@ func ServeApi(dp *ioc.DependencyProvider) {
 	r.HandleFunc("/oidc/{realmName}/userinfo", oidc.Token).Methods("GET", "POST")
 	r.HandleFunc("/oidc/{realmName}/jwks", oidc.Token)
 	r.HandleFunc("/oidc/{realmName}/logout", oidc.Token)
-
-	r.Use(services.CurrentUserMiddleware)
 
 	r.HandleFunc("/api/auth/authorize-grant", auth.AuthorizeGrant).Methods("POST")
 	r.HandleFunc("/api/auth/verify-password", auth.VerifyPassword).Methods("POST")

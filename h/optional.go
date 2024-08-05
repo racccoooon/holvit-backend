@@ -1,4 +1,4 @@
-package happiness
+package h
 
 import (
 	"errors"
@@ -126,4 +126,11 @@ func MapOpt[From any, To any](from Optional[From], m func(From) To) Optional[To]
 	}
 	mapped := m(*from.value)
 	return Optional[To]{value: &mapped}
+}
+
+func (o Optional[T]) IfSome(f func(T)) {
+	if o.value == nil {
+		return
+	}
+	f(*o.value)
 }

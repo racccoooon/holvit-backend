@@ -4,8 +4,10 @@ import (
 	"holvit/config"
 	"holvit/httpErrors"
 	"holvit/ioc"
+	"holvit/logging"
 	"holvit/requestContext"
 	"net/http"
+	"runtime/debug"
 )
 
 func ErrorHandlingMiddleware(next http.Handler) http.Handler {
@@ -13,6 +15,15 @@ func ErrorHandlingMiddleware(next http.Handler) http.Handler {
 		scope := GetScope(r.Context())
 		rcs := ioc.Get[requestContext.RequestContextService](scope)
 
+		defer func() {
+			if err := recover(); err != nil {
+				// Log the panic and stack trace
+				logging.Logger.Errorf("panic: %v\n%s", err, debug.Stack())
+
+				// Return a 500 Internal Server Error response
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		}()
 		next.ServeHTTP(w, r)
 
 		errors := rcs.Errors()
@@ -27,6 +38,7 @@ func ErrorHandlingMiddleware(next http.Handler) http.Handler {
 					message = ""
 				}
 
+				logging.Logger.Error(err)
 				http.Error(w, message, httpErr.Status())
 				break
 
@@ -37,6 +49,7 @@ func ErrorHandlingMiddleware(next http.Handler) http.Handler {
 					msg = err.Error()
 				}
 
+				logging.Logger.Error(err)
 				http.Error(w, msg, http.StatusInternalServerError)
 				break
 			}

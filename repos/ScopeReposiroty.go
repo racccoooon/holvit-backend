@@ -1,4 +1,4 @@
-package repositories
+package repos
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/lib/pq"
-	"holvit/httpErrors"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -38,19 +38,19 @@ type ScopeFilter struct {
 	BaseFilter
 
 	RealmId uuid.UUID
-	Names   []string
+	Names   h.Optional[[]string]
 
 	IncludeGrants bool
 	OnlyGranted   bool
 
-	UserId   *uuid.UUID
-	ClientId *uuid.UUID
+	UserId   h.Optional[uuid.UUID]
+	ClientId h.Optional[uuid.UUID]
 }
 
 type ScopeRepository interface {
-	FindScopeById(ctx context.Context, id uuid.UUID) (*Scope, error)
-	FindScopes(ctx context.Context, filter ScopeFilter) ([]*Scope, int, error)
-	CreateScope(ctx context.Context, scope *Scope) (uuid.UUID, error)
+	FindScopeById(ctx context.Context, id uuid.UUID) h.Optional[Scope]
+	FindScopes(ctx context.Context, filter ScopeFilter) h.Result[FilterResult[Scope]]
+	CreateScope(ctx context.Context, scope Scope) h.Result[uuid.UUID]
 	CreateGrants(ctx context.Context, userId uuid.UUID, clientId uuid.UUID, scopeIds []uuid.UUID) error
 }
 
@@ -60,33 +60,21 @@ func NewScopeReposiroty() ScopeRepository {
 	return &ScopeRepositoryImpl{}
 }
 
-func (s *ScopeRepositoryImpl) FindScopeById(ctx context.Context, id uuid.UUID) (*Scope, error) {
-	result, resultCount, err := s.FindScopes(ctx, ScopeFilter{
+func (s *ScopeRepositoryImpl) FindScopeById(ctx context.Context, id uuid.UUID) h.Optional[Scope] {
+	return s.FindScopes(ctx, ScopeFilter{
 		BaseFilter: BaseFilter{
-			Id: id,
-			PagingInfo: PagingInfo{
-				PageSize:   1,
-				PageNumber: 0,
-			},
+			Id: h.Some(id),
 		},
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	if resultCount == 0 {
-		return nil, httpErrors.NotFound()
-	}
-	return result[0], nil
+	}).Unwrap().First()
 }
 
-func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter) ([]*Scope, int, error) {
+func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter) h.Result[FilterResult[Scope]] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[Scope]](err)
 	}
 
 	sql := "select count(*) over() as total_count, s.id, s.realm_id, s.name, s.display_name, s.description"
@@ -112,32 +100,32 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 	parameters = append(parameters, filter.RealmId)
 	sql += fmt.Sprintf(" where s.realm_id = $%d", len(parameters))
 
-	if filter.Names != nil {
-		parameters = append(parameters, pq.Array(filter.Names))
+	filter.Id.IfSome(func(x uuid.UUID) {
+		parameters = append(parameters, x)
+		sql += fmt.Sprintf(" and s.id = $%d", len(parameters))
+	})
+
+	filter.Names.IfSome(func(x []string) {
+		parameters = append(parameters, pq.Array(x))
 		sql += fmt.Sprintf(" and s.name = any($%d::text[])", len(parameters))
-	}
+	})
 
-	if filter.UserId != nil {
-		parameters = append(parameters, filter.UserId)
-		sql += fmt.Sprintf(" and (g.user_id = $%d or g.user_id is null)", len(parameters))
-	}
-
-	if filter.ClientId != nil {
-		parameters = append(parameters, filter.ClientId)
+	filter.ClientId.IfSome(func(x uuid.UUID) {
+		parameters = append(parameters, x)
 		sql += fmt.Sprintf(" and (g.client_id = $%d or g.client_id is null)", len(parameters))
-	}
+	})
 
 	sql += ` order by "sort_index" asc`
 
 	logging.Logger.Debugf("executing sql: %s", sql)
 	rows, err := tx.Query(sql, parameters...)
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[Scope]](err)
 	}
 	defer rows.Close()
 
 	var totalCount int
-	var result []*Scope
+	var result []Scope
 	for rows.Next() {
 		var row Scope
 		var grant Grant
@@ -153,7 +141,7 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 			&grant.UserId,
 			&grant.ClientId)
 		if err != nil {
-			return nil, 0, err
+			return h.Err[FilterResult[Scope]](err)
 		}
 
 		if filter.IncludeGrants && grantId != nil {
@@ -161,13 +149,16 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 			row.Grant = &grant
 		}
 
-		result = append(result, &row)
+		result = append(result, row)
 	}
 
-	return result, totalCount, nil
+	return h.Ok(pagedResult[Scope]{
+		values: result,
+		count:  totalCount,
+	}.ToResult())
 }
 
-func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope *Scope) (uuid.UUID, error) {
+func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope Scope) h.Result[uuid.UUID] {
 	iocScope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](iocScope)
 
@@ -175,7 +166,7 @@ func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope *Scope) (uu
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return resultingId, err
+		return h.Err[uuid.UUID](err)
 	}
 
 	err = tx.QueryRow(`insert into "scopes"
@@ -189,7 +180,7 @@ func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope *Scope) (uu
 		scope.SortIndex).
 		Scan(&resultingId)
 
-	return resultingId, err
+	return h.Ok(resultingId)
 }
 
 func (s *ScopeRepositoryImpl) CreateGrants(ctx context.Context, userId uuid.UUID, clientId uuid.UUID, scopeIds []uuid.UUID) error {

@@ -1,4 +1,4 @@
-package repositories
+package repos
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
 	"holvit/constants"
-	"holvit/httpErrors"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -62,19 +62,14 @@ func (d *CredentialTotpDetails) Scan(value interface{}) error {
 
 type CredentialFilter struct {
 	BaseFilter
-	UserId *uuid.UUID
-	Type   *string
-}
-
-type CredentialUpdate struct {
-	Type    string
-	Details interface{}
+	UserId h.Optional[uuid.UUID]
+	Type   h.Optional[string]
 }
 
 type CredentialRepository interface {
-	CreateCredential(ctx context.Context, credential *Credential) (uuid.UUID, error)
-	FindCredentialById(ctx context.Context, id uuid.UUID) (*Credential, error)
-	FindCredentials(ctx context.Context, filter CredentialFilter) ([]*Credential, int, error)
+	CreateCredential(ctx context.Context, credential *Credential) h.Result[uuid.UUID]
+	FindCredentialById(ctx context.Context, id uuid.UUID) h.Optional[Credential]
+	FindCredentials(ctx context.Context, filter CredentialFilter) h.Result[FilterResult[Credential]]
 	DeleteCredential(ctx context.Context, id uuid.UUID) error
 }
 
@@ -84,7 +79,7 @@ func NewCredentialRepository() CredentialRepository {
 	return &CredentialRepositoryImpl{}
 }
 
-func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credential *Credential) (uuid.UUID, error) {
+func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credential *Credential) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -92,7 +87,7 @@ func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credent
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return resultingId, err
+		return h.Err[uuid.UUID](err)
 	}
 
 	sqlString := `insert into "credentials"
@@ -105,65 +100,60 @@ func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credent
 		credential.UserId,
 		credential.Type,
 		credential.Details).Scan(&resultingId)
-
-	return resultingId, err
-}
-
-func (c *CredentialRepositoryImpl) FindCredentialById(ctx context.Context, id uuid.UUID) (*Credential, error) {
-	credentials, resultCount, err := c.FindCredentials(ctx, CredentialFilter{
-		BaseFilter: BaseFilter{
-			Id: id,
-			PagingInfo: PagingInfo{
-				PageSize:   1,
-				PageNumber: 0,
-			},
-		},
-	})
-
 	if err != nil {
-		return nil, err
+		return h.Err[uuid.UUID](err)
 	}
-	if resultCount != len(credentials) {
-		return nil, httpErrors.NotFound()
-	}
-	return credentials[0], nil
+
+	return h.Ok(resultingId)
 }
 
-func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter CredentialFilter) ([]*Credential, int, error) {
+func (c *CredentialRepositoryImpl) FindCredentialById(ctx context.Context, id uuid.UUID) h.Optional[Credential] {
+	return c.FindCredentials(ctx, CredentialFilter{
+		BaseFilter: BaseFilter{
+			Id: h.Some(id),
+		},
+	}).Unwrap().First()
+}
+
+func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter CredentialFilter) h.Result[FilterResult[Credential]] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[Credential]](err)
 	}
 
 	sb := sqlbuilder.Select("count(*) over()", "id", "user_id", "type", "details").
 		From("credentials")
 
-	if filter.UserId != nil {
-		sb.Where(sb.Equal("user_id", *filter.UserId))
-	}
+	filter.Id.IfSome(func(x uuid.UUID) {
+		sb.Where(sb.Equal("id", x))
+	})
 
-	if filter.Type != nil {
-		sb.Where(sb.Equal("type", *filter.Type))
-	}
+	filter.UserId.IfSome(func(x uuid.UUID) {
+		sb.Where(sb.Equal("user_id", x))
+	})
 
-	if filter.PagingInfo.PageSize > 0 {
-		sb.Limit(filter.PagingInfo.PageSize).
-			Offset(filter.PagingInfo.PageSize * (filter.PagingInfo.PageNumber - 1))
+	filter.Type.IfSome(func(x string) {
+		sb.Where(sb.Equal("type", x))
+	})
+
+	if filter.PagingInfo.IsSome() {
+		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
+			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
 	}
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[Credential]](err)
 	}
 	defer rows.Close()
 
 	var totalCount int
-	var result []*Credential
+	var result []Credential
 	for rows.Next() {
 		var row Credential
 		var detailsRaw json.RawMessage
@@ -173,7 +163,7 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 			&row.Type,
 			&detailsRaw)
 		if err != nil {
-			return nil, 0, err
+			return h.Err[FilterResult[Credential]](err)
 		}
 
 		switch row.Type {
@@ -181,7 +171,7 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 			var passwordDetails CredentialPasswordDetails
 			err := json.Unmarshal(detailsRaw, &passwordDetails)
 			if err != nil {
-				return nil, 0, err
+				return h.Err[FilterResult[Credential]](err)
 			}
 			row.Details = passwordDetails
 			break
@@ -189,7 +179,7 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 			var totpDetails CredentialTotpDetails
 			err := json.Unmarshal(detailsRaw, &totpDetails)
 			if err != nil {
-				return nil, 0, err
+				return h.Err[FilterResult[Credential]](err)
 			}
 			row.Details = totpDetails
 			break
@@ -197,10 +187,13 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 			logging.Logger.Fatalf("Unsupported hash algorithm '%v' in password credential '%v'", row.Type, row.Id.String())
 		}
 
-		result = append(result, &row)
+		result = append(result, row)
 	}
 
-	return result, totalCount, nil
+	return h.Ok(pagedResult[Credential]{
+		values: result,
+		count:  totalCount,
+	}.ToResult())
 }
 
 func (c *CredentialRepositoryImpl) DeleteCredential(ctx context.Context, id uuid.UUID) error {

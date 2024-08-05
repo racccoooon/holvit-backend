@@ -1,4 +1,4 @@
-package repositories
+package repos
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"holvit/constants"
-	"holvit/httpErrors"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -49,8 +49,8 @@ func (c *UserInfoClaimMapperDetails) Scan(value interface{}) error {
 type ClaimMapperFilter struct {
 	BaseFilter
 
-	RealmId  *uuid.UUID
-	ScopeIds []uuid.UUID
+	RealmId  h.Optional[uuid.UUID]
+	ScopeIds h.Optional[[]uuid.UUID]
 }
 
 type AssociateScopeClaimRequest struct {
@@ -59,10 +59,10 @@ type AssociateScopeClaimRequest struct {
 }
 
 type ClaimMapperRepository interface {
-	FindClaimMapperById(ctx context.Context, id uuid.UUID) (*ClaimMapper, error)
-	FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) ([]*ClaimMapper, int, error)
-	CreateClaimMapper(ctx context.Context, claimMapper *ClaimMapper) (uuid.UUID, error)
-	AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) (uuid.UUID, error)
+	FindClaimMapperById(ctx context.Context, id uuid.UUID) h.Optional[ClaimMapper]
+	FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) h.Result[FilterResult[ClaimMapper]]
+	CreateClaimMapper(ctx context.Context, claimMapper *ClaimMapper) h.Result[uuid.UUID]
+	AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) h.Result[uuid.UUID]
 }
 
 type ClaimMapperRepositoryImpl struct{}
@@ -71,61 +71,54 @@ func NewClaimMapperRepository() ClaimMapperRepository {
 	return &ClaimMapperRepositoryImpl{}
 }
 
-func (c *ClaimMapperRepositoryImpl) FindClaimMapperById(ctx context.Context, id uuid.UUID) (*ClaimMapper, error) {
-	result, resultCount, err := c.FindClaimMappers(ctx, ClaimMapperFilter{
+func (c *ClaimMapperRepositoryImpl) FindClaimMapperById(ctx context.Context, id uuid.UUID) h.Optional[ClaimMapper] {
+	return c.FindClaimMappers(ctx, ClaimMapperFilter{
 		BaseFilter: BaseFilter{
-			Id: id,
-			PagingInfo: PagingInfo{
-				PageSize:   1,
-				PageNumber: 0,
-			},
+			Id: h.Some(id),
 		},
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	if resultCount == 0 {
-		return nil, httpErrors.NotFound()
-	}
-	return result[0], nil
+	}).Unwrap().First()
 }
 
-func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) ([]*ClaimMapper, int, error) {
+func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) h.Result[FilterResult[ClaimMapper]] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[ClaimMapper]](err)
 	}
 
 	sqlString := `select count(*) over(), c.id, c.realm_id, c.display_name, c.description, c.type, c.details from claim_mappers c where true`
 
 	args := make([]interface{}, 0)
-	if filter.RealmId != nil {
-		args = append(args, *filter.RealmId)
+	filter.Id.IfSome(func(x uuid.UUID) {
+		args = append(args, x)
 		sqlString += fmt.Sprintf(" and c.realm_id = $%d", len(args))
-	}
+	})
 
-	if len(filter.ScopeIds) > 0 {
-		args = append(args, pq.Array(filter.ScopeIds))
+	filter.Id.IfSome(func(x uuid.UUID) {
+		args = append(args, filter.Id.Unwrap())
+		sqlString += fmt.Sprintf(" and c.id = $%d", len(args))
+	})
+
+	filter.ScopeIds.IfSome(func(x []uuid.UUID) {
+		args = append(args, pq.Array(filter.ScopeIds.Unwrap()))
 		sqlString += fmt.Sprintf(" and exists (select 1 from scope_claims sc where sc.claim_mapper_id = c.id and sc.scope_id = any($%d::uuid[]))", len(args))
-	}
+	})
 
-	if filter.PagingInfo.PageSize > 0 {
-		sqlString += fmt.Sprintf(" limit %d offset %d", filter.PagingInfo.PageSize, filter.PagingInfo.PageSize*(filter.PagingInfo.PageNumber-1))
+	if filter.PagingInfo.IsSome() {
+		sqlString += fmt.Sprintf(" limit %d offset %d", filter.PagingInfo.Unwrap().PageSize, filter.PagingInfo.Unwrap().PageSize*(filter.PagingInfo.Unwrap().PageNumber-1))
 	}
 
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[ClaimMapper]](err)
 	}
 	defer rows.Close()
 
 	var totalCount int
-	var result []*ClaimMapper
+	var result []ClaimMapper
 	for rows.Next() {
 		var row ClaimMapper
 		var detailsRaw json.RawMessage
@@ -137,7 +130,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 			&row.Type,
 			&detailsRaw)
 		if err != nil {
-			return nil, 0, err
+			return h.Err[FilterResult[ClaimMapper]](err)
 		}
 
 		switch row.Type {
@@ -145,7 +138,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 			var userInfoMapper UserInfoClaimMapperDetails
 			err := json.Unmarshal(detailsRaw, &userInfoMapper)
 			if err != nil {
-				return nil, 0, err
+				return h.Err[FilterResult[ClaimMapper]](err)
 			}
 			row.Details = userInfoMapper
 			break
@@ -153,13 +146,16 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 			logging.Logger.Fatalf("Unsupported mapper type '%v' in claims mapper '%v'", row.Type, row.Id.String())
 		}
 
-		result = append(result, &row)
+		result = append(result, row)
 	}
 
-	return result, totalCount, nil
+	return h.Ok(pagedResult[ClaimMapper]{
+		values: result,
+		count:  totalCount,
+	}.ToResult())
 }
 
-func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claimMapper *ClaimMapper) (uuid.UUID, error) {
+func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claimMapper *ClaimMapper) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -167,7 +163,7 @@ func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claim
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return resultingId, nil
+		return h.Err[uuid.UUID](err)
 	}
 
 	sqlString := `insert into "claim_mappers"
@@ -182,11 +178,14 @@ func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claim
 		claimMapper.Description,
 		claimMapper.Type,
 		claimMapper.Details).Scan(&resultingId)
+	if err != nil {
+		return h.Err[uuid.UUID](err)
+	}
 
-	return resultingId, err
+	return h.Ok(resultingId)
 }
 
-func (c *ClaimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) (uuid.UUID, error) {
+func (c *ClaimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -194,7 +193,7 @@ func (c *ClaimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, re
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return resultingId, nil
+		return h.Err[uuid.UUID](err)
 	}
 
 	sqlString := `insert into "scope_claims"
@@ -206,6 +205,9 @@ func (c *ClaimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, re
 	err = tx.QueryRow(sqlString,
 		request.ScopeId,
 		request.ClaimMapperId).Scan(&resultingId)
+	if err != nil {
+		return h.Err[uuid.UUID](err)
+	}
 
-	return resultingId, err
+	return h.Ok(resultingId)
 }

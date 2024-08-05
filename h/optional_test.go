@@ -1,4 +1,4 @@
-package happiness
+package h
 
 import (
 	"errors"

@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"holvit/constants"
+	"holvit/h"
 	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 	"holvit/requestContext"
 	"holvit/services"
 	"holvit/utils"
@@ -24,14 +25,10 @@ func login(w http.ResponseWriter, r *http.Request, realmName string, request ser
 		return err
 	}
 
-	realmRepository := ioc.Get[repositories.RealmRepository](scope)
-	realms, _, err := realmRepository.FindRealms(ctx, repositories.RealmFilter{
-		Name: &realmName,
-	})
-	if err != nil {
-		return err
-	}
-	realm := realms[0]
+	realmRepository := ioc.Get[repos.RealmRepository](scope)
+	realm := realmRepository.FindRealms(ctx, repos.RealmFilter{
+		Name: h.Some(realmName),
+	}).Unwrap().First().Unwrap()
 
 	tokenService := ioc.Get[services.TokenService](scope)
 	loginToken, err := tokenService.StoreLoginCode(ctx, services.LoginInfo{

@@ -2,47 +2,39 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"holvit/constants"
 	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 	"holvit/requestContext"
 	"holvit/services"
+	"holvit/utils"
 	"net/http"
 )
-
-type LoginRequest struct {
-	Token string `json:"token"`
-}
 
 func Login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
-	var request ResetPasswordRequest
-	err := json.NewDecoder(r.Body).Decode(&request)
+	err := r.ParseForm()
 	if err != nil {
 		rcs.Error(err)
 		return
 	}
 
 	tokenService := ioc.Get[services.TokenService](scope)
-	loginInfo, err := tokenService.PeekLoginCode(ctx, request.Token)
+	//TODO: i think we can get rid of all the peeks in the code and replace them with retrieve
+	loginInfo, err := tokenService.RetrieveLoginCode(ctx, r.Form.Get("token"))
 	if err != nil {
 		rcs.Error(err)
 		return
 	}
 
-	realmRepository := ioc.Get[repositories.RealmRepository](scope)
-	realm, err := realmRepository.FindRealmById(ctx, loginInfo.RealmId)
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
+	realmRepository := ioc.Get[repos.RealmRepository](scope)
+	realm := realmRepository.FindRealmById(ctx, loginInfo.RealmId).Unwrap()
 
 	currentUser := ioc.Get[services.CurrentUserService](scope)
 	deviceIdString, err := currentUser.DeviceIdString()
@@ -75,8 +67,10 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	if !isKnownDeviceResponse.IsKnown {
 		id, err := deviceService.AddKnownDevice(ctx, services.AddDeviceRequest{
-			UserId:   loginInfo.UserId,
-			DeviceId: deviceIdString,
+			UserId:    loginInfo.UserId,
+			DeviceId:  deviceIdString,
+			UserAgent: r.UserAgent(),
+			Ip:        utils.GetRequestIp(r),
 		})
 		if err != nil {
 			rcs.Error(err)
@@ -86,19 +80,18 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		deviceUuid = id
 	}
 
-	if loginInfo.RememberMe {
-		sessionService := ioc.Get[services.SessionService](scope)
-		sessionToken, err := sessionService.CreateSession(ctx, services.CreateSessionRequest{
-			UserId:   loginInfo.UserId,
-			RealmId:  loginInfo.RealmId,
-			DeviceId: *deviceUuid,
-		})
-		if err != nil {
-			rcs.Error(err)
-			return
-		}
-		w.Header().Add(constants.SessionCookieName(realm.Name), sessionToken)
+	sessionService := ioc.Get[services.SessionService](scope)
+	sessionToken, err := sessionService.CreateSession(ctx, services.CreateSessionRequest{
+		UserId:   loginInfo.UserId,
+		RealmId:  loginInfo.RealmId,
+		DeviceId: *deviceUuid,
+	})
+	if err != nil {
+		rcs.Error(err)
+		return
 	}
+
+	currentUser.SetSession(w, loginInfo.UserId, loginInfo.RememberMe, realm.Name, sessionToken)
 
 	oidcService := ioc.Get[services.OidcService](scope)
 	response, err := oidcService.Authorize(ctx, loginInfo.Request)

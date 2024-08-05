@@ -14,7 +14,7 @@ import (
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 	"holvit/requestContext"
 	"holvit/server"
 	"holvit/services"
@@ -48,16 +48,16 @@ func initialize(dp *ioc.DependencyProvider) {
 
 	ctx := middlewares.ContextWithNewScope(context.Background(), scope)
 
-	realmRepository := ioc.Get[repositories.RealmRepository](scope)
+	realmRepository := ioc.Get[repos.RealmRepository](scope)
 
-	_, realmCount, err := realmRepository.FindRealms(ctx, repositories.RealmFilter{
-		BaseFilter: repositories.BaseFilter{},
+	realmsResult := realmRepository.FindRealms(ctx, repos.RealmFilter{
+		BaseFilter: repos.BaseFilter{},
 	})
-	if err != nil {
-		logging.Logger.Fatal(err)
+	if realmsResult.IsErr() {
+		logging.Logger.Fatal(realmsResult.UnwrapErr())
 	}
 
-	if realmCount == 0 {
+	if realmsResult.Unwrap().Count() == 0 {
 		seedData(ctx)
 	}
 
@@ -145,32 +145,35 @@ func configureServices() *ioc.DependencyProvider {
 		return services.NewCurrentUserService()
 	})
 
-	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.RealmRepository {
-		return repositories.NewRealmRepository()
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.RealmRepository {
+		return repos.NewRealmRepository()
 	})
-	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.UserRepository {
-		return repositories.NewUserRepository()
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.UserRepository {
+		return repos.NewUserRepository()
 	})
-	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.CredentialRepository {
-		return repositories.NewCredentialRepository()
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.CredentialRepository {
+		return repos.NewCredentialRepository()
 	})
-	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.ClientRepository {
-		return repositories.NewClientRepository()
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.ClientRepository {
+		return repos.NewClientRepository()
 	})
-	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.ScopeRepository {
-		return repositories.NewScopeReposiroty()
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.ScopeRepository {
+		return repos.NewScopeReposiroty()
 	})
-	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.RefreshTokenRepository {
-		return repositories.NewRefreshTokenRepository()
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.RefreshTokenRepository {
+		return repos.NewRefreshTokenRepository()
 	})
-	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.ClaimMapperRepository {
-		return repositories.NewClaimMapperRepository()
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.ClaimMapperRepository {
+		return repos.NewClaimMapperRepository()
 	})
-	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.UserDeviceRepository {
-		return repositories.NewUserDeviceRepository()
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.UserDeviceRepository {
+		return repos.NewUserDeviceRepository()
 	})
-	ioc.Add(builder, func(dp *ioc.DependencyProvider) repositories.QueuedJobRepository {
-		return repositories.NewQueuedJobRepository()
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.QueuedJobRepository {
+		return repos.NewQueuedJobRepository()
+	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.SessionRepository {
+		return repos.NewSessionRepository()
 	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.UserService {

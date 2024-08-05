@@ -1,4 +1,4 @@
-package repositories
+package repos
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
 	"holvit/constants"
-	"holvit/httpErrors"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -61,19 +61,19 @@ type QueuedJobFilter struct {
 	BaseFilter
 
 	IgnoreLocked bool
-	Status       *string
+	Status       h.Optional[string]
 }
 
 type QueuedJobUpdate struct {
-	Status       *string
-	FailureCount *int
-	Error        *string
+	Status       h.Optional[string]
+	FailureCount h.Optional[int]
+	Error        h.Optional[string]
 }
 
 type QueuedJobRepository interface {
-	FindQueuedJobById(ctx context.Context, id uuid.UUID) (*QueuedJob, error)
-	FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) ([]*QueuedJob, int, error)
-	CreateQueuedJob(ctx context.Context, job *QueuedJob) (uuid.UUID, error)
+	FindQueuedJobById(ctx context.Context, id uuid.UUID) h.Optional[QueuedJob]
+	FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) h.Result[FilterResult[QueuedJob]]
+	CreateQueuedJob(ctx context.Context, job *QueuedJob) h.Result[uuid.UUID]
 	UpdateQueuedJob(ctx context.Context, id uuid.UUID, upd QueuedJobUpdate) error
 }
 
@@ -83,33 +83,22 @@ func NewQueuedJobRepository() QueuedJobRepository {
 	return &QueuedJobRepositoryImpl{}
 }
 
-func (r *QueuedJobRepositoryImpl) FindQueuedJobById(ctx context.Context, id uuid.UUID) (*QueuedJob, error) {
-	credentials, resultCount, err := r.FindQueuedJobs(ctx, QueuedJobFilter{
+func (r *QueuedJobRepositoryImpl) FindQueuedJobById(ctx context.Context, id uuid.UUID) h.Optional[QueuedJob] {
+	return r.FindQueuedJobs(ctx, QueuedJobFilter{
 		BaseFilter: BaseFilter{
-			Id: id,
-			PagingInfo: PagingInfo{
-				PageSize:   1,
-				PageNumber: 0,
-			},
+			Id: h.Some(id),
 		},
-	})
+	}).Unwrap().First()
 
-	if err != nil {
-		return nil, err
-	}
-	if resultCount != len(credentials) {
-		return nil, httpErrors.NotFound()
-	}
-	return credentials[0], nil
 }
 
-func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) ([]*QueuedJob, int, error) {
+func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) h.Result[FilterResult[QueuedJob]] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[QueuedJob]](err)
 	}
 
 	selectCount := "count(*) over ()"
@@ -120,13 +109,17 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 	sb := sqlbuilder.Select(selectCount, "id", "status", "type", "details", "failure_count", "error").
 		From("queued_jobs")
 
-	if filter.Status != nil {
-		sb.Where(sb.Equal("status", *filter.Status))
-	}
+	filter.Id.IfSome(func(x uuid.UUID) {
+		sb.Where(sb.Equal("id", x))
+	})
 
-	if filter.PagingInfo.PageSize > 0 {
-		sb.Limit(filter.PagingInfo.PageSize).
-			Offset(filter.PagingInfo.PageSize * (filter.PagingInfo.PageNumber - 1))
+	filter.Status.IfSome(func(x string) {
+		sb.Where(sb.Equal("status", x))
+	})
+
+	if filter.PagingInfo.IsSome() {
+		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
+			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
 	}
 
 	if filter.IgnoreLocked {
@@ -137,12 +130,12 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[QueuedJob]](err)
 	}
 	defer rows.Close()
 
 	var totalCount int
-	var result []*QueuedJob
+	var result []QueuedJob
 	for rows.Next() {
 		var row QueuedJob
 		var detailsRaw json.RawMessage
@@ -154,7 +147,7 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 			&row.FailureCount,
 			&row.Error)
 		if err != nil {
-			return nil, 0, err
+			return h.Err[FilterResult[QueuedJob]](err)
 		}
 
 		switch row.Type {
@@ -162,7 +155,7 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 			var details SendMailJobDetails
 			err := json.Unmarshal(detailsRaw, &details)
 			if err != nil {
-				return nil, 0, err
+				return h.Err[FilterResult[QueuedJob]](err)
 			}
 			row.Details = details
 			break
@@ -170,13 +163,16 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 			logging.Logger.Fatalf("Unsupported job type '%v' in queud job '%v'", row.Type, row.Id.String())
 		}
 
-		result = append(result, &row)
+		result = append(result, row)
 	}
 
-	return result, totalCount, nil
+	return h.Ok(pagedResult[QueuedJob]{
+		values: result,
+		count:  totalCount,
+	}.ToResult())
 }
 
-func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job *QueuedJob) (uuid.UUID, error) {
+func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job *QueuedJob) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -184,7 +180,7 @@ func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job *Queu
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return resultingId, err
+		return h.Err[uuid.UUID](err)
 	}
 
 	sqlString := `insert into "queued_jobs"
@@ -199,8 +195,11 @@ func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job *Queu
 		job.Details,
 		job.FailureCount,
 		job.Error).Scan(&resultingId)
+	if err != nil {
+		return h.Err[uuid.UUID](err)
+	}
 
-	return resultingId, err
+	return h.Ok(resultingId)
 }
 
 func (c *QueuedJobRepositoryImpl) UpdateQueuedJob(ctx context.Context, id uuid.UUID, upd QueuedJobUpdate) error {
@@ -214,17 +213,17 @@ func (c *QueuedJobRepositoryImpl) UpdateQueuedJob(ctx context.Context, id uuid.U
 
 	sb := sqlbuilder.Update("queued_jobs")
 
-	if upd.Status != nil {
-		sb.Set(sb.Assign("status", *upd.Status))
-	}
+	upd.Status.IfSome(func(x string) {
+		sb.Set(sb.Assign("status", x))
+	})
 
-	if upd.Error != nil {
-		sb.Set(sb.Assign("error", *upd.Error))
-	}
+	upd.Error.IfSome(func(x string) {
+		sb.Set(sb.Assign("error", x))
+	})
 
-	if upd.FailureCount != nil {
-		sb.Set(sb.Assign("failure_count", *upd.FailureCount))
-	}
+	upd.FailureCount.IfSome(func(x int) {
+		sb.Set(sb.Assign("failure_count", x))
+	})
 
 	sb.Where(sb.Equal("id", id))
 

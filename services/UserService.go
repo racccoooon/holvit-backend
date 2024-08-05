@@ -8,10 +8,11 @@ import (
 	"github.com/pquerna/otp/totp"
 	"holvit/config"
 	"holvit/constants"
+	"holvit/h"
 	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 	"holvit/utils"
 )
 
@@ -75,16 +76,13 @@ func NewUserService() UserService {
 func (u *UserServiceImpl) CreateUser(ctx context.Context, request CreateUserRequest) (*CreateUserResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
-	userRepository := ioc.Get[repositories.UserRepository](scope)
+	userRepository := ioc.Get[repos.UserRepository](scope)
 
-	userId, err := userRepository.CreateUser(ctx, &repositories.User{
+	userId := userRepository.CreateUser(ctx, &repos.User{
 		RealmId:  request.RealmId,
-		Username: request.Username,
-		Email:    request.Email,
-	})
-	if err != nil {
-		return nil, err
-	}
+		Username: h.FromPtr(request.Username),
+		Email:    h.FromPtr(request.Email),
+	}).Unwrap()
 
 	return &CreateUserResponse{
 		Id: userId,
@@ -94,47 +92,43 @@ func (u *UserServiceImpl) CreateUser(ctx context.Context, request CreateUserRequ
 func (u *UserServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.UUID) (bool, error) {
 	scope := middlewares.GetScope(ctx)
 
-	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
-	credentials, count, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
-		BaseFilter: repositories.BaseFilter{},
-		UserId:     &userId,
-		Type:       utils.Ptr(constants.CredentialTypePassword),
-	})
-	if err != nil {
-		return false, err
-	}
-	if count == 0 {
+	credential := credentialRepository.FindCredentials(ctx, repos.CredentialFilter{
+		BaseFilter: repos.BaseFilter{},
+		UserId:     h.Some(userId),
+		Type:       h.Some(constants.CredentialTypePassword),
+	}).Unwrap().First()
+	if credential.IsNone() {
 		return false, nil
 	}
-	credential := credentials[0]
 
-	return credential.Details.(repositories.CredentialPasswordDetails).Temporary, nil
+	return credential.Unwrap().Details.(repos.CredentialPasswordDetails).Temporary, nil
 }
 
 func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRequest) error {
 	scope := middlewares.GetScope(ctx)
 
-	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
-	credentials, _, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
-		BaseFilter: repositories.BaseFilter{},
-		UserId:     &request.UserId,
-		Type:       utils.Ptr(constants.CredentialTypePassword),
-	})
-	if err != nil {
-		return err
-	}
+	credential := credentialRepository.FindCredentials(ctx, repos.CredentialFilter{
+		BaseFilter: repos.BaseFilter{},
+		UserId:     h.Some(request.UserId),
+		Type:       h.Some(constants.CredentialTypePassword),
+	}).Unwrap().First()
 
-	if credentials != nil {
-		credential := credentials[0]
+	if credential.IsSome() {
+		if request.OldPassword == nil {
+			return httpErrors.Unauthorized().WithMessage("missing old password")
+		}
 
-		err = verifyPassword(credential, request.Password)
+		existingCredential := credential.Unwrap()
+		err := verifyPassword(utils.Ptr(existingCredential), *request.OldPassword)
 		if err != nil {
 			return err
 		}
 
-		err = credentialRepository.DeleteCredential(ctx, credential.Id)
+		err = credentialRepository.DeleteCredential(ctx, existingCredential.Id)
 		if err != nil {
 			return err
 		}
@@ -146,23 +140,20 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 		return err
 	}
 
-	_, err = credentialRepository.CreateCredential(ctx, &repositories.Credential{
+	_ = credentialRepository.CreateCredential(ctx, &repos.Credential{
 		UserId: request.UserId,
 		Type:   constants.CredentialTypePassword,
-		Details: repositories.CredentialPasswordDetails{
+		Details: repos.CredentialPasswordDetails{
 			HashedPassword: hashed,
 			Temporary:      request.Temporary,
 		},
-	})
-	if err != nil {
-		return err
-	}
+	}).Unwrap()
 
 	return nil
 }
 
-func verifyPassword(credential *repositories.Credential, password string) error {
-	details := credential.Details.(repositories.CredentialPasswordDetails)
+func verifyPassword(credential *repos.Credential, password string) error {
+	details := credential.Details.(repos.CredentialPasswordDetails)
 
 	err := utils.CompareHash(password, details.HashedPassword)
 	if err != nil {
@@ -175,35 +166,20 @@ func verifyPassword(credential *repositories.Credential, password string) error 
 func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRequest) (*VerifyLoginResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
-	userRepository := ioc.Get[repositories.UserRepository](scope)
-	users, count, err := userRepository.FindUsers(ctx, repositories.UserFilter{
-		RealmId:            request.RealmId,
-		UsernameOrPassword: &request.UsernameOrEmail,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if count == 0 {
-		return nil, httpErrors.Unauthorized().WithMessage("user does not exist")
-	}
-	user := users[0]
+	userRepository := ioc.Get[repos.UserRepository](scope)
+	user := userRepository.FindUsers(ctx, repos.UserFilter{
+		RealmId:         h.Some(request.RealmId),
+		UsernameOrEmail: h.Some(request.UsernameOrEmail),
+	}).Unwrap().First().Unwrap()
 
-	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
-	credentials, count, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
-		BaseFilter: repositories.BaseFilter{},
-		UserId:     &user.Id,
-		Type:       utils.Ptr(constants.CredentialTypePassword),
-	})
-	if err != nil {
-		return nil, err
-	}
-	if count == 0 {
-		return nil, httpErrors.Unauthorized().WithMessage("user is not allowed to log in")
-	}
-	credential := credentials[0]
+	credential := credentialRepository.FindCredentials(ctx, repos.CredentialFilter{
+		UserId: h.Some(user.Id),
+		Type:   h.Some(constants.CredentialTypePassword),
+	}).Unwrap().First().Unwrap()
 
-	err = verifyPassword(credential, request.Password)
+	err := verifyPassword(&credential, request.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -216,23 +192,17 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 func (u *UserServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequest) error {
 	scope := middlewares.GetScope(ctx)
 
-	userRepository := ioc.Get[repositories.UserRepository](scope)
-	user, err := userRepository.FindUserById(ctx, request.UserId)
-	if err != nil {
-		return err
-	}
+	userRepository := ioc.Get[repos.UserRepository](scope)
+	user := userRepository.FindUserById(ctx, request.UserId).Unwrap()
 
-	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
-	credentials, count, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
-		BaseFilter: repositories.BaseFilter{},
-		UserId:     &user.Id,
-		Type:       utils.Ptr(constants.CredentialTypeTotp),
-	})
-	if err != nil {
-		return err
-	}
-	if count == 0 {
+	credentials := credentialRepository.FindCredentials(ctx, repos.CredentialFilter{
+		BaseFilter: repos.BaseFilter{},
+		UserId:     h.Some(user.Id),
+		Type:       h.Some(constants.CredentialTypeTotp),
+	}).Unwrap()
+	if credentials.Count() == 0 {
 		return httpErrors.Unauthorized().WithMessage("no totp configured")
 	}
 
@@ -244,8 +214,8 @@ func (u *UserServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequ
 	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
-	for _, credential := range credentials {
-		details := credential.Details.(repositories.CredentialTotpDetails)
+	for _, credential := range credentials.Values() {
+		details := credential.Details.(repos.CredentialTotpDetails)
 
 		encryptedSecret, err := base64.StdEncoding.DecodeString(details.EncryptedSecretBase64)
 		if err != nil {
@@ -300,19 +270,16 @@ func (s *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest) e
 		encryptedSecretBase64 = utils.Ptr(base64.StdEncoding.EncodeToString(encryptedSecret))
 	}
 
-	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
-	_, err := credentialRepository.CreateCredential(ctx, &repositories.Credential{
+	_ = credentialRepository.CreateCredential(ctx, &repos.Credential{
 		UserId: request.UserId,
 		Type:   constants.CredentialTypeTotp,
-		Details: repositories.CredentialTotpDetails{
+		Details: repos.CredentialTotpDetails{
 			DisplayName:           utils.GetOrDefault(request.DisplayName, "New Totp"),
 			EncryptedSecretBase64: *encryptedSecretBase64,
 		},
-	})
-	if err != nil {
-		return err
-	}
+	}).Unwrap()
 
 	return nil
 }
@@ -320,55 +287,40 @@ func (s *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest) e
 func (s *UserServiceImpl) RequiresTotp(ctx context.Context, userId uuid.UUID) (bool, error) {
 	scope := middlewares.GetScope(ctx)
 
-	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
-	_, totpCount, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
-		BaseFilter: repositories.BaseFilter{
-			PagingInfo: repositories.PagingInfo{
-				PageSize:   1,
-				PageNumber: 0,
-			},
+	credentials := credentialRepository.FindCredentials(ctx, repos.CredentialFilter{
+		BaseFilter: repos.BaseFilter{
+			PagingInfo: h.Some(repos.NewPagingInfo(1, 0)),
 		},
-		UserId: &userId,
-		Type:   utils.Ptr(constants.CredentialTypeTotp),
-	})
-	if err != nil {
-		return false, err
-	}
+		UserId: h.Some(userId),
+		Type:   h.Some(constants.CredentialTypeTotp),
+	}).Unwrap()
 
-	return totpCount > 0, nil
+	return credentials.Count() > 0, nil
 }
 
 func (s *UserServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) (bool, error) {
 	scope := middlewares.GetScope(ctx)
 
-	credentialRepository := ioc.Get[repositories.CredentialRepository](scope)
+	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
-	_, totpCount, err := credentialRepository.FindCredentials(ctx, repositories.CredentialFilter{
-		BaseFilter: repositories.BaseFilter{
-			PagingInfo: repositories.PagingInfo{
+	credentials := credentialRepository.FindCredentials(ctx, repos.CredentialFilter{
+		BaseFilter: repos.BaseFilter{
+			PagingInfo: h.Some(repos.PagingInfo{
 				PageSize:   1,
 				PageNumber: 0,
-			},
+			}),
 		},
-		UserId: &userId,
-		Type:   utils.Ptr(constants.CredentialTypeTotp),
-	})
-	if err != nil {
-		return false, err
-	}
+		UserId: h.Some(userId),
+		Type:   h.Some(constants.CredentialTypeTotp),
+	}).Unwrap()
 
-	userRpository := ioc.Get[repositories.UserRepository](scope)
-	user, err := userRpository.FindUserById(ctx, userId)
-	if err != nil {
-		return false, err
-	}
+	userRepository := ioc.Get[repos.UserRepository](scope)
+	user := userRepository.FindUserById(ctx, userId).Unwrap()
 
-	realmRepository := ioc.Get[repositories.RealmRepository](scope)
-	realm, err := realmRepository.FindRealmById(ctx, user.RealmId)
-	if err != nil {
-		return false, err
-	}
+	realmRepository := ioc.Get[repos.RealmRepository](scope)
+	realm := realmRepository.FindRealmById(ctx, user.RealmId).Unwrap()
 
-	return totpCount == 0 && realm.RequireTotp, nil
+	return credentials.Count() == 0 && realm.RequireTotp, nil
 }

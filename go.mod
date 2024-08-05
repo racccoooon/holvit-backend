@@ -3,6 +3,7 @@ module holvit
 go 1.22
 
 require (
+	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/go-crypt/crypt v0.2.25
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.4.0

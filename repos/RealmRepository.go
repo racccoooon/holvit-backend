@@ -1,10 +1,10 @@
-package repositories
+package repos
 
 import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
-	"holvit/httpErrors"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -29,24 +29,24 @@ type Realm struct {
 type RealmFilter struct {
 	BaseFilter
 
-	Name *string
+	Name h.Optional[string]
 }
 
 type RealmUpdate struct {
-	DisplayName *string
-	Name        *string
+	DisplayName h.Optional[string]
+	Name        h.Optional[string]
 
-	RequireUsername           *bool
-	RequireEmail              *bool
-	RequireDeviceVerification *bool
-	RequireTotp               *bool
-	EnableRememberMe          *bool
+	RequireUsername           h.Optional[bool]
+	RequireEmail              h.Optional[bool]
+	RequireDeviceVerification h.Optional[bool]
+	RequireTotp               h.Optional[bool]
+	EnableRememberMe          h.Optional[bool]
 }
 
 type RealmRepository interface {
-	FindRealmById(ctx context.Context, id uuid.UUID) (*Realm, error)
-	FindRealms(ctx context.Context, filter RealmFilter) ([]*Realm, int, error)
-	CreateRealm(ctx context.Context, realm *Realm) (uuid.UUID, error)
+	FindRealmById(ctx context.Context, id uuid.UUID) h.Optional[Realm]
+	FindRealms(ctx context.Context, filter RealmFilter) h.Result[FilterResult[Realm]]
+	CreateRealm(ctx context.Context, realm *Realm) h.Result[uuid.UUID]
 	UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) error
 }
 
@@ -57,58 +57,51 @@ func NewRealmRepository() RealmRepository {
 	return &RealmRepositoryImpl{}
 }
 
-func (r *RealmRepositoryImpl) FindRealmById(ctx context.Context, id uuid.UUID) (*Realm, error) {
-	result, resultCount, err := r.FindRealms(ctx, RealmFilter{
+func (r *RealmRepositoryImpl) FindRealmById(ctx context.Context, id uuid.UUID) h.Optional[Realm] {
+	return r.FindRealms(ctx, RealmFilter{
 		BaseFilter: BaseFilter{
-			Id: id,
-			PagingInfo: PagingInfo{
-				PageSize:   1,
-				PageNumber: 0,
-			},
+			Id:         h.Some(id),
+			PagingInfo: h.Some(NewPagingInfo(1, 0)),
 		},
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	if resultCount == 0 {
-		return nil, httpErrors.NotFound()
-	}
-	return result[0], nil
+	}).Unwrap().First()
 }
 
-func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter) ([]*Realm, int, error) {
+func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter) h.Result[FilterResult[Realm]] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[Realm]](err)
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
 		"id", "name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_device_verification", "require_totp", "enable_remember_me").
 		From("realms")
 
-	if filter.Name != nil {
-		sb.Where(sb.Equal("name", *filter.Name))
-	}
+	filter.Id.IfSome(func(x uuid.UUID) {
+		sb.Where(sb.Equal("id", x))
+	})
 
-	if filter.PagingInfo.PageSize > 0 {
-		sb.Limit(filter.PagingInfo.PageSize).
-			Offset(filter.PagingInfo.PageSize * (filter.PagingInfo.PageNumber - 1))
+	filter.Name.IfSome(func(x string) {
+		sb.Where(sb.Equal("name", x))
+	})
+
+	if filter.PagingInfo.IsSome() {
+		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
+			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
 	}
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[Realm]](err)
 	}
 	defer rows.Close()
 
 	var totalCount int
-	var result []*Realm
+	var result []Realm
 	for rows.Next() {
 		var row Realm
 		err := rows.Scan(&totalCount,
@@ -122,15 +115,18 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 			&row.RequireTotp,
 			&row.EnableRememberMe)
 		if err != nil {
-			return nil, 0, err
+			return h.Err[FilterResult[Realm]](err)
 		}
-		result = append(result, &row)
+		result = append(result, row)
 	}
 
-	return result, totalCount, nil
+	return h.Ok(pagedResult[Realm]{
+		values: result,
+		count:  totalCount,
+	}.ToResult())
 }
 
-func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm *Realm) (uuid.UUID, error) {
+func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm *Realm) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -138,7 +134,7 @@ func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm *Realm) (uu
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return resultingId, err
+		return h.Err[uuid.UUID](err)
 	}
 
 	sqlString := `insert into "realms"
@@ -156,8 +152,11 @@ func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm *Realm) (uu
 		realm.RequireDeviceVerification,
 		realm.RequireTotp,
 		realm.EnableRememberMe).Scan(&resultingId)
+	if err != nil {
+		return h.Err[uuid.UUID](err)
+	}
 
-	return resultingId, err
+	return h.Ok(resultingId)
 }
 
 func (r *RealmRepositoryImpl) UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) error {
@@ -171,33 +170,33 @@ func (r *RealmRepositoryImpl) UpdateRealm(ctx context.Context, id uuid.UUID, upd
 
 	sb := sqlbuilder.Update("realms")
 
-	if upd.Name != nil {
-		sb.Set(sb.Assign("name", *upd.Name))
-	}
+	upd.Name.IfSome(func(x string) {
+		sb.Set(sb.Assign("name", x))
+	})
 
-	if upd.DisplayName != nil {
-		sb.Set(sb.Assign("display_name", *upd.DisplayName))
-	}
+	upd.DisplayName.IfSome(func(x string) {
+		sb.Set(sb.Assign("display_name", x))
+	})
 
-	if upd.RequireUsername != nil {
-		sb.Set(sb.Assign("require_username", *upd.RequireUsername))
-	}
+	upd.RequireUsername.IfSome(func(x bool) {
+		sb.Set(sb.Assign("require_username", x))
+	})
 
-	if upd.RequireEmail != nil {
-		sb.Set(sb.Assign("require_email", *upd.RequireEmail))
-	}
+	upd.RequireEmail.IfSome(func(x bool) {
+		sb.Set(sb.Assign("require_email", x))
+	})
 
-	if upd.RequireTotp != nil {
-		sb.Set(sb.Assign("require_totp", *upd.RequireTotp))
-	}
+	upd.RequireTotp.IfSome(func(x bool) {
+		sb.Set(sb.Assign("require_totp", x))
+	})
 
-	if upd.EnableRememberMe != nil {
-		sb.Set(sb.Assign("enable_remember_me", *upd.EnableRememberMe))
-	}
+	upd.EnableRememberMe.IfSome(func(x bool) {
+		sb.Set(sb.Assign("enable_remember_me", x))
+	})
 
-	if upd.RequireDeviceVerification != nil {
-		sb.Set(sb.Assign("require_device_verification", *upd.RequireDeviceVerification))
-	}
+	upd.RequireDeviceVerification.IfSome(func(x bool) {
+		sb.Set(sb.Assign("require_device_verification", x))
+	})
 
 	sb.Where(sb.Equal("id", id))
 

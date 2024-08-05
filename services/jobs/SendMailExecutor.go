@@ -5,14 +5,14 @@ import (
 	"crypto/tls"
 	mail "github.com/xhit/go-simple-mail/v2"
 	"holvit/config"
-	"holvit/repositories"
+	"holvit/repos"
 	"time"
 )
 
 type SendMailExecutor struct{}
 
-func (e *SendMailExecutor) Execute(ctx context.Context, details repositories.QueuedJobDetails) error {
-	d := details.(repositories.SendMailJobDetails)
+func (e *SendMailExecutor) Execute(ctx context.Context, details repos.QueuedJobDetails) error {
+	d := details.(repos.SendMailJobDetails)
 
 	server := mail.NewSMTPClient()
 

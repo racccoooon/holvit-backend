@@ -7,7 +7,7 @@ import (
 	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 	"holvit/requestContext"
 	"holvit/services"
 	"net/http"
@@ -17,7 +17,7 @@ type VerifyPasswordRequest struct {
 	Username   string `json:"username"`
 	Password   string `json:"password"`
 	Token      string `json:"token"`
-	RememberMe bool   `json:"rememberMe"`
+	RememberMe bool   `json:"remember_me"`
 }
 
 func VerifyPassword(w http.ResponseWriter, r *http.Request) {
@@ -53,12 +53,9 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	realmRepository := ioc.Get[repositories.RealmRepository](scope)
-	realm, err := realmRepository.FindRealmById(ctx, loginInfo.RealmId)
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
+	realmRepository := ioc.Get[repos.RealmRepository](scope)
+	realm := realmRepository.FindRealmById(ctx, loginInfo.RealmId).Unwrap()
+
 	if request.RememberMe && !realm.EnableRememberMe {
 		rcs.Error(httpErrors.BadRequest().WithMessage("realm does not allow remember me"))
 		return
@@ -75,6 +72,10 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	loginInfo.UserId = loginResponse.UserId
+	loginInfo.DeviceId = deviceIdString
+	loginInfo.RememberMe = request.RememberMe
+
 	nextStep, err := getNextStep(ctx, currentStep, loginInfo)
 	if err != nil {
 		rcs.Error(err)
@@ -86,10 +87,7 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loginInfo.UserId = loginResponse.UserId
 	loginInfo.NextStep = nextStep.Name()
-	loginInfo.DeviceId = deviceIdString
-	loginInfo.RememberMe = request.RememberMe
 
 	err = tokenService.OverwriteLoginCode(ctx, request.Token, *loginInfo)
 	if err != nil {

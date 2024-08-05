@@ -7,10 +7,11 @@ import (
 	"github.com/google/uuid"
 	"holvit/cache"
 	"holvit/constants"
+	"holvit/h"
 	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 	"holvit/requestContext"
 	"holvit/utils"
 	"net/http"
@@ -34,9 +35,9 @@ type AuthorizationResponse interface {
 }
 
 type ScopeConsentResponse struct {
-	RequiredGrants []*repositories.Scope
-	Client         *repositories.Client
-	User           *repositories.User
+	RequiredGrants []repos.Scope
+	Client         *repos.Client
+	User           *repos.User
 	Token          string
 	RedirectUri    string
 }
@@ -64,7 +65,7 @@ func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request
 		Authorize: &utils.AuthFrontendDataAuthorize{
 			ClientName: c.Client.DisplayName,
 			User: utils.AuthFrontendUser{
-				Name: *c.User.Username, // TODO: handle the case that there is no username
+				Name: c.User.Username.Unwrap(), // TODO: handle the case that there is no username
 			},
 			Scopes:    scopes,
 			Token:     c.Token,
@@ -296,17 +297,14 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 		return nil, httpErrors.Unauthorized().WithMessage("too many scopes")
 	}
 
-	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
-	scopes, _, err := scopeRepository.FindScopes(ctx, repositories.ScopeFilter{
+	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
+	scopes := scopeRepository.FindScopes(ctx, repos.ScopeFilter{
 		RealmId: refreshToken.RealmId,
-		Names:   request.ScopeNames,
-	})
-	if err != nil {
-		return nil, err
-	}
+		Names:   h.Some(request.ScopeNames),
+	}).Unwrap()
 
 	grantedScopeIds := make([]uuid.UUID, 0)
-	for _, dbScope := range scopes {
+	for _, dbScope := range scopes.Values() {
 		grantedScopeIds = append(grantedScopeIds, dbScope.Id)
 	}
 
@@ -373,17 +371,14 @@ func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) 
 
 	currentUser := ioc.Get[CurrentUserService](scope)
 
-	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
-	scopes, _, err := scopeRepository.FindScopes(ctx, repositories.ScopeFilter{
+	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
+	scopes := scopeRepository.FindScopes(ctx, repos.ScopeFilter{
 		RealmId: grantRequest.RealmId,
-		Names:   grantRequest.ScopeNames,
-	})
-	if err != nil {
-		return nil, err
-	}
+		Names:   h.Some(grantRequest.ScopeNames),
+	}).Unwrap()
 
-	scopeIds := make([]uuid.UUID, 0, len(scopes))
-	for _, scope := range scopes {
+	scopeIds := make([]uuid.UUID, 0)
+	for _, scope := range scopes.Values() {
 		scopeIds = append(scopeIds, scope.Id)
 	}
 
@@ -415,86 +410,63 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 
 	scope := middlewares.GetScope(ctx)
 
-	realmRepository := ioc.Get[repositories.RealmRepository](scope)
-	realms, count, err := realmRepository.FindRealms(ctx, repositories.RealmFilter{
-		Name: &authorizationRequest.RealmName,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if count == 0 {
-		return nil, httpErrors.NotFound().WithMessage("Realm not found")
-	}
-	realm := realms[0]
+	realmRepository := ioc.Get[repos.RealmRepository](scope)
+	realm := realmRepository.FindRealms(ctx, repos.RealmFilter{
+		Name: h.Some(authorizationRequest.RealmName),
+	}).Unwrap().First().Unwrap()
 
-	clientRepository := ioc.Get[repositories.ClientRepository](scope)
-	clients, count, err := clientRepository.FindClients(ctx, repositories.ClientFilter{
-		RealmId:  &realm.Id,
-		ClientId: &authorizationRequest.ClientId,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if count == 0 {
-		return nil, httpErrors.NotFound().WithMessage("Client not found")
-	}
-	client := clients[0]
+	clientRepository := ioc.Get[repos.ClientRepository](scope)
+	client := clientRepository.FindClients(ctx, repos.ClientFilter{
+		RealmId:  h.Some(realm.Id),
+		ClientId: h.Some(authorizationRequest.ClientId),
+	}).Unwrap().First().Unwrap()
 
 	currentUser := ioc.Get[CurrentUserService](scope)
 
-	scopeRepository := ioc.Get[repositories.ScopeRepository](scope)
+	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
 	userid, err := currentUser.UserId()
 	if err != nil {
 		return nil, err
 	}
 
-	scopes, count, err := scopeRepository.FindScopes(ctx, repositories.ScopeFilter{
-		Names:         authorizationRequest.Scopes,
-		UserId:        &userid,
-		ClientId:      &client.Id,
+	scopes := scopeRepository.FindScopes(ctx, repos.ScopeFilter{
+		Names:         h.Some(authorizationRequest.Scopes),
+		UserId:        h.Some(userid),
+		ClientId:      h.Some(client.Id),
 		RealmId:       realm.Id,
 		IncludeGrants: true,
-	})
-	if err != nil {
-		return nil, err
-	}
+	}).Unwrap()
 
-	missingGrants := make([]*repositories.Scope, 0, len(scopes))
-	for _, oidcScope := range scopes {
+	missingGrants := make([]repos.Scope, 0)
+	for _, oidcScope := range scopes.Values() {
 		if oidcScope.Grant == nil {
 			missingGrants = append(missingGrants, oidcScope)
 		}
 	}
 
-	//TODO: only on first round!
+	//TODO: only on first round
 	if len(missingGrants) > 0 {
 		tokenService := ioc.Get[TokenService](scope)
-		token, err := tokenService.StoreGrantInfo(ctx, GrantInfo{
+		token := tokenService.StoreGrantInfo(ctx, GrantInfo{
 			RealmId:              realm.Id,
 			ClientId:             client.Id,
 			AuthorizationRequest: authorizationRequest,
 		})
-		if err != nil {
-			return nil, err
-		}
 
-		user, err := currentUser.User(ctx)
-		if err != nil {
-			return nil, err
-		}
+		user := currentUser.User(ctx)
 
 		return &ScopeConsentResponse{
 			RequiredGrants: missingGrants,
-			Token:          token,
-			Client:         client,
-			User:           user,
+			Token:          token.Unwrap(),
+			Client:         &client,
+			User:           user.Unwrap(),
 			RedirectUri:    authorizationRequest.RedirectUri,
 		}, nil
 	}
 
-	grantedScopes := make([]string, 0, len(scopes))
-	grantedScopeIds := make([]uuid.UUID, 0, len(scopes))
-	for _, oidcScope := range scopes {
+	grantedScopes := make([]string, 0)
+	grantedScopeIds := make([]uuid.UUID, 0)
+	for _, oidcScope := range scopes.Values() {
 		if oidcScope.Grant != nil {
 			grantedScopes = append(grantedScopes, oidcScope.Name)
 			grantedScopeIds = append(grantedScopeIds, oidcScope.Id)

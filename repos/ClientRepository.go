@@ -1,11 +1,11 @@
-package repositories
+package repos
 
 import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/lib/pq"
-	"holvit/httpErrors"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -28,19 +28,19 @@ type Client struct {
 type ClientFilter struct {
 	BaseFilter
 
-	RealmId  *uuid.UUID
-	ClientId *string
+	RealmId  h.Optional[uuid.UUID]
+	ClientId h.Optional[string]
 }
 
 type ClientUpdate struct {
-	DisplayName  *string
-	RedirectUris *[]string
+	DisplayName  h.Optional[string]
+	RedirectUris h.Optional[[]string]
 }
 
 type ClientRepository interface {
-	FindClientById(ctx context.Context, id uuid.UUID) (*Client, error)
-	FindClients(ctx context.Context, filter ClientFilter) ([]*Client, int, error)
-	CreateClient(ctx context.Context, client *Client) (uuid.UUID, error)
+	FindClientById(ctx context.Context, id uuid.UUID) h.Optional[Client]
+	FindClients(ctx context.Context, filter ClientFilter) h.Result[FilterResult[Client]]
+	CreateClient(ctx context.Context, client *Client) h.Result[uuid.UUID]
 	UpdateClient(ctx context.Context, id uuid.UUID, upd *ClientUpdate) error
 }
 
@@ -50,58 +50,55 @@ func NewClientRepository() ClientRepository {
 	return &ClientRepositoryImpl{}
 }
 
-func (c *ClientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID) (*Client, error) {
-	result, resultCount, err := c.FindClients(ctx, ClientFilter{
+func (c *ClientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID) h.Optional[Client] {
+	return c.FindClients(ctx, ClientFilter{
 		BaseFilter: BaseFilter{
-			Id: id,
-			PagingInfo: PagingInfo{
-				PageSize:   1,
-				PageNumber: 0,
-			},
+			Id:         h.Some(id),
+			PagingInfo: h.Some(NewPagingInfo(1, 0)),
 		},
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	if resultCount == 0 {
-		return nil, httpErrors.NotFound()
-	}
-	return result[0], nil
+	}).Unwrap().First()
 }
 
-func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFilter) ([]*Client, int, error) {
+func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFilter) h.Result[FilterResult[Client]] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[Client]](err)
 	}
 
 	sb := sqlbuilder.Select("count(*) over()",
 		"id", "realm_id", "display_name", "client_id", "hashed_client_secret", "redirect_uris").
 		From("clients")
 
-	if filter.ClientId != nil {
-		sb.Where(sb.Equal("client_id", *filter.ClientId))
-	}
+	filter.Id.IfSome(func(x uuid.UUID) {
+		sb.Where(sb.Equal("id", x))
+	})
 
-	if filter.PagingInfo.PageSize > 0 {
-		sb.Limit(filter.PagingInfo.PageSize).
-			Offset(filter.PagingInfo.PageSize * (filter.PagingInfo.PageNumber - 1))
+	filter.RealmId.IfSome(func(x uuid.UUID) {
+		sb.Where(sb.Equal("realm_id", x))
+	})
+
+	filter.ClientId.IfSome(func(x string) {
+		sb.Where(sb.Equal("client_id", x))
+	})
+
+	if filter.PagingInfo.IsSome() {
+		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
+			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
 	}
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return nil, 0, err
+		return h.Err[FilterResult[Client]](err)
 	}
 	defer rows.Close()
 
 	var totalCount int
-	var result []*Client
+	var result []Client
 	for rows.Next() {
 		var row Client
 		err := rows.Scan(&totalCount,
@@ -112,15 +109,18 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 			&row.ClientSecret,
 			pq.Array(&row.RedirectUris))
 		if err != nil {
-			return nil, 0, err
+			return h.Err[FilterResult[Client]](err)
 		}
-		result = append(result, &row)
+		result = append(result, row)
 	}
 
-	return result, totalCount, nil
+	return h.Ok(pagedResult[Client]{
+		values: result,
+		count:  totalCount,
+	}.ToResult())
 }
 
-func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client) (uuid.UUID, error) {
+func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -128,7 +128,7 @@ func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return resultingId, err
+		return h.Err[uuid.UUID](err)
 	}
 
 	err = tx.QueryRow(`insert into "clients"
@@ -140,8 +140,11 @@ func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client)
 		client.ClientId,
 		client.ClientSecret,
 		pq.Array(client.RedirectUris)).Scan(&resultingId)
+	if err != nil {
+		return h.Err[uuid.UUID](err)
+	}
 
-	return resultingId, err
+	return h.Ok(resultingId)
 }
 
 func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, upd *ClientUpdate) error {
@@ -155,13 +158,13 @@ func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, u
 
 	sb := sqlbuilder.Update("clients")
 
-	if upd.DisplayName != nil {
-		sb.Set(sb.Assign("display_name", *upd.DisplayName))
-	}
+	upd.DisplayName.IfSome(func(x string) {
+		sb.Set(sb.Assign("display_name", x))
+	})
 
-	if upd.RedirectUris != nil {
-		sb.Set(sb.Assign("redirect_uris", *upd.RedirectUris))
-	}
+	upd.RedirectUris.IfSome(func(x []string) {
+		sb.Set(sb.Assign("redirect_uris", x))
+	})
 
 	sb.Where(sb.Equal("id", id))
 

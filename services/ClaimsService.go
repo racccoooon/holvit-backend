@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"holvit/constants"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
-	"holvit/repositories"
+	"holvit/repos"
 )
 
 type ClaimResponse struct {
@@ -34,18 +35,15 @@ type ClaimsServiceImpl struct{}
 func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequest) ([]*ClaimResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
-	claimMapperRepository := ioc.Get[repositories.ClaimMapperRepository](scope)
-	mappers, _, err := claimMapperRepository.FindClaimMappers(ctx, repositories.ClaimMapperFilter{
-		ScopeIds: request.ScopeIds,
-	})
-	if err != nil {
-		return nil, err
-	}
+	claimMapperRepository := ioc.Get[repos.ClaimMapperRepository](scope)
+	mappers := claimMapperRepository.FindClaimMappers(ctx, repos.ClaimMapperFilter{
+		ScopeIds: h.Some(request.ScopeIds),
+	}).Unwrap()
 
-	claims := make([]*ClaimResponse, 0, len(mappers))
+	claims := make([]*ClaimResponse, 0, len(mappers.Values()))
 
 	userInfoMappers := make([]interface{}, 0)
-	for _, mapper := range mappers {
+	for _, mapper := range mappers.Values() {
 		switch mapper.Type {
 		case constants.ClaimMapperUserInfo:
 			userInfoMappers = append(userInfoMappers, mapper.Details)
@@ -53,15 +51,12 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 		}
 	}
 
-	userRepository := ioc.Get[repositories.UserRepository](scope)
+	userRepository := ioc.Get[repos.UserRepository](scope)
 	if len(userInfoMappers) > 0 {
-		user, err := userRepository.FindUserById(ctx, request.UserId)
-		if err != nil {
-			return nil, err
-		}
+		user := userRepository.FindUserById(ctx, request.UserId).Unwrap()
 
 		for _, m := range userInfoMappers {
-			mapper := m.(repositories.UserInfoClaimMapperDetails)
+			mapper := m.(repos.UserInfoClaimMapperDetails)
 
 			switch mapper.Property {
 			case constants.UserInfoPropertyId:
@@ -71,23 +66,23 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 				})
 				break
 			case constants.UserInfoPropertyUsername:
-				if user.Username != nil {
+				user.Username.IfSome(func(x string) {
 					claims = append(claims, &ClaimResponse{
 						Name:  mapper.ClaimName,
-						Claim: *user.Username,
+						Claim: x,
 					})
-				}
+				})
 				break
 			case constants.UserInfoPropertyEmail:
-				if user.Email != nil {
+				user.Email.IfSome(func(x string) {
 					claims = append(claims, &ClaimResponse{
 						Name:  mapper.ClaimName,
-						Claim: *user.Email,
+						Claim: x,
 					})
-				}
+				})
 				break
 			case constants.UserInfoPropertyEmailVerified:
-				if user.Email != nil {
+				if user.Email.IsSome() {
 					claims = append(claims, &ClaimResponse{
 						Name:  mapper.ClaimName,
 						Claim: fmt.Sprintf("%t", user.EmailVerified),

@@ -1,7 +1,9 @@
 package repos
 
 import (
+	"fmt"
 	"github.com/google/uuid"
+	"github.com/huandu/go-sqlbuilder"
 	"holvit/h"
 )
 
@@ -13,6 +15,14 @@ type BaseFilter struct {
 type PagingInfo struct {
 	PageSize   int
 	PageNumber int
+}
+
+func (i PagingInfo) Apply(sb *sqlbuilder.SelectBuilder) {
+	sb.Limit(i.PageSize).Offset(i.PageSize * (i.PageNumber - 1))
+}
+
+func (i PagingInfo) SqlString() string {
+	return fmt.Sprintf(" limit %d offset %d", i.PageSize, i.PageSize*(i.PageNumber-1))
 }
 
 type FilterResult[T any] interface {
@@ -30,8 +40,15 @@ func first[T any](r FilterResult[T]) h.Optional[T] {
 }
 
 type pagedResult[T any] struct {
-	values []T
-	count  int
+	values     []T
+	totalCount int
+}
+
+func NewPagedResult[T any](values []T, totalCount int) FilterResult[T] {
+	return &pagedResult[T]{
+		values:     values,
+		totalCount: totalCount,
+	}
 }
 
 func (p *pagedResult[T]) Values() []T {
@@ -39,7 +56,7 @@ func (p *pagedResult[T]) Values() []T {
 }
 
 func (p *pagedResult[T]) Count() int {
-	return p.count
+	return p.totalCount
 }
 
 func (p *pagedResult[T]) First() h.Optional[T] {

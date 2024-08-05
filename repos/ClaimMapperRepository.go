@@ -106,9 +106,9 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 		sqlString += fmt.Sprintf(" and exists (select 1 from scope_claims sc where sc.claim_mapper_id = c.id and sc.scope_id = any($%d::uuid[]))", len(args))
 	})
 
-	if filter.PagingInfo.IsSome() {
-		sqlString += fmt.Sprintf(" limit %d offset %d", filter.PagingInfo.Unwrap().PageSize, filter.PagingInfo.Unwrap().PageSize*(filter.PagingInfo.Unwrap().PageNumber-1))
-	}
+	filter.PagingInfo.IfSome(func(x PagingInfo) {
+		sqlString += x.SqlString()
+	})
 
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
@@ -149,10 +149,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 		result = append(result, row)
 	}
 
-	return h.Ok(pagedResult[ClaimMapper]{
-		values: result,
-		count:  totalCount,
-	}.ToResult())
+	return h.Ok(NewPagedResult(result, totalCount))
 }
 
 func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claimMapper *ClaimMapper) h.Result[uuid.UUID] {

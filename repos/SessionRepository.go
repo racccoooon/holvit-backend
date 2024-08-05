@@ -100,10 +100,9 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 		sb.Where(sb.Equal("user_id", x))
 	})
 
-	if filter.PagingInfo.IsSome() {
-		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
-			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
-	}
+	filter.PagingInfo.IfSome(func(x PagingInfo) {
+		x.Apply(sb)
+	})
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
@@ -130,10 +129,7 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 		result = append(result, row)
 	}
 
-	return h.Ok(pagedResult[Session]{
-		values: result,
-		count:  totalCount,
-	}.ToResult())
+	return h.Ok(NewPagedResult(result, totalCount))
 }
 
 func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Session) h.Result[uuid.UUID] {

@@ -117,10 +117,9 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 		sb.Where(sb.Equal("status", x))
 	})
 
-	if filter.PagingInfo.IsSome() {
-		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
-			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
-	}
+	filter.PagingInfo.IfSome(func(x PagingInfo) {
+		x.Apply(sb)
+	})
 
 	if filter.IgnoreLocked {
 		sb.SQL("for update skip locked")
@@ -166,10 +165,7 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 		result = append(result, row)
 	}
 
-	return h.Ok(pagedResult[QueuedJob]{
-		values: result,
-		count:  totalCount,
-	}.ToResult())
+	return h.Ok(NewPagedResult(result, totalCount))
 }
 
 func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job *QueuedJob) h.Result[uuid.UUID] {

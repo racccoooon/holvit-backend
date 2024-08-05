@@ -77,10 +77,9 @@ func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter U
 		sb.Where(sb.Equal("user_id", x))
 	})
 
-	if filter.PagingInfo.IsSome() {
-		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
-			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
-	}
+	filter.PagingInfo.IfSome(func(x PagingInfo) {
+		x.Apply(sb)
+	})
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
@@ -108,10 +107,7 @@ func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter U
 		result = append(result, row)
 	}
 
-	return h.Ok(pagedResult[UserDevice]{
-		values: result,
-		count:  totalCount,
-	}.ToResult())
+	return h.Ok(NewPagedResult(result, totalCount))
 }
 
 func (r *UserDeviceRepositoryImpl) CreateUserDevice(ctx context.Context, userDevice *UserDevice) h.Result[uuid.UUID] {

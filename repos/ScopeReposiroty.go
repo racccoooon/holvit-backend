@@ -115,6 +115,10 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 		sql += fmt.Sprintf(" and (g.client_id = $%d or g.client_id is null)", len(parameters))
 	})
 
+	filter.PagingInfo.IfSome(func(x PagingInfo) {
+		sql += x.SqlString()
+	})
+
 	sql += ` order by "sort_index" asc`
 
 	logging.Logger.Debugf("executing sql: %s", sql)
@@ -152,10 +156,7 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 		result = append(result, row)
 	}
 
-	return h.Ok(pagedResult[Scope]{
-		values: result,
-		count:  totalCount,
-	}.ToResult())
+	return h.Ok(NewPagedResult(result, totalCount))
 }
 
 func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope Scope) h.Result[uuid.UUID] {

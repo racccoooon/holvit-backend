@@ -82,10 +82,9 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 		sb.Where(sb.Equal("client_id", x))
 	})
 
-	if filter.PagingInfo.IsSome() {
-		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
-			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
-	}
+	filter.PagingInfo.IfSome(func(x PagingInfo) {
+		x.Apply(sb)
+	})
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
@@ -116,10 +115,7 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 		result = append(result, row)
 	}
 
-	return h.Ok(pagedResult[RefreshToken]{
-		values: result,
-		count:  totalCount,
-	}.ToResult())
+	return h.Ok(NewPagedResult(result, totalCount))
 }
 
 func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) h.Result[uuid.UUID] {

@@ -84,10 +84,9 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 		sb.Where(sb.Equal("client_id", x))
 	})
 
-	if filter.PagingInfo.IsSome() {
-		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
-			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
-	}
+	filter.PagingInfo.IfSome(func(x PagingInfo) {
+		x.Apply(sb)
+	})
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
@@ -114,10 +113,7 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 		result = append(result, row)
 	}
 
-	return h.Ok(pagedResult[Client]{
-		values: result,
-		count:  totalCount,
-	}.ToResult())
+	return h.Ok(NewPagedResult(result, totalCount))
 }
 
 func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client) h.Result[uuid.UUID] {

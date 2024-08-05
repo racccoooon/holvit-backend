@@ -77,10 +77,9 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 
 	})
 
-	if filter.PagingInfo.IsSome() {
-		sb.Limit(filter.PagingInfo.Unwrap().PageSize).
-			Offset(filter.PagingInfo.Unwrap().PageSize * (filter.PagingInfo.Unwrap().PageNumber - 1))
-	}
+	filter.PagingInfo.IfSome(func(x PagingInfo) {
+		x.Apply(sb)
+	})
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
@@ -113,10 +112,7 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 		result = append(result, row)
 	}
 
-	return h.Ok(pagedResult[User]{
-		values: result,
-		count:  totalCount,
-	}.ToResult())
+	return h.Ok(NewPagedResult(result, totalCount))
 }
 
 func (u *UserRepositoryImpl) CreateUser(ctx context.Context, user *User) h.Result[uuid.UUID] {

@@ -50,9 +50,9 @@ func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "text/html")
 
-	scopes := make([]utils.AuthFrontendScope, 0, len(c.RequiredGrants))
+	scopes := make([]AuthFrontendScope, 0, len(c.RequiredGrants))
 	for _, grant := range c.RequiredGrants {
-		scopes = append(scopes, utils.AuthFrontendScope{
+		scopes = append(scopes, AuthFrontendScope{
 			Required:    grant.Name == "openid", // TODO: idk what lol
 			Name:        grant.Name,
 			DisplayName: grant.DisplayName,
@@ -60,11 +60,11 @@ func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request
 		})
 	}
 
-	frontendData := utils.AuthFrontendData{
+	frontendData := AuthFrontendData{
 		Mode: constants.FrontendModeAuthorize,
-		Authorize: &utils.AuthFrontendDataAuthorize{
+		Authorize: &AuthFrontendDataAuthorize{
 			ClientName: c.Client.DisplayName,
-			User: utils.AuthFrontendUser{
+			User: AuthFrontendUser{
 				Name: c.User.Username.Unwrap(), // TODO: handle the case that there is no username
 			},
 			Scopes:    scopes,
@@ -75,7 +75,9 @@ func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request
 		},
 	}
 
-	err := utils.ServeAuthFrontend(w, frontendData)
+	frontendService := ioc.Get[FrontendService](scope)
+
+	err := frontendService.WriteAuthFrontend(w, frontendData)
 	if err != nil {
 		rcs.Error(err)
 	}

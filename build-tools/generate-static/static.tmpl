@@ -1,0 +1,56 @@
+{{if ne .BuildFlags "" -}}
+//go:build {{ .BuildFlags }}
+{{- end}}
+
+
+// Code generated DO NOT EDIT
+
+
+package {{ .PackageName }}
+
+import "holvit/static"
+
+type {{ .TypeName }} struct {
+    {{- range $variant := .Variants}}
+    {{ $variant.Id }} static.File
+    {{- end}}
+}
+
+func (a {{ .TypeName }}) Get(name string, encoding string) *static.File {
+	switch name {
+	{{- range $file := .Files}}
+	case "{{$file.Name}}":
+		switch encoding {
+		{{- range $enc, $variant := $file.OtherVariants}}
+		case "{{$enc}}":
+			return &a.{{$variant.Id}}
+		{{- end}}
+		default:
+			return &a.{{$file.DefaultVariant.Id}}
+		}
+    {{- end}}
+	default:
+		return nil
+	}
+}
+
+var {{ .StructName }} = {{ .TypeName }}{
+    {{- range $file := .Files}}
+    {{- range $enc, $variant := $file.Variants}}
+    {{$variant.Id}}: static.File{
+            Content:         {{$variant.Id}}_data,
+            ContentType:     "{{$file.ContentType}}",
+            ContentEncoding: "{{$enc}}",
+        },
+    {{- end}}
+    {{- end}}
+}
+
+
+{{ range $variant := .Variants}}
+var {{ $variant.Id }}_data = []byte{
+    {{- range $byte := $variant.Content -}}
+    {{- $byte -}},
+    {{- end -}}
+}
+{{- end}}

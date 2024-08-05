@@ -135,6 +135,8 @@ func configureServices() *ioc.DependencyProvider {
 		return c
 	})
 
+	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) services.FrontendService { return services.NewFrontendService() })
+
 	ioc.AddScoped(builder, func(dp *ioc.DependencyProvider) requestContext.RequestContextService {
 		return requestContext.NewRequestContextService(dp)
 	})

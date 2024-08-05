@@ -1,0 +1,14 @@
+// Code Generated DO NOT EDIT
+
+package {{ .PackageName }}
+
+import "holvit/static"
+
+var {{ .VariableName }} = static.Manifest{
+	JsEntrypoint: "{{ .Entrypoint }}",
+	Stylesheets: []string{
+	    {{- range $style := .Styles }}
+		"{{$style}}",
+		{{- end}}
+	},
+}

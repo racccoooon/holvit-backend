@@ -12,7 +12,6 @@ import (
 	"holvit/repos"
 	"holvit/requestContext"
 	"holvit/services"
-	"holvit/utils"
 	"net/http"
 	"strings"
 )
@@ -40,15 +39,17 @@ func login(w http.ResponseWriter, r *http.Request, realmName string, request ser
 		return err
 	}
 
-	frontendData := utils.AuthFrontendData{
+	frontendData := services.AuthFrontendData{
 		Mode: constants.FrontendModeAuthenticate,
-		Authenticate: &utils.AuthFrontendDataAuthenticate{
+		Authenticate: &services.AuthFrontendDataAuthenticate{
 			Token:         loginToken,
 			UseRememberMe: realm.EnableRememberMe,
 		},
 	}
 
-	err = utils.ServeAuthFrontend(w, frontendData)
+	frontendService := ioc.Get[services.FrontendService](scope)
+
+	err = frontendService.WriteAuthFrontend(w, frontendData)
 	if err != nil {
 		return err
 	}

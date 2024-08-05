@@ -6,6 +6,7 @@ require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/go-crypt/crypt v0.2.25
 	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/google/brotli/go/cbrotli v0.0.0-20240715182736-39bcecf4559f
 	github.com/google/uuid v1.4.0
 	github.com/gorilla/mux v1.8.1
 	github.com/huandu/go-sqlbuilder v1.28.0
@@ -17,6 +18,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rubenv/sql-migrate v1.7.0
 	github.com/spf13/viper v1.19.0
+	github.com/timewasted/go-accept-headers v0.0.0-20130320203746-c78f304b1b09
 	github.com/stretchr/testify v1.9.0
 	github.com/xhit/go-simple-mail/v2 v2.16.0
 	go.uber.org/zap v1.21.0

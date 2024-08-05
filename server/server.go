@@ -51,6 +51,8 @@ func ServeApi(dp *ioc.DependencyProvider) {
 	r.HandleFunc("/api/auth/get-onboarding-totp", auth.GetOnboardingTotp).Methods("POST")
 	// TODO: r.HandleFunc("/api/auth/resend-email-verification", auth.ResendEmailVerification).Methods("POST")
 
+	registerStatics(r)
+
 	srv := &http.Server{
 		Handler:      r,
 		Addr:         address,

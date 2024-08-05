@@ -13,6 +13,12 @@ import (
 type HolvitConfig struct {
 	Environment string
 
+	Development struct {
+		AuthFrontendUrl string
+	}
+
+	StaticRoot string
+
 	Secret string
 
 	MasterRealmName        string
@@ -119,6 +125,9 @@ func readFlags() {
 
 func setDefaultConfigValues() {
 	C.Environment = Production
+
+	C.Development.AuthFrontendUrl = "http://localhost:5173/"
+	C.StaticRoot = "/static/"
 
 	C.HashAlgorithm = constants.HashAlgorithmBCrypt
 	C.BCryptSettings.Cost = bcrypt.DefaultCost

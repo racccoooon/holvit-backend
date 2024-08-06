@@ -73,11 +73,7 @@ func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, reques
 	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
-	token, err := utils.GenerateRandomStringBase64(32)
-	if err != nil {
-		return "", nil, err
-	}
-
+	token := utils.GenerateRandomStringBase64(32) // TODO: constant
 	hashedToken := utils.CheapHash(token)
 
 	refreshTokenRepository := ioc.Get[repos.RefreshTokenRepository](scope)

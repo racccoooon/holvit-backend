@@ -22,89 +22,92 @@ func GenerateRandomBytes(length int) ([]byte, error) {
 	return bytes, nil
 }
 
-func GenerateRandomNumber(max int64) (int, error) {
+func GenerateRandomNumber(max int64) int {
 	i, err := rand.Int(rand.Reader, big.NewInt(max))
 	if err != nil {
-		return 0, err
+		panic(err)
 	}
-	return int(i.Int64()), nil
+	return int(i.Int64())
 }
 
-func GenerateRandomStringBase64(length int) (string, error) {
+func GenerateRandomStringBase64(length int) string {
 	bytes, err := GenerateRandomBytes(length)
 	if err != nil {
-		return "", err
+		panic(err)
 	}
 
-	return base64.StdEncoding.EncodeToString(bytes), nil
+	return base64.StdEncoding.EncodeToString(bytes)
 }
 
-func GenerateKeyPair() (ed25519.PrivateKey, ed25519.PublicKey, error) {
+func GenerateKeyPair() (ed25519.PrivateKey, ed25519.PublicKey) {
 	publicKey, privateKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate Ed25519 key pair: %v", err)
+		panic(fmt.Errorf("failed to generate Ed25519 key pair: %v", err))
 	}
-	return privateKey, publicKey, nil
+	return privateKey, publicKey
 }
 
 func ExportPrivateKey(privateKey ed25519.PrivateKey) []byte {
 	return privateKey
 }
 
-func ImportPrivateKey(privateKeyBytes []byte) (ed25519.PrivateKey, ed25519.PublicKey, error) {
+func ImportPrivateKey(privateKeyBytes []byte) (ed25519.PrivateKey, ed25519.PublicKey) {
 	if len(privateKeyBytes) != ed25519.PrivateKeySize {
-		return nil, nil, fmt.Errorf("invalid private key size: expected %d bytes, got %d bytes", ed25519.PrivateKeySize, len(privateKeyBytes))
+		panic(fmt.Errorf("invalid private key size: expected %d bytes, got %d bytes", ed25519.PrivateKeySize, len(privateKeyBytes)))
 	}
 
 	privateKey := ed25519.PrivateKey(privateKeyBytes)
 	publicKey := privateKey.Public().(ed25519.PublicKey)
 
-	return privateKey, publicKey, nil
+	return privateKey, publicKey
 }
 
-func GenerateSymmetricKeyFromText(aesKeyStr string) ([]byte, error) {
-	// TODO: maybe change to pbkdf2 later
+func GenerateSymmetricKeyFromText(aesKeyStr string) []byte {
 	hashedKey := sha256.Sum256([]byte(aesKeyStr))
-
-	return hashedKey[:32], nil
+	return hashedKey[:32]
 }
 
-func EncryptSymmetric(plain []byte, key []byte) ([]byte, error) {
+func EncryptSymmetric(plain []byte, key []byte) []byte {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	nonce, err := GenerateRandomBytes(gcm.NonceSize())
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	ciphertext := gcm.Seal(nonce, nonce, plain, nil)
-	return ciphertext, nil
+	return ciphertext
 }
 
-func DecryptSymmetric(ciphertext []byte, key []byte) ([]byte, error) {
+func DecryptSymmetric(ciphertext []byte, key []byte) []byte {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	nonceSize := gcm.NonceSize()
 	if len(ciphertext) < nonceSize {
-		return nil, errors.New("ciphertext too short")
+		panic(errors.New("ciphertext too short"))
 	}
 
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-	return gcm.Open(nil, nonce, ciphertext, nil)
+	open, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	return open
 }

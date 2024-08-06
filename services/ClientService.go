@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"holvit/config"
 	"holvit/h"
+	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
 	"holvit/repos"
@@ -48,9 +49,9 @@ func (c *ClientServiceImpl) Authenticate(ctx context.Context, request Authentica
 	}).Unwrap().First()
 
 	requestClientSecret, _ := strings.CutPrefix(request.ClientSecret, "secret_")
-	err := utils.CompareHash(requestClientSecret, client.ClientSecret)
-	if err != nil {
-		return nil, err
+	valid := utils.CompareHash(requestClientSecret, client.ClientSecret)
+	if !valid {
+		return nil, httpErrors.Unauthorized()
 	}
 
 	return &client, nil
@@ -67,16 +68,10 @@ func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClie
 	}
 	clientIdString := clientId.String()
 
-	clientSecret, err := utils.GenerateRandomStringBase64(32)
-	if err != nil {
-		return nil, err
-	}
+	clientSecret := utils.GenerateRandomStringBase64(32)
 
 	hashAlgorithm := config.C.GetHashAlgorithm()
-	hashedClientSecret, err := hashAlgorithm.Hash(clientSecret)
-	if err != nil {
-		return nil, err
-	}
+	hashedClientSecret := hashAlgorithm.Hash(clientSecret)
 
 	client := repos.Client{
 		RealmId:      request.RealmId,

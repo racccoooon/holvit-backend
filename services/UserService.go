@@ -44,10 +44,7 @@ func (s TotpAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) {
 		panic(httpErrors.Unauthorized().WithMessage("no totp configured for user"))
 	}
 
-	key, err := config.C.GetSymmetricEncryptionKey()
-	if err != nil {
-		panic(err)
-	}
+	key := config.C.GetSymmetricEncryptionKey()
 
 	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
@@ -60,10 +57,7 @@ func (s TotpAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) {
 			panic(err)
 		}
 
-		secret, err := utils.DecryptSymmetric(encryptedSecret, key)
-		if err != nil {
-			panic(err)
-		}
+		secret := utils.DecryptSymmetric(encryptedSecret, key)
 
 		isValid, err := totp.ValidateCustom(s.Code, string(secret), now, totp.ValidateOpts{
 			Period:    config.C.Totp.Period,
@@ -99,8 +93,8 @@ func (s PasswordAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) {
 
 	details := credential.Details.(repos.CredentialPasswordDetails)
 
-	err := utils.CompareHash(s.Password, details.HashedPassword)
-	if err != nil {
+	valid := utils.CompareHash(s.Password, details.HashedPassword)
+	if !valid {
 		panic(httpErrors.Unauthorized().WithMessage("failed to verify password"))
 	}
 }
@@ -193,12 +187,9 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 	}
 
 	hashAlgorithm := config.C.GetHashAlgorithm()
-	hashed, err := hashAlgorithm.Hash(request.Password)
-	if err != nil {
-		return err
-	}
+	hashed := hashAlgorithm.Hash(request.Password)
 
-	err = credentialRepository.CreateCredential(ctx, &repos.Credential{
+	err := credentialRepository.CreateCredential(ctx, &repos.Credential{
 		UserId: request.UserId,
 		Type:   constants.CredentialTypePassword,
 		Details: repos.CredentialPasswordDetails{
@@ -232,21 +223,13 @@ func (u *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest, s
 
 	scope := middlewares.GetScope(ctx)
 
-	key, err := config.C.GetSymmetricEncryptionKey()
-	if err != nil {
-		return err
-	}
-
-	encryptedSecret, err := utils.EncryptSymmetric(request.Secret, key)
-	if err != nil {
-		return err
-	}
-
+	key := config.C.GetSymmetricEncryptionKey()
+	encryptedSecret := utils.EncryptSymmetric(request.Secret, key)
 	encryptedSecretBase64 := base64.StdEncoding.EncodeToString(encryptedSecret)
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
-	err = credentialRepository.CreateCredential(ctx, &repos.Credential{
+	err := credentialRepository.CreateCredential(ctx, &repos.Credential{
 		UserId: request.UserId,
 		Type:   constants.CredentialTypeTotp,
 		Details: repos.CredentialTotpDetails{

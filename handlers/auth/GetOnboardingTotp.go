@@ -60,23 +60,13 @@ func GetOnboardingTotp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := config.C.GetSymmetricEncryptionKey()
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
-
+	key := config.C.GetSymmetricEncryptionKey()
 	encryptedSecret, err := base64.StdEncoding.DecodeString(loginInfo.EncryptedTotpOnboardingSecretBase64)
 	if err != nil {
 		rcs.Error(err)
 		return
 	}
-
-	secret, err := utils.DecryptSymmetric(encryptedSecret, key)
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
+	secret := utils.DecryptSymmetric(encryptedSecret, key)
 
 	w.Header().Set("Content-Type", "application/json")
 

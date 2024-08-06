@@ -79,23 +79,13 @@ func TotpOnboarding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := config.C.GetSymmetricEncryptionKey()
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
-
+	key := config.C.GetSymmetricEncryptionKey()
 	encryptedSecret, err := base64.StdEncoding.DecodeString(loginInfo.EncryptedTotpOnboardingSecretBase64)
 	if err != nil {
 		rcs.Error(err)
 		return
 	}
-
-	totpSecret, err := utils.DecryptSymmetric(encryptedSecret, key)
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
+	totpSecret := utils.DecryptSymmetric(encryptedSecret, key)
 
 	userService := ioc.Get[services.UserService](scope)
 	err = userService.AddTotp(ctx, services.AddTotpRequest{
@@ -163,15 +153,8 @@ func (s *TotpOnboardingStep) Prepare(ctx context.Context, info *services.LoginIn
 		return err
 	}
 
-	key, err := config.C.GetSymmetricEncryptionKey()
-	if err != nil {
-		return err
-	}
-
-	encryptedSecret, err := utils.EncryptSymmetric(secret, key)
-	if err != nil {
-		return err
-	}
+	key := config.C.GetSymmetricEncryptionKey()
+	encryptedSecret := utils.EncryptSymmetric(secret, key)
 
 	info.EncryptedTotpOnboardingSecretBase64 = base64.StdEncoding.EncodeToString(encryptedSecret)
 

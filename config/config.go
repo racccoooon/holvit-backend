@@ -104,7 +104,7 @@ func (c *HolvitConfig) GetHashAlgorithm() utils.HashAlgorithm {
 	}
 }
 
-func (c *HolvitConfig) GetSymmetricEncryptionKey() ([]byte, error) {
+func (c *HolvitConfig) GetSymmetricEncryptionKey() []byte {
 	return utils.GenerateSymmetricKeyFromText(C.Secret)
 }
 

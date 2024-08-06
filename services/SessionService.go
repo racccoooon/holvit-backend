@@ -35,11 +35,7 @@ func (s *SessionServiceImpl) CreateSession(ctx context.Context, request CreateSe
 	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
-	token, err := utils.GenerateRandomStringBase64(32)
-	if err != nil {
-		return "", err
-	}
-
+	token := utils.GenerateRandomStringBase64(32) //TODO: constant
 	hashedToken := utils.CheapHash(token)
 
 	sessionRepository := ioc.Get[repos.SessionRepository](scope)

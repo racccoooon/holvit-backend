@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/jackc/pgtype"
 	"github.com/mssola/user_agent"
 	"holvit/h"
 	"holvit/ioc"
 	"holvit/middlewares"
 	"holvit/repos"
 	"holvit/utils"
-	"strings"
 )
 
 type IsKnownDeviceRequest struct {
@@ -73,27 +71,12 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
-	lastIp := pgtype.Inet{}
-	ipStr := request.Ip
-	// Remove the port if it exists
-	if colonIndex := strings.LastIndex(ipStr, ":"); colonIndex != -1 {
-		ipStr = ipStr[:colonIndex] // Remove port part
-	}
-	if strings.HasPrefix(ipStr, "[") && strings.HasSuffix(ipStr, "]") {
-		ipStr = ipStr[1 : len(ipStr)-1] // Remove square brackets for IPv6
-	}
-
-	err := lastIp.Set(ipStr)
-	if err != nil {
-		return nil, err
-	}
-
 	id := userDeviceRepository.CreateUserDevice(ctx, &repos.UserDevice{
 		UserId:      request.UserId,
 		DisplayName: displayName,
 		DeviceId:    request.DeviceId,
 		UserAgent:   request.UserAgent,
-		LastIp:      lastIp,
+		LastIp:      utils.InetFromString(request.Ip),
 		LastLoginAt: now,
 	}).Unwrap()
 
@@ -104,13 +87,10 @@ func (d *DeviceServiceImpl) SendVerificationEmail(ctx context.Context, request S
 	scope := middlewares.GetScope(ctx)
 	jobService := ioc.Get[JobService](scope)
 
-	num, err := utils.GenerateRandomNumber(999_999)
-	if err != nil {
-		return nil, err
-	}
+	num := utils.GenerateRandomNumber(999_999)
 	code := fmt.Sprintf("%d", num)
 
-	err = jobService.QueueJob(ctx, repos.SendMailJobDetails{
+	err := jobService.QueueJob(ctx, repos.SendMailJobDetails{
 		To:      nil,
 		Subject: "Device Verification Code",
 		Body:    fmt.Sprintf(`<html><body>Enter the following code:<br/>%v</body></html>`, code),

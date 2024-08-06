@@ -5,36 +5,32 @@ import (
 	"fmt"
 	"github.com/go-crypt/crypt"
 	"golang.org/x/crypto/bcrypt"
-	"holvit/httpErrors"
 )
 
 type HashAlgorithm interface {
-	Hash(plain string) (string, error)
+	Hash(plain string) string
 }
 
 type BCryptHashAlgorithm struct {
 	Cost int
 }
 
-func CompareHash(plain string, hash string) error {
+func CompareHash(plain string, hash string) bool {
 	sha := CheapHash(plain)
 	valid, err := crypt.CheckPassword(sha, hash)
 	if err != nil {
-		return err
+		panic(err)
 	}
-	if !valid {
-		return httpErrors.Unauthorized().WithMessage("wrong hash")
-	}
-	return nil
+	return valid
 }
 
-func (b *BCryptHashAlgorithm) Hash(plain string) (string, error) {
+func (b *BCryptHashAlgorithm) Hash(plain string) string {
 	sha := CheapHash(plain)
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(sha), b.Cost)
 	if err != nil {
-		return "", err
+		panic(err)
 	}
-	return string(hashBytes), nil
+	return string(hashBytes)
 }
 
 func CheapHash(input string) string {

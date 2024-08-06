@@ -41,21 +41,10 @@ func NewRealmService() RealmService {
 func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmRequest) (*CreateRealmResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
-	key, err := config.C.GetSymmetricEncryptionKey()
-	if err != nil {
-		return nil, err
-	}
-
-	privateKey, _, err := utils.GenerateKeyPair()
-	if err != nil {
-		return nil, err
-	}
-
+	key := config.C.GetSymmetricEncryptionKey()
+	privateKey, _ := utils.GenerateKeyPair()
 	privateKeyBytes := utils.ExportPrivateKey(privateKey)
-	encryptedPrivateKeyBytes, err := utils.EncryptSymmetric(privateKeyBytes, key)
-	if err != nil {
-		return nil, err
-	}
+	encryptedPrivateKeyBytes := utils.EncryptSymmetric(privateKeyBytes, key)
 
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realmId := realmRepository.CreateRealm(ctx, &repos.Realm{
@@ -200,22 +189,12 @@ func (s *RealmServiceImpl) InitializeRealmKeys(ctx context.Context) error {
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realms := realmRepository.FindRealms(ctx, repos.RealmFilter{}).Unwrap()
 
-	key, err := config.C.GetSymmetricEncryptionKey()
-	if err != nil {
-		return err
-	}
+	key := config.C.GetSymmetricEncryptionKey()
 
 	keyCache := ioc.Get[cache.KeyCache](scope)
 	for _, realm := range realms.Values() {
-		decryptedPrivateKeyBytes, err := utils.DecryptSymmetric(realm.EncryptedPrivateKey, key)
-		if err != nil {
-			return err
-		}
-
-		privateKey, _, err := utils.ImportPrivateKey(decryptedPrivateKeyBytes)
-		if err != nil {
-			return err
-		}
+		decryptedPrivateKeyBytes := utils.DecryptSymmetric(realm.EncryptedPrivateKey, key)
+		privateKey, _ := utils.ImportPrivateKey(decryptedPrivateKeyBytes)
 
 		keyCache.Set(realm.Id, privateKey)
 	}

@@ -121,7 +121,7 @@ func setPassword(ctx context.Context, request SetPasswordRequest, verifyOld bool
 		BaseFilter: repos.BaseFilter{},
 		UserId:     h.Some(request.UserId),
 		Type:       h.Some(constants.CredentialTypePassword),
-	}).Unwrap().SingleOrNone().Unwrap()
+	}).Unwrap().SingleOrNone()
 
 	if existingCredential, ok := credential.Get(); ok {
 

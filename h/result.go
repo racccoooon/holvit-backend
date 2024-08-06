@@ -30,7 +30,7 @@ func (r Result[T]) IsErr() bool {
 
 func (r Result[T]) Unwrap() T {
 	if r.IsErr() {
-		panic(unwrapErr("tried to unwrap an error result", r.err))
+		panic(r.err)
 	}
 	return r.value
 }
@@ -44,7 +44,7 @@ func (r Result[T]) UnwrapOr(defaultValue T) T {
 
 func (r Result[T]) UnwrapErr() error {
 	if r.IsOk() {
-		panic(unwrapErr("called UnwrapErr on a successful Result", nil))
+		panic("called UnwrapErr on a successful Result")
 	}
 	return r.err
 }

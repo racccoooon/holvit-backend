@@ -1,6 +1,7 @@
 package h
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -82,22 +83,16 @@ func (o Optional[T]) ToNillablePtr() *T {
 }
 
 func (o Optional[T]) Expect(msg string) T {
-	if o.value == nil {
-		panic(unwrapErr("tried to unwrap an empty option", fmt.Errorf(msg)))
-	}
-	return *o.value
+	return o.UnwrapErr(errors.New(fmt.Sprintf("tried to unwrap an empty option: %s", msg)))
 }
 
 func (o Optional[T]) Unwrap() T {
-	if o.value == nil {
-		panic(unwrapErr("tried to unwrap an empty option", nil))
-	}
-	return *o.value
+	return o.UnwrapErr(errors.New("tried to unwrap an empty option"))
 }
 
 func (o Optional[T]) UnwrapErr(e error) T {
 	if o.value == nil {
-		panic(unwrapErr("tried to unwrap an empty option", e))
+		panic(e)
 	}
 	return *o.value
 }

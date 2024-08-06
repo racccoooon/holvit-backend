@@ -35,7 +35,7 @@ create table "users"
 (
     "id"             uuid not null default gen_random_uuid(),
     "realm_id"       uuid not null,
-    "username"       citext,
+    "username"       text not null,
     "email"          citext,
     "email_verified" bool not null default false,
     primary key ("id")
@@ -43,6 +43,8 @@ create table "users"
 
 alter table "users"
     add constraint "fk_users_realms" foreign key ("realm_id") references "realms";
+
+create unique index "idx_unique_username_per_realm" on "users" ("realm_id", lower("username"));
 
 create table "credentials"
 (
@@ -173,21 +175,24 @@ alter table "scope_claims"
     add constraint "fk_scope_claims_scopes" foreign key ("scope_id") references "scopes";
 
 -- +migrate StatementBegin
-do $$ begin
-    create type job_status as enum ('pending', 'completed', 'failed');
-exception
-    when duplicate_object then null;
-end $$;
+do
+$$
+    begin
+        create type job_status as enum ('pending', 'completed', 'failed');
+    exception
+        when duplicate_object then null;
+    end
+$$;
 -- +migrate StatementEnd
 
 create table "queued_jobs"
 (
-    "id" uuid not null default gen_random_uuid(),
-    "status" job_status default 'pending',
-    "type" text not null,
-    "details" jsonb not null,
-    "failure_count" int not null,
-    "error" text,
+    "id"            uuid  not null default gen_random_uuid(),
+    "status"        job_status     default 'pending',
+    "type"          text  not null,
+    "details"       jsonb not null,
+    "failure_count" int   not null,
+    "error"         text,
     primary key ("id")
 );
 

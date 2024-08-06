@@ -66,11 +66,9 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 				})
 				break
 			case constants.UserInfoPropertyUsername:
-				user.Username.IfSome(func(x string) {
-					claims = append(claims, &ClaimResponse{
-						Name:  mapper.ClaimName,
-						Claim: x,
-					})
+				claims = append(claims, &ClaimResponse{
+					Name:  mapper.ClaimName,
+					Claim: user.Username,
 				})
 				break
 			case constants.UserInfoPropertyEmail:

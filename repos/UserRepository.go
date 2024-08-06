@@ -2,8 +2,9 @@ package repos
 
 import (
 	"context"
+	"fmt"
 	"github.com/google/uuid"
-	"github.com/huandu/go-sqlbuilder"
+	"github.com/lib/pq"
 	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
@@ -16,16 +17,25 @@ type User struct {
 
 	RealmId uuid.UUID
 
-	Username      h.Optional[string]
+	Username      string
 	Email         h.Optional[string]
 	EmailVerified bool
+}
+
+type DuplicateUsernameError struct {
+	RealmId  uuid.UUID
+	Username string
+}
+
+func (e DuplicateUsernameError) Error() string {
+	return fmt.Sprintf("Username '%s' already in use in realm '%s'", e.Username, e.RealmId.String())
 }
 
 type UserFilter struct {
 	BaseFilter
 
-	RealmId         h.Optional[uuid.UUID]
-	UsernameOrEmail h.Optional[string]
+	RealmId  h.Optional[uuid.UUID]
+	Username h.Optional[string]
 }
 
 type UserRepository interface {
@@ -57,31 +67,28 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 		return h.Err[FilterResult[User]](err)
 	}
 
-	sb := sqlbuilder.Select(filter.CountCol(), "id", "realm_id", "username", "email", "email_verified").
-		From("users")
+	sqlString := `select ` + filter.CountCol() + `, "id", "realm_id", "username", "email", "email_verified" from users where true`
 
+	args := []interface{}{}
 	filter.Id.IfSome(func(x uuid.UUID) {
-		sb.Where(sb.Equal("id", x))
+		args = append(args, x)
+		sqlString += fmt.Sprintf(" id = $%d", len(args))
 	})
 
 	filter.RealmId.IfSome(func(x uuid.UUID) {
-		sb.Where(sb.Equal("realm_id", x))
+		args = append(args, x)
+		sqlString += fmt.Sprintf(" realm_id = $%d", len(args))
 	})
 
-	filter.UsernameOrEmail.IfSome(func(x string) {
-		sb.Where(
-			sb.Or(
-				sb.Equal("username", x),
-				sb.Equal("email", x),
-			))
-
+	filter.Username.IfSome(func(x string) {
+		args = append(args, x)
+		sqlString += fmt.Sprintf(" username = lower($%d)", len(args))
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply(sb)
+		sqlString += x.SqlString()
 	})
 
-	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
@@ -96,7 +103,7 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 		err := rows.Scan(&totalCount,
 			&row.Id,
 			&row.RealmId,
-			row.Username.ToNillablePtr(),
+			&row.Username,
 			row.Email.ToNillablePtr(),
 			&row.EmailVerified)
 		if err != nil {
@@ -121,14 +128,27 @@ func (u *UserRepositoryImpl) CreateUser(ctx context.Context, user *User) h.Resul
 	}
 
 	err = tx.QueryRow(`insert into "users"
-    			("realm_id", "username", "email")
-    			values ($1, $2, $3)
+    			("realm_id", "username", "email", "email_verified")
+    			values ($1, $2, $3, $4)
     			returning "id"`,
 		user.RealmId,
-		user.Username.ToNillablePtr(),
-		user.Email.ToNillablePtr()).
-		Scan(&resultingId)
+		user.Username,
+		user.Email.ToNillablePtr(),
+		user.EmailVerified).Scan(&resultingId)
 	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code.Name() {
+			case "unique_violation":
+				if pqErr.Constraint == "idx_unique_username_per_realm" {
+					return h.Err[uuid.UUID](DuplicateUsernameError{
+						Username: user.Username,
+						RealmId:  user.RealmId,
+					})
+				}
+				break
+			}
+		}
+
 		return h.Err[uuid.UUID](err)
 	}
 

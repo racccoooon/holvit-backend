@@ -56,11 +56,11 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userService := ioc.Get[services.UserService](scope)
-	err = userService.SetPasswordDangerouslyWithoutVerifyingOldPassword(ctx, services.SetPasswordRequest{
+	err = userService.SetPassword(ctx, services.SetPasswordRequest{
 		UserId:    loginInfo.UserId,
 		Password:  request.NewPassword,
 		Temporary: false,
-	})
+	}, services.DangerousNoAuthStrategy{})
 	if err != nil {
 		rcs.Error(err)
 		return
@@ -107,10 +107,7 @@ func (s *ResetPasswordStep) NeedsToRun(ctx context.Context, loginInfo *services.
 	scope := middlewares.GetScope(ctx)
 
 	userService := ioc.Get[services.UserService](scope)
-	isTemporary, err := userService.IsPasswordTemporary(ctx, loginInfo.UserId)
-	if err != nil {
-		return false, err
-	}
+	isTemporary := userService.IsPasswordTemporary(ctx, loginInfo.UserId)
 
 	return isTemporary, nil
 }

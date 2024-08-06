@@ -9,6 +9,7 @@ import (
 	"github.com/pquerna/otp/totp"
 	"holvit/config"
 	"holvit/constants"
+	"holvit/h"
 	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
@@ -78,12 +79,30 @@ func TotpOnboarding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	key, err := config.C.GetSymmetricEncryptionKey()
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	encryptedSecret, err := base64.StdEncoding.DecodeString(loginInfo.EncryptedTotpOnboardingSecretBase64)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
+	totpSecret, err := utils.DecryptSymmetric(encryptedSecret, key)
+	if err != nil {
+		rcs.Error(err)
+		return
+	}
+
 	userService := ioc.Get[services.UserService](scope)
 	err = userService.AddTotp(ctx, services.AddTotpRequest{
-		UserId:                loginInfo.UserId,
-		DisplayName:           request.DisplayName,
-		EncryptedSecretBase64: &loginInfo.EncryptedTotpOnboardingSecretBase64,
-	})
+		UserId:      loginInfo.UserId,
+		DisplayName: h.FromPtr(request.DisplayName),
+		Secret:      totpSecret,
+	}, services.DangerousNoAuthStrategy{})
 	if err != nil {
 		rcs.Error(err)
 		return
@@ -131,7 +150,11 @@ func (s *TotpOnboardingStep) NeedsToRun(ctx context.Context, info *services.Logi
 	scope := middlewares.GetScope(ctx)
 
 	userService := ioc.Get[services.UserService](scope)
-	return userService.RequiresTotpOnboarding(ctx, info.UserId)
+	requiresTotpOnboarding := userService.RequiresTotpOnboarding(ctx, info.UserId)
+	if requiresTotpOnboarding.IsOk() {
+		return requiresTotpOnboarding.Unwrap(), nil
+	}
+	return false, requiresTotpOnboarding.UnwrapErr()
 }
 
 func (s *TotpOnboardingStep) Prepare(ctx context.Context, info *services.LoginInfo) error {

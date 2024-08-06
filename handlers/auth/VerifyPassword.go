@@ -62,15 +62,11 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userService := ioc.Get[services.UserService](scope)
-	loginResponse, err := userService.VerifyLogin(ctx, services.VerifyLoginRequest{
-		UsernameOrEmail: request.Username,
-		Password:        request.Password,
-		RealmId:         loginInfo.RealmId,
+	loginResponse := userService.VerifyLogin(ctx, services.VerifyLoginRequest{
+		Username: request.Username,
+		Password: request.Password,
+		RealmId:  loginInfo.RealmId,
 	})
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
 
 	loginInfo.UserId = loginResponse.UserId
 	loginInfo.DeviceId = deviceIdString

@@ -65,10 +65,17 @@ func (o Optional[T]) AndThen(fn func(T) Optional[T]) Optional[T] {
 }
 
 func (o Optional[T]) Or(other Optional[T]) Optional[T] {
-	if o.value != nil {
-		return o
+	if o.value == nil {
+		return other
 	}
-	return other
+	return o
+}
+
+func (o Optional[T]) OrDefault(t T) T {
+	if o.value == nil {
+		return t
+	}
+	return *o.value
 }
 
 func (o Optional[T]) OrElse(fn func() Optional[T]) Optional[T] {

@@ -68,7 +68,7 @@ func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request
 		Authorize: &AuthFrontendDataAuthorize{
 			ClientName: c.Client.DisplayName,
 			User: AuthFrontendUser{
-				Name: c.User.Username.Unwrap(), // TODO: handle the case that there is no username
+				Name: c.User.Username,
 			},
 			Scopes:    scopes,
 			Token:     c.Token,

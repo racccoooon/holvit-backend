@@ -40,6 +40,7 @@ type FilterResult[T any] interface {
 	FirstOrNone() h.Optional[T]
 	Single() T
 	SingleOrNone() h.Optional[T]
+	Any() bool
 }
 
 func first[T any](r FilterResult[T]) h.Optional[T] {
@@ -79,6 +80,10 @@ func (p *pagedResult[T]) Values() []T {
 
 func (p *pagedResult[T]) Count() int {
 	return p.totalCount
+}
+
+func (p *pagedResult[T]) Any() bool {
+	return len(p.values) > 0
 }
 
 func (p *pagedResult[T]) First() T {

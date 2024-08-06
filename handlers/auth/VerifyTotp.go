@@ -55,14 +55,10 @@ func VerifyTotp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userService := ioc.Get[services.UserService](scope)
-	err = userService.VerifyTotp(ctx, services.VerifyTotpRequest{
+	userService.VerifyTotp(ctx, services.VerifyTotpRequest{
 		UserId: loginInfo.UserId,
 		Code:   request.Code,
 	})
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
 
 	nextStep, err := getNextStep(ctx, currentStep, loginInfo)
 	if err != nil {
@@ -104,7 +100,11 @@ func (s *VerifyTotpStep) NeedsToRun(ctx context.Context, info *services.LoginInf
 	scope := middlewares.GetScope(ctx)
 
 	userService := ioc.Get[services.UserService](scope)
-	return userService.RequiresTotp(ctx, info.UserId)
+	requiresTotpOnboarding := userService.RequiresTotpOnboarding(ctx, info.UserId)
+	if requiresTotpOnboarding.IsOk() {
+		return requiresTotpOnboarding.Unwrap(), nil
+	}
+	return false, requiresTotpOnboarding.UnwrapErr()
 }
 
 func (s *VerifyTotpStep) Prepare(ctx context.Context, info *services.LoginInfo) error {

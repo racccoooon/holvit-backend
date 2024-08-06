@@ -101,20 +101,19 @@ func seedData(ctx context.Context) {
 	logging.Logger.Infof("admin client id=%s secret=%s", clientResponse.ClientId, clientResponse.ClientSecret)
 
 	userService := ioc.Get[services.UserService](scope)
-	adminUser, err := userService.CreateUser(ctx, services.CreateUserRequest{
+	adminUserId := userService.CreateUser(ctx, services.CreateUserRequest{
 		RealmId:  masterRealm.Id,
-		Username: &config.C.AdminUserName,
-		Email:    nil,
-	})
+		Username: config.C.AdminUserName,
+	}).Unwrap()
 	if err != nil {
 		logging.Logger.Fatal(err)
 	}
 
 	err = userService.SetPassword(ctx, services.SetPasswordRequest{
-		UserId:    adminUser.Id,
+		UserId:    adminUserId,
 		Password:  config.C.InitialAdminPassword,
 		Temporary: true,
-	})
+	}, services.DangerousNoAuthStrategy{})
 	if err != nil {
 		logging.Logger.Fatal(err)
 	}

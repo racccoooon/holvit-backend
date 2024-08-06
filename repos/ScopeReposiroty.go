@@ -26,6 +26,12 @@ type Scope struct {
 	Grant *Grant
 }
 
+type DuplicateScopeError struct{}
+
+func (e DuplicateScopeError) Error() string {
+	return "Duplicate Scope"
+}
+
 type Grant struct {
 	BaseModel
 
@@ -49,9 +55,9 @@ type ScopeFilter struct {
 
 type ScopeRepository interface {
 	FindScopeById(ctx context.Context, id uuid.UUID) h.Optional[Scope]
-	FindScopes(ctx context.Context, filter ScopeFilter) h.Result[FilterResult[Scope]]
+	FindScopes(ctx context.Context, filter ScopeFilter) FilterResult[Scope]
 	CreateScope(ctx context.Context, scope Scope) h.Result[uuid.UUID]
-	CreateGrants(ctx context.Context, userId uuid.UUID, clientId uuid.UUID, scopeIds []uuid.UUID) error
+	CreateGrants(ctx context.Context, userId uuid.UUID, clientId uuid.UUID, scopeIds []uuid.UUID)
 }
 
 type ScopeRepositoryImpl struct{}
@@ -65,16 +71,16 @@ func (s *ScopeRepositoryImpl) FindScopeById(ctx context.Context, id uuid.UUID) h
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().FirstOrNone()
+	}).FirstOrNone()
 }
 
-func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter) h.Result[FilterResult[Scope]] {
+func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter) FilterResult[Scope] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[FilterResult[Scope]](err)
+		panic(err)
 	}
 
 	sql := "select " + filter.CountCol() + ", s.id, s.realm_id, s.name, s.display_name, s.description"
@@ -124,7 +130,7 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 	logging.Logger.Debugf("executing sql: %s", sql)
 	rows, err := tx.Query(sql, parameters...)
 	if err != nil {
-		return h.Err[FilterResult[Scope]](err)
+		panic(err)
 	}
 	defer rows.Close()
 
@@ -145,7 +151,7 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 			&grant.UserId,
 			&grant.ClientId)
 		if err != nil {
-			return h.Err[FilterResult[Scope]](err)
+			panic(err)
 		}
 
 		if filter.IncludeGrants && grantId != nil {
@@ -156,7 +162,7 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 		result = append(result, row)
 	}
 
-	return h.Ok(NewPagedResult(result, totalCount))
+	return NewPagedResult(result, totalCount)
 }
 
 func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope Scope) h.Result[uuid.UUID] {
@@ -180,17 +186,30 @@ func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope Scope) h.Re
 		scope.Description,
 		scope.SortIndex).
 		Scan(&resultingId)
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code.Name() {
+			case "unique_violation":
+				if pqErr.Constraint == "idx_unique_scope_name_in_realm" {
+					return h.Err[uuid.UUID](DuplicateScopeError{})
+				}
+				break
+			}
+		} else {
+			panic(err)
+		}
+	}
 
 	return h.Ok(resultingId)
 }
 
-func (s *ScopeRepositoryImpl) CreateGrants(ctx context.Context, userId uuid.UUID, clientId uuid.UUID, scopeIds []uuid.UUID) error {
+func (s *ScopeRepositoryImpl) CreateGrants(ctx context.Context, userId uuid.UUID, clientId uuid.UUID, scopeIds []uuid.UUID) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return nil
+		panic(err)
 	}
 
 	sb := sqlbuilder.InsertInto("grants").
@@ -204,5 +223,7 @@ func (s *ScopeRepositoryImpl) CreateGrants(ctx context.Context, userId uuid.UUID
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	_, err = tx.Exec(sqlString, args...)
 
-	return err
+	if err != nil {
+		panic(err)
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/lib/pq"
 	"holvit/constants"
 	"holvit/h"
 	"holvit/ioc"
@@ -23,6 +24,12 @@ type Credential struct {
 
 	Type    string
 	Details interface{}
+}
+
+type DuplicatePasswordOnUserError struct{}
+
+func (DuplicatePasswordOnUserError) Error() string {
+	return "Duplicate password"
 }
 
 type CredentialPasswordDetails struct {
@@ -70,8 +77,8 @@ type CredentialFilter struct {
 type CredentialRepository interface {
 	CreateCredential(ctx context.Context, credential *Credential) h.Result[uuid.UUID]
 	FindCredentialById(ctx context.Context, id uuid.UUID) h.Optional[Credential]
-	FindCredentials(ctx context.Context, filter CredentialFilter) h.Result[FilterResult[Credential]]
-	DeleteCredential(ctx context.Context, id uuid.UUID) error
+	FindCredentials(ctx context.Context, filter CredentialFilter) FilterResult[Credential]
+	DeleteCredential(ctx context.Context, id uuid.UUID) h.Result[h.Unit]
 }
 
 type CredentialRepositoryImpl struct{}
@@ -102,7 +109,17 @@ func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credent
 		credential.Type,
 		credential.Details).Scan(&resultingId)
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code.Name() {
+			case "unique_violation":
+				if pqErr.Constraint == "idx_only_one_password_per_user" {
+					return h.Err[uuid.UUID](DuplicatePasswordOnUserError{})
+				}
+				break
+			}
+		} else {
+			panic(err)
+		}
 	}
 
 	return h.Ok(resultingId)
@@ -113,16 +130,16 @@ func (c *CredentialRepositoryImpl) FindCredentialById(ctx context.Context, id uu
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().FirstOrNone()
+	}).FirstOrNone()
 }
 
-func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter CredentialFilter) h.Result[FilterResult[Credential]] {
+func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter CredentialFilter) FilterResult[Credential] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[FilterResult[Credential]](err)
+		panic(err)
 	}
 
 	sb := sqlbuilder.Select(filter.CountCol(), "id", "user_id", "type", "details").
@@ -148,7 +165,7 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return h.Err[FilterResult[Credential]](err)
+		panic(err)
 	}
 	defer rows.Close()
 
@@ -163,7 +180,7 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 			&row.Type,
 			&detailsRaw)
 		if err != nil {
-			return h.Err[FilterResult[Credential]](err)
+			panic(err)
 		}
 
 		switch row.Type {
@@ -180,16 +197,16 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 		result = append(result, row)
 	}
 
-	return h.Ok(NewPagedResult(result, totalCount))
+	return NewPagedResult(result, totalCount)
 }
 
-func (c *CredentialRepositoryImpl) DeleteCredential(ctx context.Context, id uuid.UUID) error {
+func (c *CredentialRepositoryImpl) DeleteCredential(ctx context.Context, id uuid.UUID) h.Result[h.Unit] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	sb := sqlbuilder.DeleteFrom("credentials")
@@ -197,10 +214,17 @@ func (c *CredentialRepositoryImpl) DeleteCredential(ctx context.Context, id uuid
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
-	_, err = tx.Exec(sqlString, args...)
+	result, err := tx.Exec(sqlString, args...)
 	if err != nil {
-		return err
+		panic(err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		panic(err)
+	}
+	if affected == 0 {
+		return h.UErr(DbNotFoundError{})
 	}
 
-	return nil
+	return h.UOk()
 }

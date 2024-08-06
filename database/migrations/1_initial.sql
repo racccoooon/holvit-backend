@@ -28,6 +28,8 @@ create table "clients"
     primary key ("id")
 );
 
+create unique index "idx_unique_client_id_per_realm" on "clients" ("client_id", "realm_id");
+
 alter table "clients"
     add constraint "fk_clients_realms" foreign key ("realm_id") references "realms";
 
@@ -54,6 +56,9 @@ create table "credentials"
     "details" jsonb not null,
     primary key ("id")
 );
+
+create unique index "idx_only_one_password_per_user" on "credentials" ("user_id", "type")
+    where type = 'password';
 
 alter table "credentials"
     add constraint "fk_credentials_users" foreign key ("user_id") references "users";
@@ -139,6 +144,8 @@ create table "refresh_tokens"
     "scopes"       text[]    not null,
     primary key ("id")
 );
+
+create unique index "idx_unique_refresh_token" on "refresh_tokens" ("hashed_token");
 
 alter table "refresh_tokens"
     add constraint "fk_refresh_tokens_users" foreign key ("user_id") references "users";

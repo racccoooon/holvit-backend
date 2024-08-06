@@ -306,7 +306,7 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 	scopes := scopeRepository.FindScopes(ctx, repos.ScopeFilter{
 		RealmId: refreshToken.RealmId,
 		Names:   h.Some(request.ScopeNames),
-	}).Unwrap()
+	})
 
 	grantedScopeIds := make([]uuid.UUID, 0)
 	for _, dbScope := range scopes.Values() {
@@ -380,7 +380,7 @@ func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) 
 	scopes := scopeRepository.FindScopes(ctx, repos.ScopeFilter{
 		RealmId: grantRequest.RealmId,
 		Names:   h.Some(grantRequest.ScopeNames),
-	}).Unwrap()
+	})
 
 	scopeIds := make([]uuid.UUID, 0)
 	for _, scope := range scopes.Values() {
@@ -392,10 +392,7 @@ func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) 
 		return nil, err
 	}
 
-	err = scopeRepository.CreateGrants(ctx, userId, grantRequest.ClientId, scopeIds)
-	if err != nil {
-		return nil, err
-	}
+	scopeRepository.CreateGrants(ctx, userId, grantRequest.ClientId, scopeIds)
 
 	return o.Authorize(ctx, grantRequest.AuthorizationRequest)
 }
@@ -418,13 +415,13 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realm := realmRepository.FindRealms(ctx, repos.RealmFilter{
 		Name: h.Some(authorizationRequest.RealmName),
-	}).Unwrap().First()
+	}).First()
 
 	clientRepository := ioc.Get[repos.ClientRepository](scope)
 	client := clientRepository.FindClients(ctx, repos.ClientFilter{
 		RealmId:  h.Some(realm.Id),
 		ClientId: h.Some(authorizationRequest.ClientId),
-	}).Unwrap().First()
+	}).First()
 
 	currentUser := ioc.Get[CurrentUserService](scope)
 
@@ -440,7 +437,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 		ClientId:      h.Some(client.Id),
 		RealmId:       realm.Id,
 		IncludeGrants: true,
-	}).Unwrap()
+	})
 
 	missingGrants := make([]repos.Scope, 0)
 	for _, oidcScope := range scopes.Values() {

@@ -35,9 +35,9 @@ type SessionFilter struct {
 
 type SessionRepository interface {
 	FindSessionById(ctx context.Context, id uuid.UUID) h.Optional[Session]
-	FindSessions(ctx context.Context, filter SessionFilter) h.Result[FilterResult[Session]]
-	CreateSession(ctx context.Context, session *Session) h.Result[uuid.UUID]
-	DeleteOldSessions(ctx context.Context) error
+	FindSessions(ctx context.Context, filter SessionFilter) FilterResult[Session]
+	CreateSession(ctx context.Context, session *Session) uuid.UUID
+	DeleteOldSessions(ctx context.Context)
 }
 
 type SessionRepositoryImpl struct{}
@@ -46,13 +46,13 @@ func NewSessionRepository() SessionRepository {
 	return &SessionRepositoryImpl{}
 }
 
-func (s *SessionRepositoryImpl) DeleteOldSessions(ctx context.Context) error {
+func (s *SessionRepositoryImpl) DeleteOldSessions(ctx context.Context) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	clockService := ioc.Get[utils.ClockService](scope)
@@ -65,10 +65,8 @@ func (s *SessionRepositoryImpl) DeleteOldSessions(ctx context.Context) error {
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	_, err = tx.Exec(sqlString, args...)
 	if err != nil {
-		return err
+		panic(err)
 	}
-
-	return nil
 }
 
 func (s *SessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUID) h.Optional[Session] {
@@ -76,16 +74,16 @@ func (s *SessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUI
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().FirstOrNone()
+	}).FirstOrNone()
 }
 
-func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter SessionFilter) h.Result[FilterResult[Session]] {
+func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter SessionFilter) FilterResult[Session] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[FilterResult[Session]](err)
+		panic(err)
 	}
 
 	sb := sqlbuilder.Select(filter.CountCol(),
@@ -108,7 +106,7 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return h.Err[FilterResult[Session]](err)
+		panic(err)
 	}
 	defer rows.Close()
 
@@ -124,15 +122,15 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 			&row.HashedToken,
 			&row.ValidUntil)
 		if err != nil {
-			return h.Err[FilterResult[Session]](err)
+			panic(err)
 		}
 		result = append(result, row)
 	}
 
-	return h.Ok(NewPagedResult(result, totalCount))
+	return NewPagedResult(result, totalCount)
 }
 
-func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Session) h.Result[uuid.UUID] {
+func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Session) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -140,7 +138,7 @@ func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Sess
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
 	sqlString := `insert into "sessions"
@@ -156,8 +154,8 @@ func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Sess
 		session.HashedToken,
 		session.ValidUntil).Scan(&resultingId)
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
-	return h.Ok(resultingId)
+	return resultingId
 }

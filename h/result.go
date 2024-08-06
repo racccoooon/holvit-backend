@@ -1,8 +1,14 @@
 package h
 
+type Unit struct{}
+
 type Result[T any] struct {
 	value T
 	err   error
+}
+
+func UOk() Result[Unit] {
+	return Ok(Unit{})
 }
 
 func Ok[T any](value T) Result[T] {
@@ -10,6 +16,10 @@ func Ok[T any](value T) Result[T] {
 		value: value,
 		err:   nil,
 	}
+}
+
+func UErr(err error) Result[Unit] {
+	return Err[Unit](err)
 }
 
 func Err[T any](err error) Result[T] {

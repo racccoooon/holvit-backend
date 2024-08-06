@@ -48,7 +48,7 @@ func executeQueuedJobs() {
 	queuedJobs := queuedJobRepository.FindQueuedJobs(ctx, repos.QueuedJobFilter{
 		IgnoreLocked: true,
 		Status:       h.Some("pending"),
-	}).Unwrap()
+	})
 
 	for _, job := range queuedJobs.Values() {
 		err := executors[job.Type].Execute(ctx, job.Details)
@@ -64,22 +64,13 @@ func executeQueuedJobs() {
 				upd.Status = h.Some("failed")
 			}
 
-			err = queuedJobRepository.UpdateQueuedJob(ctx, job.Id, upd)
-			if err != nil {
-				logging.Logger.Error(err)
-				continue
-			}
+			queuedJobRepository.UpdateQueuedJob(ctx, job.Id, upd)
 		} else {
-			err := queuedJobRepository.UpdateQueuedJob(ctx, job.Id, repos.QueuedJobUpdate{
+			queuedJobRepository.UpdateQueuedJob(ctx, job.Id, repos.QueuedJobUpdate{
 				Status: h.Some("completed"),
 			})
-			if err != nil {
-				logging.Logger.Error(err)
-				continue
-			}
 		}
 	}
-
 }
 
 type JobServiceImpl struct {
@@ -96,7 +87,7 @@ func (s *JobServiceImpl) QueueJob(ctx context.Context, job repos.QueuedJobDetail
 		Details:      job,
 		FailureCount: 0,
 		Error:        nil,
-	}).Unwrap()
+	})
 
 	rcs.OnAfterTx(func(args requestContext.AfterTxEventArgs) {
 		if args.Commit {

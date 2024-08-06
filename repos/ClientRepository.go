@@ -25,6 +25,12 @@ type Client struct {
 	RedirectUris []string
 }
 
+type DuplicateClientIdError struct{}
+
+func (e DuplicateClientIdError) Error() string {
+	return "Duplicate client id"
+}
+
 type ClientFilter struct {
 	BaseFilter
 
@@ -39,9 +45,9 @@ type ClientUpdate struct {
 
 type ClientRepository interface {
 	FindClientById(ctx context.Context, id uuid.UUID) h.Optional[Client]
-	FindClients(ctx context.Context, filter ClientFilter) h.Result[FilterResult[Client]]
+	FindClients(ctx context.Context, filter ClientFilter) FilterResult[Client]
 	CreateClient(ctx context.Context, client *Client) h.Result[uuid.UUID]
-	UpdateClient(ctx context.Context, id uuid.UUID, upd *ClientUpdate) error
+	UpdateClient(ctx context.Context, id uuid.UUID, upd *ClientUpdate) h.Result[h.Unit]
 }
 
 type ClientRepositoryImpl struct{}
@@ -53,19 +59,18 @@ func NewClientRepository() ClientRepository {
 func (c *ClientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID) h.Optional[Client] {
 	return c.FindClients(ctx, ClientFilter{
 		BaseFilter: BaseFilter{
-			Id:         h.Some(id),
-			PagingInfo: h.Some(NewPagingInfo(1, 0)),
+			Id: h.Some(id),
 		},
-	}).Unwrap().FirstOrNone()
+	}).FirstOrNone()
 }
 
-func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFilter) h.Result[FilterResult[Client]] {
+func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFilter) FilterResult[Client] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[FilterResult[Client]](err)
+		panic(err)
 	}
 
 	sb := sqlbuilder.Select(filter.CountCol(),
@@ -92,7 +97,7 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return h.Err[FilterResult[Client]](err)
+		panic(err)
 	}
 	defer rows.Close()
 
@@ -108,12 +113,12 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 			&row.ClientSecret,
 			pq.Array(&row.RedirectUris))
 		if err != nil {
-			return h.Err[FilterResult[Client]](err)
+			panic(err)
 		}
 		result = append(result, row)
 	}
 
-	return h.Ok(NewPagedResult(result, totalCount))
+	return NewPagedResult(result, totalCount)
 }
 
 func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client) h.Result[uuid.UUID] {
@@ -137,19 +142,29 @@ func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client)
 		client.ClientSecret,
 		pq.Array(client.RedirectUris)).Scan(&resultingId)
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code.Name() {
+			case "unique_violation":
+				if pqErr.Constraint == "idx_unique_client_id_per_realm" {
+					return h.Err[uuid.UUID](DuplicateClientIdError{})
+				}
+				break
+			}
+		}
+
+		panic(err)
 	}
 
 	return h.Ok(resultingId)
 }
 
-func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, upd *ClientUpdate) error {
+func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, upd *ClientUpdate) h.Result[h.Unit] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	sb := sqlbuilder.Update("clients")
@@ -168,8 +183,18 @@ func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, u
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	_, err = tx.Exec(sqlString, args...)
 	if err != nil {
-		return err
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code.Name() {
+			case "unique_violation":
+				if pqErr.Constraint == "idx_unique_client_id_per_realm" {
+					return h.UErr(DuplicateClientIdError{})
+				}
+				break
+			}
+		}
+
+		panic(err)
 	}
 
-	return nil
+	return h.UOk()
 }

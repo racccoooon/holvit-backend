@@ -61,9 +61,9 @@ type AssociateScopeClaimRequest struct {
 
 type ClaimMapperRepository interface {
 	FindClaimMapperById(ctx context.Context, id uuid.UUID) h.Optional[ClaimMapper]
-	FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) h.Result[FilterResult[ClaimMapper]]
-	CreateClaimMapper(ctx context.Context, claimMapper *ClaimMapper) h.Result[uuid.UUID]
-	AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) h.Result[uuid.UUID]
+	FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) FilterResult[ClaimMapper]
+	CreateClaimMapper(ctx context.Context, claimMapper *ClaimMapper) uuid.UUID
+	AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) uuid.UUID
 }
 
 type ClaimMapperRepositoryImpl struct{}
@@ -77,16 +77,16 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMapperById(ctx context.Context, id 
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().FirstOrNone()
+	}).FirstOrNone()
 }
 
-func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) h.Result[FilterResult[ClaimMapper]] {
+func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) FilterResult[ClaimMapper] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[FilterResult[ClaimMapper]](err)
+		panic(err)
 	}
 
 	sqlString := `select ` + filter.CountCol() + `, c.id, c.realm_id, c.display_name, c.description, c.type, c.details from claim_mappers c where true`
@@ -114,7 +114,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return h.Err[FilterResult[ClaimMapper]](err)
+		panic(err)
 	}
 	defer rows.Close()
 
@@ -131,7 +131,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 			&row.Type,
 			&detailsRaw)
 		if err != nil {
-			return h.Err[FilterResult[ClaimMapper]](err)
+			panic(err)
 		}
 
 		switch row.Type {
@@ -145,10 +145,10 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 		result = append(result, row)
 	}
 
-	return h.Ok(NewPagedResult(result, totalCount))
+	return NewPagedResult(result, totalCount)
 }
 
-func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claimMapper *ClaimMapper) h.Result[uuid.UUID] {
+func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claimMapper *ClaimMapper) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -156,7 +156,7 @@ func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claim
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
 	sqlString := `insert into "claim_mappers"
@@ -172,13 +172,13 @@ func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claim
 		claimMapper.Type,
 		claimMapper.Details).Scan(&resultingId)
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
-	return h.Ok(resultingId)
+	return resultingId
 }
 
-func (c *ClaimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) h.Result[uuid.UUID] {
+func (c *ClaimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -186,7 +186,7 @@ func (c *ClaimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, re
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
 	sqlString := `insert into "scope_claims"
@@ -199,8 +199,8 @@ func (c *ClaimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, re
 		request.ScopeId,
 		request.ClaimMapperId).Scan(&resultingId)
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
-	return h.Ok(resultingId)
+	return resultingId
 }

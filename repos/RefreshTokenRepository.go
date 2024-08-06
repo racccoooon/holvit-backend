@@ -38,9 +38,9 @@ type RefreshTokenFilter struct {
 
 type RefreshTokenRepository interface {
 	FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Optional[RefreshToken]
-	FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) h.Result[FilterResult[RefreshToken]]
-	CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) h.Result[uuid.UUID]
-	DeleteRefreshToken(ctx context.Context, id uuid.UUID) error
+	FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) FilterResult[RefreshToken]
+	CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) uuid.UUID
+	DeleteRefreshToken(ctx context.Context, id uuid.UUID)
 }
 
 type RefreshTokenRepositoryImpl struct{}
@@ -54,16 +54,16 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokenById(ctx context.Context, i
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().FirstOrNone()
+	}).FirstOrNone()
 }
 
-func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) h.Result[FilterResult[RefreshToken]] {
+func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) FilterResult[RefreshToken] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[FilterResult[RefreshToken]](err)
+		panic(err)
 	}
 
 	sb := sqlbuilder.Select(filter.CountCol(),
@@ -90,7 +90,7 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return h.Err[FilterResult[RefreshToken]](err)
+		panic(err)
 	}
 	defer rows.Close()
 
@@ -110,15 +110,15 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 			&row.Audience,
 			pq.Array(&row.Scopes))
 		if err != nil {
-			return h.Err[FilterResult[RefreshToken]](err)
+			panic(err)
 		}
 		result = append(result, row)
 	}
 
-	return h.Ok(NewPagedResult(result, totalCount))
+	return NewPagedResult(result, totalCount)
 }
 
-func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) h.Result[uuid.UUID] {
+func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -126,7 +126,7 @@ func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, ref
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
 	sqlString := `insert into "refresh_tokens"
@@ -147,19 +147,19 @@ func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, ref
 		pq.Array(refreshToken.Scopes)).
 		Scan(&resultingId)
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
-	return h.Ok(resultingId)
+	return resultingId
 }
 
-func (r *RefreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id uuid.UUID) error {
+func (r *RefreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id uuid.UUID) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	sb := sqlbuilder.DeleteFrom("refresh_tokens")
@@ -169,8 +169,6 @@ func (r *RefreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id 
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	_, err = tx.Exec(sqlString, args...)
 	if err != nil {
-		return err
+		panic(err)
 	}
-
-	return nil
 }

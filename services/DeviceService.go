@@ -59,7 +59,7 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 	devices := userDeviceRepository.FindUserDevices(ctx, repos.UserDeviceFilter{
 		UserId:   h.Some(request.UserId),
 		DeviceId: h.Some(request.DeviceId),
-	}).Unwrap()
+	})
 	if devices.Count() > 0 {
 		return utils.Ptr(devices.First().Id), nil
 	}
@@ -78,7 +78,7 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 		UserAgent:   request.UserAgent,
 		LastIp:      utils.InetFromString(request.Ip),
 		LastLoginAt: now,
-	}).Unwrap()
+	})
 
 	return &id, nil
 }
@@ -111,7 +111,7 @@ func (d *DeviceServiceImpl) IsKnownUserDevice(ctx context.Context, request IsKno
 	devices := userDeviceRepository.FindUserDevices(ctx, repos.UserDeviceFilter{
 		UserId:   h.Some(request.UserId),
 		DeviceId: h.Some(request.DeviceId),
-	}).Unwrap()
+	})
 	if devices.Count() > 0 {
 		return &IsKnownDeviceResponse{
 			IsKnown:              true,

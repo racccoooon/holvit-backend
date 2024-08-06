@@ -45,16 +45,13 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 	refreshTokenRepository := ioc.Get[repos.RefreshTokenRepository](scope)
 	refreshToken := refreshTokenRepository.FindRefreshTokens(ctx, repos.RefreshTokenFilter{
 		HashedToken: h.Some(hashedToken),
-	}).Unwrap().First()
+	}).First()
 
 	if refreshToken.ValidUntil.Compare(now) < 0 {
 		return "", nil, httpErrors.Unauthorized().WithMessage("token not valid")
 	}
 
-	err := refreshTokenRepository.DeleteRefreshToken(ctx, refreshToken.Id)
-	if err != nil {
-		return "", nil, err
-	}
+	refreshTokenRepository.DeleteRefreshToken(ctx, refreshToken.Id)
 
 	return r.CreateRefreshToken(ctx, CreateRefreshTokenRequest{
 		ClientId: clientId,
@@ -88,7 +85,7 @@ func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, reques
 		Audience:    request.Audience,
 		Scopes:      request.Scopes,
 	}
-	tokenId := refreshTokenRepository.CreateRefreshToken(ctx, &refreshToken).Unwrap()
+	tokenId := refreshTokenRepository.CreateRefreshToken(ctx, &refreshToken)
 
 	refreshToken.Id = tokenId
 

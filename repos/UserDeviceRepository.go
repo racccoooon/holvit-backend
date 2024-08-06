@@ -34,8 +34,8 @@ type UserDeviceFilter struct {
 
 type UserDeviceRepository interface {
 	FindUserDeviceById(ctx context.Context, id uuid.UUID) h.Optional[UserDevice]
-	FindUserDevices(ctx context.Context, filter UserDeviceFilter) h.Result[FilterResult[UserDevice]]
-	CreateUserDevice(ctx context.Context, userDevice *UserDevice) h.Result[uuid.UUID]
+	FindUserDevices(ctx context.Context, filter UserDeviceFilter) FilterResult[UserDevice]
+	CreateUserDevice(ctx context.Context, userDevice *UserDevice) uuid.UUID
 }
 
 func NewUserDeviceRepository() UserDeviceRepository {
@@ -49,16 +49,16 @@ func (r *UserDeviceRepositoryImpl) FindUserDeviceById(ctx context.Context, id uu
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().FirstOrNone()
+	}).FirstOrNone()
 }
 
-func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter UserDeviceFilter) h.Result[FilterResult[UserDevice]] {
+func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter UserDeviceFilter) FilterResult[UserDevice] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[FilterResult[UserDevice]](err)
+		panic(err)
 	}
 
 	sb := sqlbuilder.Select(filter.CountCol(),
@@ -85,7 +85,7 @@ func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter U
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return h.Err[FilterResult[UserDevice]](err)
+		panic(err)
 	}
 	defer rows.Close()
 
@@ -102,15 +102,15 @@ func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter U
 			&row.LastIp,
 			&row.LastLoginAt)
 		if err != nil {
-			return h.Err[FilterResult[UserDevice]](err)
+			panic(err)
 		}
 		result = append(result, row)
 	}
 
-	return h.Ok(NewPagedResult(result, totalCount))
+	return NewPagedResult(result, totalCount)
 }
 
-func (r *UserDeviceRepositoryImpl) CreateUserDevice(ctx context.Context, userDevice *UserDevice) h.Result[uuid.UUID] {
+func (r *UserDeviceRepositoryImpl) CreateUserDevice(ctx context.Context, userDevice *UserDevice) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -118,7 +118,7 @@ func (r *UserDeviceRepositoryImpl) CreateUserDevice(ctx context.Context, userDev
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
 	sqlString := `insert into "user_devices"
@@ -135,8 +135,8 @@ func (r *UserDeviceRepositoryImpl) CreateUserDevice(ctx context.Context, userDev
 		userDevice.LastIp,
 		userDevice.LastLoginAt).Scan(&resultingId)
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
-	return h.Ok(resultingId)
+	return resultingId
 }

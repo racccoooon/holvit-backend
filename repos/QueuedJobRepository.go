@@ -73,9 +73,9 @@ type QueuedJobUpdate struct {
 
 type QueuedJobRepository interface {
 	FindQueuedJobById(ctx context.Context, id uuid.UUID) h.Optional[QueuedJob]
-	FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) h.Result[FilterResult[QueuedJob]]
-	CreateQueuedJob(ctx context.Context, job *QueuedJob) h.Result[uuid.UUID]
-	UpdateQueuedJob(ctx context.Context, id uuid.UUID, upd QueuedJobUpdate) error
+	FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) FilterResult[QueuedJob]
+	CreateQueuedJob(ctx context.Context, job *QueuedJob) uuid.UUID
+	UpdateQueuedJob(ctx context.Context, id uuid.UUID, upd QueuedJobUpdate)
 }
 
 type QueuedJobRepositoryImpl struct{}
@@ -89,17 +89,17 @@ func (r *QueuedJobRepositoryImpl) FindQueuedJobById(ctx context.Context, id uuid
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().FirstOrNone()
+	}).FirstOrNone()
 
 }
 
-func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) h.Result[FilterResult[QueuedJob]] {
+func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) FilterResult[QueuedJob] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[FilterResult[QueuedJob]](err)
+		panic(err)
 	}
 
 	selectCount := filter.CountCol()
@@ -130,7 +130,7 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return h.Err[FilterResult[QueuedJob]](err)
+		panic(err)
 	}
 	defer rows.Close()
 
@@ -147,7 +147,7 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 			&row.FailureCount,
 			&row.Error)
 		if err != nil {
-			return h.Err[FilterResult[QueuedJob]](err)
+			panic(err)
 		}
 
 		switch row.Type {
@@ -161,10 +161,10 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 		result = append(result, row)
 	}
 
-	return h.Ok(NewPagedResult(result, totalCount))
+	return NewPagedResult(result, totalCount)
 }
 
-func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job *QueuedJob) h.Result[uuid.UUID] {
+func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job *QueuedJob) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -172,7 +172,7 @@ func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job *Queu
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
 	sqlString := `insert into "queued_jobs"
@@ -188,19 +188,19 @@ func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job *Queu
 		job.FailureCount,
 		job.Error).Scan(&resultingId)
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
-	return h.Ok(resultingId)
+	return resultingId
 }
 
-func (c *QueuedJobRepositoryImpl) UpdateQueuedJob(ctx context.Context, id uuid.UUID, upd QueuedJobUpdate) error {
+func (c *QueuedJobRepositoryImpl) UpdateQueuedJob(ctx context.Context, id uuid.UUID, upd QueuedJobUpdate) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	sb := sqlbuilder.Update("queued_jobs")
@@ -223,8 +223,6 @@ func (c *QueuedJobRepositoryImpl) UpdateQueuedJob(ctx context.Context, id uuid.U
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	_, err = tx.Exec(sqlString, args...)
 	if err != nil {
-		return err
+		panic(err)
 	}
-
-	return nil
 }

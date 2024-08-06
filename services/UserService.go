@@ -38,7 +38,7 @@ func (s TotpAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) bool 
 	credentials := credentialRepository.FindCredentials(ctx, repos.CredentialFilter{
 		UserId: h.Some(userId),
 		Type:   h.Some(constants.CredentialTypeTotp),
-	}).Unwrap()
+	})
 	if !credentials.Any() {
 		panic(httpErrors.Unauthorized().WithMessage("no totp configured for user"))
 	}
@@ -89,7 +89,7 @@ func (s PasswordAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) b
 		BaseFilter: repos.BaseFilter{},
 		UserId:     h.Some(userId),
 		Type:       h.Some(constants.CredentialTypePassword),
-	}).Unwrap().SingleOrNone()
+	}).SingleOrNone()
 
 	if credential, ok := credential.Get(); ok {
 		details := credential.Details.(repos.CredentialPasswordDetails)
@@ -180,13 +180,10 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 		BaseFilter: repos.BaseFilter{},
 		UserId:     h.Some(request.UserId),
 		Type:       h.Some(constants.CredentialTypePassword),
-	}).Unwrap().SingleOrNone()
+	}).SingleOrNone()
 
 	if existingCredential, ok := credential.Get(); ok {
-		err := credentialRepository.DeleteCredential(ctx, existingCredential.Id)
-		if err != nil {
-			panic(err)
-		}
+		credentialRepository.DeleteCredential(ctx, existingCredential.Id).Unwrap()
 	}
 
 	hashAlgorithm := config.C.GetHashAlgorithm()
@@ -214,7 +211,7 @@ func (u *UserServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.U
 		BaseFilter: repos.BaseFilter{},
 		UserId:     h.Some(userId),
 		Type:       h.Some(constants.CredentialTypePassword),
-	}).Unwrap().First()
+	}).First()
 
 	return credential.Details.(repos.CredentialPasswordDetails).Temporary
 }
@@ -253,7 +250,7 @@ func (u *UserServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uui
 		},
 		UserId: h.Some(userId),
 		Type:   h.Some(constants.CredentialTypeTotp),
-	}).Unwrap().Any()
+	}).Any()
 
 	userRepository := ioc.Get[repos.UserRepository](scope)
 	user := userRepository.FindUserById(ctx, userId).Unwrap()
@@ -275,7 +272,7 @@ func (u *UserServiceImpl) HasTotpConfigured(ctx context.Context, userId uuid.UUI
 		},
 		UserId: h.Some(userId),
 		Type:   h.Some(constants.CredentialTypeTotp),
-	}).Unwrap().Any()
+	}).Any()
 }
 
 func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRequest) VerifyLoginResponse {

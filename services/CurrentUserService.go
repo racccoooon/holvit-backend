@@ -98,7 +98,7 @@ func (s *CurrentUserServiceImpl) DeviceId(ctx context.Context) (uuid.UUID, error
 	devices := userDeviceRepository.FindUserDevices(ctx, repos.UserDeviceFilter{
 		DeviceId: h.Some(deviceIdString),
 		UserId:   h.FromPtr(s.userId),
-	}).Unwrap()
+	})
 
 	if devices.Count() == 0 {
 		return uuid.UUID{}, nil

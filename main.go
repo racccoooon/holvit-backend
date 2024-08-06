@@ -53,11 +53,8 @@ func initialize(dp *ioc.DependencyProvider) {
 	realmsResult := realmRepository.FindRealms(ctx, repos.RealmFilter{
 		BaseFilter: repos.BaseFilter{},
 	})
-	if realmsResult.IsErr() {
-		logging.Logger.Fatal(realmsResult.UnwrapErr())
-	}
 
-	if realmsResult.Unwrap().Count() == 0 {
+	if !realmsResult.Any() {
 		seedData(ctx)
 	}
 

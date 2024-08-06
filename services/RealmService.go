@@ -94,12 +94,12 @@ func (s *RealmServiceImpl) createProfileScope(ctx context.Context, realmId uuid.
 			ClaimName: "preferred_username",
 			Property:  constants.UserInfoPropertyUsername,
 		},
-	}).Unwrap()
+	})
 
 	_ = claimMapperRepository.AssociateClaimMapper(ctx, repos.AssociateScopeClaimRequest{
 		ClaimMapperId: mapperId,
 		ScopeId:       scopeId.Unwrap(),
-	}).Unwrap()
+	})
 }
 
 func (s *RealmServiceImpl) createEmailScope(ctx context.Context, realmId uuid.UUID) {
@@ -126,12 +126,12 @@ func (s *RealmServiceImpl) createEmailScope(ctx context.Context, realmId uuid.UU
 			ClaimName: "email",
 			Property:  constants.UserInfoPropertyEmail,
 		},
-	}).Unwrap()
+	})
 
 	_ = claimMapperRepository.AssociateClaimMapper(ctx, repos.AssociateScopeClaimRequest{
 		ClaimMapperId: mapperId,
 		ScopeId:       scopeId,
-	}).Unwrap()
+	})
 
 	mapperId = claimMapperRepository.CreateClaimMapper(ctx, &repos.ClaimMapper{
 		BaseModel:   repos.BaseModel{},
@@ -143,12 +143,12 @@ func (s *RealmServiceImpl) createEmailScope(ctx context.Context, realmId uuid.UU
 			ClaimName: "email_verified",
 			Property:  constants.UserInfoPropertyEmailVerified,
 		},
-	}).Unwrap()
+	})
 
 	_ = claimMapperRepository.AssociateClaimMapper(ctx, repos.AssociateScopeClaimRequest{
 		ClaimMapperId: mapperId,
 		ScopeId:       scopeId,
-	}).Unwrap()
+	})
 }
 
 func (s *RealmServiceImpl) createOpenIdScope(ctx context.Context, realmId uuid.UUID) {
@@ -175,19 +175,19 @@ func (s *RealmServiceImpl) createOpenIdScope(ctx context.Context, realmId uuid.U
 			ClaimName: "sub",
 			Property:  constants.UserInfoPropertyId,
 		},
-	}).Unwrap()
+	})
 
 	_ = claimMapperRepository.AssociateClaimMapper(ctx, repos.AssociateScopeClaimRequest{
 		ClaimMapperId: mapperId,
 		ScopeId:       scopeId,
-	}).Unwrap()
+	})
 }
 
 func (s *RealmServiceImpl) InitializeRealmKeys(ctx context.Context) error {
 	scope := middlewares.GetScope(ctx)
 
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
-	realms := realmRepository.FindRealms(ctx, repos.RealmFilter{}).Unwrap()
+	realms := realmRepository.FindRealms(ctx, repos.RealmFilter{})
 
 	key := config.C.GetSymmetricEncryptionKey()
 

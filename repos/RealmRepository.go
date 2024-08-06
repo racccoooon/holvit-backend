@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/lib/pq"
 	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
@@ -45,9 +46,9 @@ type RealmUpdate struct {
 
 type RealmRepository interface {
 	FindRealmById(ctx context.Context, id uuid.UUID) h.Optional[Realm]
-	FindRealms(ctx context.Context, filter RealmFilter) h.Result[FilterResult[Realm]]
+	FindRealms(ctx context.Context, filter RealmFilter) FilterResult[Realm]
 	CreateRealm(ctx context.Context, realm *Realm) h.Result[uuid.UUID]
-	UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) error
+	UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) h.Result[h.Unit]
 }
 
 type RealmRepositoryImpl struct {
@@ -63,16 +64,16 @@ func (r *RealmRepositoryImpl) FindRealmById(ctx context.Context, id uuid.UUID) h
 			Id:         h.Some(id),
 			PagingInfo: h.Some(NewPagingInfo(1, 0)),
 		},
-	}).Unwrap().FirstOrNone()
+	}).FirstOrNone()
 }
 
-func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter) h.Result[FilterResult[Realm]] {
+func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter) FilterResult[Realm] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[FilterResult[Realm]](err)
+		panic(err)
 	}
 
 	sb := sqlbuilder.Select(filter.CountCol(),
@@ -95,7 +96,7 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return h.Err[FilterResult[Realm]](err)
+		panic(err)
 	}
 	defer rows.Close()
 
@@ -114,12 +115,12 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 			&row.RequireTotp,
 			&row.EnableRememberMe)
 		if err != nil {
-			return h.Err[FilterResult[Realm]](err)
+			panic(err)
 		}
 		result = append(result, row)
 	}
 
-	return h.Ok(NewPagedResult(result, totalCount))
+	return NewPagedResult(result, totalCount)
 }
 
 func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm *Realm) h.Result[uuid.UUID] {
@@ -130,7 +131,7 @@ func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm *Realm) h.R
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		panic(err)
 	}
 
 	sqlString := `insert into "realms"
@@ -149,19 +150,29 @@ func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm *Realm) h.R
 		realm.RequireTotp,
 		realm.EnableRememberMe).Scan(&resultingId)
 	if err != nil {
-		return h.Err[uuid.UUID](err)
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code.Name() {
+			case "unique_violation":
+				if pqErr.Constraint == "idx_unique_realm_name" {
+					return h.Err[uuid.UUID](DuplicateUsernameError{})
+				}
+				break
+			}
+		} else {
+			panic(err)
+		}
 	}
 
 	return h.Ok(resultingId)
 }
 
-func (r *RealmRepositoryImpl) UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) error {
+func (r *RealmRepositoryImpl) UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) h.Result[h.Unit] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	sb := sqlbuilder.Update("realms")
@@ -200,8 +211,18 @@ func (r *RealmRepositoryImpl) UpdateRealm(ctx context.Context, id uuid.UUID, upd
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	_, err = tx.Exec(sqlString, args...)
 	if err != nil {
-		return err
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code.Name() {
+			case "unique_violation":
+				if pqErr.Constraint == "idx_unique_realm_name" {
+					return h.Err[h.Unit](DuplicateUsernameError{})
+				}
+				break
+			}
+		} else {
+			panic(err)
+		}
 	}
 
-	return nil
+	return h.UOk()
 }

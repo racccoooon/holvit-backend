@@ -45,7 +45,7 @@ func (s *SessionServiceImpl) CreateSession(ctx context.Context, request CreateSe
 		RealmId:      request.RealmId,
 		ValidUntil:   now.Add(time.Hour * 24 * 30), //TODO: read from realm config
 		HashedToken:  hashedToken,
-	}).Unwrap()
+	})
 
 	return token, nil
 }
@@ -61,7 +61,7 @@ func (s *SessionServiceImpl) ValidateSession(ctx context.Context, token string) 
 	sessionRepository := ioc.Get[repos.SessionRepository](scope)
 	session := sessionRepository.FindSessions(ctx, repos.SessionFilter{
 		HashedToken: h.Some(hashedToken),
-	}).Unwrap().First()
+	}).First()
 
 	if session.ValidUntil.Compare(now) < 0 {
 		return nil, httpErrors.Unauthorized().WithMessage("session not valid")

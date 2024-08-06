@@ -22,13 +22,10 @@ type User struct {
 	EmailVerified bool
 }
 
-type DuplicateUsernameError struct {
-	RealmId  uuid.UUID
-	Username string
-}
+type DuplicateUsernameError struct{}
 
 func (e DuplicateUsernameError) Error() string {
-	return fmt.Sprintf("Username '%s' already in use in realm '%s'", e.Username, e.RealmId.String())
+	return "Duplicate username"
 }
 
 type UserFilter struct {
@@ -140,16 +137,13 @@ func (u *UserRepositoryImpl) CreateUser(ctx context.Context, user *User) h.Resul
 			switch pqErr.Code.Name() {
 			case "unique_violation":
 				if pqErr.Constraint == "idx_unique_username_per_realm" {
-					return h.Err[uuid.UUID](DuplicateUsernameError{
-						Username: user.Username,
-						RealmId:  user.RealmId,
-					})
+					return h.Err[uuid.UUID](DuplicateUsernameError{})
 				}
 				break
 			}
+		} else {
+			panic(err)
 		}
-
-		return h.Err[uuid.UUID](err)
 	}
 
 	return h.Ok(resultingId)

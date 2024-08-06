@@ -16,9 +16,5 @@ func SessionCleanup() {
 	ctx := middlewares.ContextWithNewScope(context.Background(), scope)
 
 	sessionRepository := ioc.Get[repos.SessionRepository](scope)
-	err := sessionRepository.DeleteOldSessions(ctx)
-
-	if err != nil {
-		logging.Logger.Error(err)
-	}
+	sessionRepository.DeleteOldSessions(ctx)
 }

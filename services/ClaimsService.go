@@ -38,7 +38,7 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 	claimMapperRepository := ioc.Get[repos.ClaimMapperRepository](scope)
 	mappers := claimMapperRepository.FindClaimMappers(ctx, repos.ClaimMapperFilter{
 		ScopeIds: h.Some(request.ScopeIds),
-	}).Unwrap()
+	})
 
 	claims := make([]*ClaimResponse, 0, len(mappers.Values()))
 

@@ -14,6 +14,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/utils"
 )
 
 type ClaimMapper struct {
@@ -97,12 +98,12 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 	})
 
 	filter.Id.IfSome(func(x uuid.UUID) {
-		args = append(args, filter.Id.Unwrap())
+		args = append(args, x)
 		sqlString += fmt.Sprintf(" and c.id = $%d", len(args))
 	})
 
 	filter.ScopeIds.IfSome(func(x []uuid.UUID) {
-		args = append(args, pq.Array(filter.ScopeIds.Unwrap()))
+		args = append(args, pq.Array(x))
 		sqlString += fmt.Sprintf(" and exists (select 1 from scope_claims sc where sc.claim_mapper_id = c.id and sc.scope_id = any($%d::uuid[]))", len(args))
 	})
 
@@ -135,12 +136,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 
 		switch row.Type {
 		case constants.ClaimMapperUserInfo:
-			var userInfoMapper UserInfoClaimMapperDetails
-			err := json.Unmarshal(detailsRaw, &userInfoMapper)
-			if err != nil {
-				return h.Err[FilterResult[ClaimMapper]](err)
-			}
-			row.Details = userInfoMapper
+			row.Details = utils.FromRawMessage[UserInfoClaimMapperDetails](detailsRaw).Unwrap()
 			break
 		default:
 			logging.Logger.Fatalf("Unsupported mapper type '%v' in claims mapper '%v'", row.Type, row.Id.String())

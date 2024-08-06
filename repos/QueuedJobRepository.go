@@ -13,6 +13,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/utils"
 )
 
 type QueuedJob struct {
@@ -151,12 +152,7 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 
 		switch row.Type {
 		case constants.QueuedJobSendMail:
-			var details SendMailJobDetails
-			err := json.Unmarshal(detailsRaw, &details)
-			if err != nil {
-				return h.Err[FilterResult[QueuedJob]](err)
-			}
-			row.Details = details
+			row.Details = utils.FromRawMessage[SendMailJobDetails](detailsRaw).Unwrap()
 			break
 		default:
 			logging.Logger.Fatalf("Unsupported job type '%v' in queud job '%v'", row.Type, row.Id.String())

@@ -13,6 +13,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/utils"
 )
 
 type Credential struct {
@@ -167,20 +168,10 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 
 		switch row.Type {
 		case constants.CredentialTypePassword:
-			var passwordDetails CredentialPasswordDetails
-			err := json.Unmarshal(detailsRaw, &passwordDetails)
-			if err != nil {
-				return h.Err[FilterResult[Credential]](err)
-			}
-			row.Details = passwordDetails
+			row.Details = utils.FromRawMessage[CredentialPasswordDetails](detailsRaw).Unwrap()
 			break
 		case constants.CredentialTypeTotp:
-			var totpDetails CredentialTotpDetails
-			err := json.Unmarshal(detailsRaw, &totpDetails)
-			if err != nil {
-				return h.Err[FilterResult[Credential]](err)
-			}
-			row.Details = totpDetails
+			row.Details = utils.FromRawMessage[CredentialTotpDetails](detailsRaw).Unwrap()
 			break
 		default:
 			logging.Logger.Fatalf("Unsupported hash algorithm '%v' in password credential '%v'", row.Type, row.Id.String())

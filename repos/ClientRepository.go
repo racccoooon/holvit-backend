@@ -56,7 +56,7 @@ func (c *ClientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID)
 			Id:         h.Some(id),
 			PagingInfo: h.Some(NewPagingInfo(1, 0)),
 		},
-	}).Unwrap().First()
+	}).Unwrap().FirstOrNone()
 }
 
 func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFilter) h.Result[FilterResult[Client]] {

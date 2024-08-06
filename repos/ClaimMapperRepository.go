@@ -77,7 +77,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMapperById(ctx context.Context, id 
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().First()
+	}).Unwrap().FirstOrNone()
 }
 
 func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) h.Result[FilterResult[ClaimMapper]] {

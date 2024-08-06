@@ -104,7 +104,7 @@ func (s *CurrentUserServiceImpl) DeviceId(ctx context.Context) (uuid.UUID, error
 		return uuid.UUID{}, nil
 	}
 
-	s.device = utils.Ptr(devices.First().Unwrap())
+	s.device = utils.Ptr(devices.First())
 	s.deviceId = &s.device.Id
 
 	return *s.deviceId, nil

@@ -54,7 +54,7 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokenById(ctx context.Context, i
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().First()
+	}).Unwrap().FirstOrNone()
 }
 
 func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) h.Result[FilterResult[RefreshToken]] {

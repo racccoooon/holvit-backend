@@ -65,7 +65,7 @@ func (s *SessionServiceImpl) ValidateSession(ctx context.Context, token string) 
 	sessionRepository := ioc.Get[repos.SessionRepository](scope)
 	session := sessionRepository.FindSessions(ctx, repos.SessionFilter{
 		HashedToken: h.Some(hashedToken),
-	}).Unwrap().First().Unwrap()
+	}).Unwrap().First()
 
 	if session.ValidUntil.Compare(now) < 0 {
 		return nil, httpErrors.Unauthorized().WithMessage("session not valid")

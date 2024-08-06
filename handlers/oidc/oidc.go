@@ -27,7 +27,7 @@ func login(w http.ResponseWriter, r *http.Request, realmName string, request ser
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realm := realmRepository.FindRealms(ctx, repos.RealmFilter{
 		Name: h.Some(realmName),
-	}).Unwrap().First().Unwrap()
+	}).Unwrap().First()
 
 	tokenService := ioc.Get[services.TokenService](scope)
 	loginToken, err := tokenService.StoreLoginCode(ctx, services.LoginInfo{

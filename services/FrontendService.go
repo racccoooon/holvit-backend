@@ -17,6 +17,8 @@ func NewFrontendService() FrontendService {
 
 	if config.C.IsDevelopment() {
 		if config.C.Development.AuthFrontendUrl != "" {
+			scripts = append(scripts, Script{Url: config.C.Development.AuthFrontendUrl + "@id/virtual:vue-devtools-path:overlay.js", Type: "module"})
+			scripts = append(scripts, Script{Url: config.C.Development.AuthFrontendUrl + "@id/virtual:vue-inspector-path:load.js", Type: "module"})
 			scripts = append(scripts, Script{Url: config.C.Development.AuthFrontendUrl + "@vite/client", Type: "module"})
 			scripts = append(scripts, Script{Url: config.C.Development.AuthFrontendUrl + "src/main.js", Type: "module"})
 		} else {

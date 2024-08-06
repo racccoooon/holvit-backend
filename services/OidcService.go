@@ -415,13 +415,13 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realm := realmRepository.FindRealms(ctx, repos.RealmFilter{
 		Name: h.Some(authorizationRequest.RealmName),
-	}).Unwrap().First().Unwrap()
+	}).Unwrap().First()
 
 	clientRepository := ioc.Get[repos.ClientRepository](scope)
 	client := clientRepository.FindClients(ctx, repos.ClientFilter{
 		RealmId:  h.Some(realm.Id),
 		ClientId: h.Some(authorizationRequest.ClientId),
-	}).Unwrap().First().Unwrap()
+	}).Unwrap().First()
 
 	currentUser := ioc.Get[CurrentUserService](scope)
 

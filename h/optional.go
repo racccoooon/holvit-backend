@@ -41,6 +41,15 @@ func (o Optional[T]) IsSome() bool {
 	return o.value != nil
 }
 
+func (o Optional[T]) Get() (T, bool) {
+	if o.IsNone() {
+		var zero T
+		return zero, false
+	} else {
+		return *o.value, true
+	}
+}
+
 func (o Optional[T]) And(other Optional[T]) Optional[T] {
 	if o.value == nil {
 		return o

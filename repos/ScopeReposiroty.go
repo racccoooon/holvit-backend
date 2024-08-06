@@ -65,7 +65,7 @@ func (s *ScopeRepositoryImpl) FindScopeById(ctx context.Context, id uuid.UUID) h
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().First()
+	}).Unwrap().FirstOrNone()
 }
 
 func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter) h.Result[FilterResult[Scope]] {

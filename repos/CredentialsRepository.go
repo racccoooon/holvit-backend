@@ -113,7 +113,7 @@ func (c *CredentialRepositoryImpl) FindCredentialById(ctx context.Context, id uu
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().First()
+	}).Unwrap().FirstOrNone()
 }
 
 func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter CredentialFilter) h.Result[FilterResult[Credential]] {

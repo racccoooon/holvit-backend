@@ -63,7 +63,7 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 		DeviceId: h.Some(request.DeviceId),
 	}).Unwrap()
 	if devices.Count() > 0 {
-		return utils.Ptr(devices.First().Unwrap().Id), nil
+		return utils.Ptr(devices.First().Id), nil
 	}
 
 	ua := user_agent.New(request.UserAgent)

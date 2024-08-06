@@ -76,7 +76,7 @@ func (s *SessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUI
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().First()
+	}).Unwrap().FirstOrNone()
 }
 
 func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter SessionFilter) h.Result[FilterResult[Session]] {

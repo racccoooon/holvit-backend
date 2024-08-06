@@ -34,6 +34,12 @@ type SetPasswordRequest struct {
 	Temporary   bool
 }
 
+type SetPasswordInitialRequest struct {
+	UserId    uuid.UUID
+	Password  string
+	Temporary bool
+}
+
 type VerifyLoginRequest struct {
 	UsernameOrEmail string
 	Password        string
@@ -98,7 +104,7 @@ func (u *UserServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.U
 		BaseFilter: repos.BaseFilter{},
 		UserId:     h.Some(userId),
 		Type:       h.Some(constants.CredentialTypePassword),
-	}).Unwrap().First()
+	}).Unwrap().FirstOrNone()
 	if credential.IsNone() {
 		return false, nil
 	}
@@ -106,7 +112,7 @@ func (u *UserServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.U
 	return credential.Unwrap().Details.(repos.CredentialPasswordDetails).Temporary, nil
 }
 
-func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRequest) error {
+func setPassword(ctx context.Context, request SetPasswordRequest, verifyOld bool) error {
 	scope := middlewares.GetScope(ctx)
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
@@ -115,20 +121,22 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 		BaseFilter: repos.BaseFilter{},
 		UserId:     h.Some(request.UserId),
 		Type:       h.Some(constants.CredentialTypePassword),
-	}).Unwrap().First()
+	}).Unwrap().Single()
 
-	if credential.IsSome() {
-		if request.OldPassword == nil {
-			return httpErrors.Unauthorized().WithMessage("missing old password")
+	if existingCredential, ok := credential.Get(); ok {
+
+		if verifyOld {
+			if request.OldPassword == nil {
+				return httpErrors.Unauthorized().WithMessage("missing old password")
+			}
+
+			err := verifyPassword(utils.Ptr(existingCredential), *request.OldPassword)
+			if err != nil {
+				return err
+			}
 		}
 
-		existingCredential := credential.Unwrap()
-		err := verifyPassword(utils.Ptr(existingCredential), *request.OldPassword)
-		if err != nil {
-			return err
-		}
-
-		err = credentialRepository.DeleteCredential(ctx, existingCredential.Id)
+		err := credentialRepository.DeleteCredential(ctx, existingCredential.Id)
 		if err != nil {
 			return err
 		}
@@ -152,6 +160,14 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 	return nil
 }
 
+func (u *UserServiceImpl) SetPasswordDangerouslyWithoutVerifyingOldPassword(ctx context.Context, request SetPasswordRequest) error {
+	return setPassword(ctx, request, false)
+}
+
+func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRequest) error {
+	return setPassword(ctx, request, true)
+}
+
 func verifyPassword(credential *repos.Credential, password string) error {
 	details := credential.Details.(repos.CredentialPasswordDetails)
 
@@ -170,14 +186,14 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 	user := userRepository.FindUsers(ctx, repos.UserFilter{
 		RealmId:         h.Some(request.RealmId),
 		UsernameOrEmail: h.Some(request.UsernameOrEmail),
-	}).Unwrap().First().Unwrap()
+	}).Unwrap().First()
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
 	credential := credentialRepository.FindCredentials(ctx, repos.CredentialFilter{
 		UserId: h.Some(user.Id),
 		Type:   h.Some(constants.CredentialTypePassword),
-	}).Unwrap().First().Unwrap()
+	}).Unwrap().First()
 
 	err := verifyPassword(&credential, request.Password)
 	if err != nil {
@@ -246,7 +262,7 @@ func (u *UserServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequ
 	return httpErrors.Unauthorized().WithMessage("no matching totp found")
 }
 
-func (s *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest) error {
+func (u *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest) error {
 	scope := middlewares.GetScope(ctx)
 
 	encryptedSecretBase64 := request.EncryptedSecretBase64
@@ -284,7 +300,7 @@ func (s *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest) e
 	return nil
 }
 
-func (s *UserServiceImpl) RequiresTotp(ctx context.Context, userId uuid.UUID) (bool, error) {
+func (u *UserServiceImpl) RequiresTotp(ctx context.Context, userId uuid.UUID) (bool, error) {
 	scope := middlewares.GetScope(ctx)
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
@@ -300,7 +316,7 @@ func (s *UserServiceImpl) RequiresTotp(ctx context.Context, userId uuid.UUID) (b
 	return credentials.Count() > 0, nil
 }
 
-func (s *UserServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) (bool, error) {
+func (u *UserServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) (bool, error) {
 	scope := middlewares.GetScope(ctx)
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)

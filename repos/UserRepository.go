@@ -45,7 +45,7 @@ func (u *UserRepositoryImpl) FindUserById(ctx context.Context, id uuid.UUID) h.O
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().First()
+	}).Unwrap().FirstOrNone()
 }
 
 func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h.Result[FilterResult[User]] {

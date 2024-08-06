@@ -5,11 +5,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"flag"
-	"github.com/sourcegraph/conc/iter"
 	"go/format"
 	"io"
 	"os"
-	"strings"
 	"text/template"
 )
 
@@ -101,8 +99,8 @@ func main() {
 	err = tmpl.Execute(&output, TemplateData{
 		PackageName:  packageName,
 		VariableName: name,
-		Entrypoint:   strings.TrimPrefix(entryPoints[0].File, "static/"),
-		Styles:       iter.Map(entryPoints[0].Css, func(str *string) string { return strings.TrimPrefix(*str, "static/") }),
+		Entrypoint:   entryPoints[0].File,
+		Styles:       entryPoints[0].Css,
 	})
 	if err != nil {
 		panic(err)

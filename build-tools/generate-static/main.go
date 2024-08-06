@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"text/template"
 	"unicode"
 	"unicode/utf8"
@@ -107,6 +108,9 @@ func main() {
 			continue
 		}
 		name := e.Name()
+		if strings.HasSuffix(name, ".html") {
+			continue
+		}
 		id := nameRegex.ReplaceAllString(name, "_")
 		p := filepath.Join(sourceDir, name)
 

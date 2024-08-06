@@ -75,7 +75,7 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 		return h.Err[FilterResult[Realm]](err)
 	}
 
-	sb := sqlbuilder.Select("count(*) over()",
+	sb := sqlbuilder.Select(filter.CountCol(),
 		"id", "name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_device_verification", "require_totp", "enable_remember_me").
 		From("realms")
 

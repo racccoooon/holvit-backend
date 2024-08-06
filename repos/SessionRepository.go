@@ -88,7 +88,7 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 		return h.Err[FilterResult[Session]](err)
 	}
 
-	sb := sqlbuilder.Select("count(*) over()",
+	sb := sqlbuilder.Select(filter.CountCol(),
 		"id", "user_id", "user_device_id", "realm_id", "hashed_token", "valid_until").
 		From("sessions")
 

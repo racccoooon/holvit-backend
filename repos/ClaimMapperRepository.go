@@ -89,7 +89,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 		return h.Err[FilterResult[ClaimMapper]](err)
 	}
 
-	sqlString := `select count(*) over(), c.id, c.realm_id, c.display_name, c.description, c.type, c.details from claim_mappers c where true`
+	sqlString := `select ` + filter.CountCol() + `, c.id, c.realm_id, c.display_name, c.description, c.type, c.details from claim_mappers c where true`
 
 	args := make([]interface{}, 0)
 	filter.Id.IfSome(func(x uuid.UUID) {

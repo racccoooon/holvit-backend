@@ -57,7 +57,7 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 		return h.Err[FilterResult[User]](err)
 	}
 
-	sb := sqlbuilder.Select("count(*) over()", "id", "realm_id", "username", "email", "email_verified").
+	sb := sqlbuilder.Select(filter.CountCol(), "id", "realm_id", "username", "email", "email_verified").
 		From("users")
 
 	filter.Id.IfSome(func(x uuid.UUID) {
@@ -93,21 +93,15 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 	var result []User
 	for rows.Next() {
 		var row User
-		var username *string
-		var email *string
 		err := rows.Scan(&totalCount,
 			&row.Id,
 			&row.RealmId,
-			&username,
-			&email,
+			row.Username.ToNillablePtr(),
+			row.Email.ToNillablePtr(),
 			&row.EmailVerified)
 		if err != nil {
 			return h.Err[FilterResult[User]](err)
 		}
-
-		//TODO: implement valuer for optionals?
-		row.Username = h.FromPtr(username)
-		row.Email = h.FromPtr(email)
 
 		result = append(result, row)
 	}

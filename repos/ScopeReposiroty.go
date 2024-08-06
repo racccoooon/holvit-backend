@@ -77,7 +77,7 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 		return h.Err[FilterResult[Scope]](err)
 	}
 
-	sql := "select count(*) over() as total_count, s.id, s.realm_id, s.name, s.display_name, s.description"
+	sql := "select " + filter.CountCol() + ", s.id, s.realm_id, s.name, s.display_name, s.description"
 
 	if filter.IncludeGrants {
 		sql += ", g.id, g.scope_id, g.user_id, g.client_id"

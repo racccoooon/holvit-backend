@@ -61,7 +61,7 @@ func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter U
 		return h.Err[FilterResult[UserDevice]](err)
 	}
 
-	sb := sqlbuilder.Select("count(*) over()",
+	sb := sqlbuilder.Select(filter.CountCol(),
 		"id", "user_id", "device_id", "display_name", "user_agent", "last_ip", "last_login_at").
 		From("user_devices")
 

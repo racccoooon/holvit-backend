@@ -66,7 +66,7 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 		return h.Err[FilterResult[RefreshToken]](err)
 	}
 
-	sb := sqlbuilder.Select("count(*) over()",
+	sb := sqlbuilder.Select(filter.CountCol(),
 		"id", "user_id", "client_id", "realm_id", "hashed_token", "valid_until", "issuer", "subject", "audience", "scopes").
 		From("refresh_tokens")
 

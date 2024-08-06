@@ -125,7 +125,7 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 		return h.Err[FilterResult[Credential]](err)
 	}
 
-	sb := sqlbuilder.Select("count(*) over()", "id", "user_id", "type", "details").
+	sb := sqlbuilder.Select(filter.CountCol(), "id", "user_id", "type", "details").
 		From("credentials")
 
 	filter.Id.IfSome(func(x uuid.UUID) {

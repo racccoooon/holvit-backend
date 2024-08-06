@@ -13,6 +13,13 @@ type BaseFilter struct {
 	PagingInfo h.Optional[PagingInfo]
 }
 
+func (f *BaseFilter) CountCol() string {
+	if f.PagingInfo.IsSome() {
+		return "count(*) over()"
+	}
+	return "-1"
+}
+
 type PagingInfo struct {
 	PageSize   int
 	PageNumber int

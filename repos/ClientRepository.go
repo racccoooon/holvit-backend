@@ -68,7 +68,7 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 		return h.Err[FilterResult[Client]](err)
 	}
 
-	sb := sqlbuilder.Select("count(*) over()",
+	sb := sqlbuilder.Select(filter.CountCol(),
 		"id", "realm_id", "display_name", "client_id", "hashed_client_secret", "redirect_uris").
 		From("clients")
 

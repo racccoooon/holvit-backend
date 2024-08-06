@@ -102,7 +102,7 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 		return h.Err[FilterResult[QueuedJob]](err)
 	}
 
-	selectCount := "count(*) over ()"
+	selectCount := filter.CountCol()
 	if filter.IgnoreLocked {
 		selectCount = "-1"
 	}

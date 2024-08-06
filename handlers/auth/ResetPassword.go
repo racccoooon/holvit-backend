@@ -56,11 +56,10 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userService := ioc.Get[services.UserService](scope)
-	err = userService.SetPassword(ctx, services.SetPasswordRequest{
-		UserId:      loginInfo.UserId,
-		Password:    request.NewPassword,
-		OldPassword: &request.Password,
-		Temporary:   false,
+	err = userService.SetPasswordDangerouslyWithoutVerifyingOldPassword(ctx, services.SetPasswordRequest{
+		UserId:    loginInfo.UserId,
+		Password:  request.NewPassword,
+		Temporary: false,
 	})
 	if err != nil {
 		rcs.Error(err)

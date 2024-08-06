@@ -25,8 +25,8 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
-	currentUser := ioc.Get[services.CurrentUserService](scope)
-	deviceIdString, err := currentUser.DeviceIdString()
+	currentUserService := ioc.Get[services.CurrentUserService](scope)
+	deviceIdString, err := currentUserService.DeviceIdString()
 	if err != nil {
 		rcs.Error(err)
 		return

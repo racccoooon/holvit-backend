@@ -13,6 +13,7 @@ import (
 	"holvit/middlewares"
 	"holvit/repos"
 	"holvit/requestContext"
+	"holvit/routes"
 	"holvit/utils"
 	"net/http"
 	"net/url"
@@ -60,6 +61,8 @@ func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request
 		})
 	}
 
+	realmName := "admin" // TODO: get from where?
+
 	frontendData := AuthFrontendData{
 		Mode: constants.FrontendModeAuthorize,
 		Authorize: &AuthFrontendDataAuthorize{
@@ -69,9 +72,9 @@ func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request
 			},
 			Scopes:    scopes,
 			Token:     c.Token,
-			GrantUrl:  fmt.Sprintf("/api/auth/authorize-grant"), // TODO: get this from some URL resolver service thingie
+			GrantUrl:  routes.ApiAuthorizeGrant.Url(realmName),
 			RefuseUrl: c.RedirectUri,
-			LogoutUrl: "/oidc/logout", // TODO: get this from a service
+			LogoutUrl: routes.OidcLogout.Url(realmName),
 		},
 	}
 
@@ -371,7 +374,7 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) (AuthorizationResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
-	currentUser := ioc.Get[CurrentUserService](scope)
+	currentUserService := ioc.Get[CurrentUserService](scope)
 
 	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
 	scopes := scopeRepository.FindScopes(ctx, repos.ScopeFilter{
@@ -384,7 +387,7 @@ func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) 
 		scopeIds = append(scopeIds, scope.Id)
 	}
 
-	userId, err := currentUser.UserId()
+	userId, err := currentUserService.UserId()
 	if err != nil {
 		return nil, err
 	}

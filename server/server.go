@@ -11,6 +11,7 @@ import (
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
+	"holvit/routes"
 	"holvit/services"
 	"net/http"
 	"os"
@@ -32,24 +33,24 @@ func ServeApi(dp *ioc.DependencyProvider) {
 
 	r.Use(services.CurrentUserMiddleware)
 
-	r.HandleFunc("/api/health", handlers.Health).Methods("GET")
+	r.HandleFunc(routes.ApiHealth.String(), handlers.Health).Methods("GET")
 
-	r.HandleFunc("/oidc/{realmName}/authorize", oidc.Authorize).Methods("GET", "POST")
-	r.HandleFunc("/oidc/{realmName}/token", oidc.Token)
-	r.HandleFunc("/oidc/{realmName}/userinfo", oidc.Token).Methods("GET", "POST")
-	r.HandleFunc("/oidc/{realmName}/jwks", oidc.Token)
-	r.HandleFunc("/oidc/{realmName}/logout", oidc.Token)
+	r.HandleFunc(routes.OidcAuthorize.String(), oidc.Authorize).Methods("GET", "POST")
+	r.HandleFunc(routes.OidcToken.String(), oidc.Token)
+	r.HandleFunc(routes.OidcUserInfo.String(), oidc.Token).Methods("GET", "POST")
+	r.HandleFunc(routes.OidcJwks.String(), oidc.Token)
+	r.HandleFunc(routes.OidcLogout.String(), oidc.Token)
 
-	r.HandleFunc("/api/auth/authorize-grant", auth.AuthorizeGrant).Methods("POST")
-	r.HandleFunc("/api/auth/verify-password", auth.VerifyPassword).Methods("POST")
-	r.HandleFunc("/api/auth/verify-email", auth.VerifyEmail).Methods("GET")
-	r.HandleFunc("/api/auth/reset-password", auth.ResetPassword).Methods("POST")
-	r.HandleFunc("/api/auth/totp-onboarding", auth.TotpOnboarding).Methods("POST")
-	r.HandleFunc("/api/auth/verify-totp", auth.VerifyTotp).Methods("POST")
-	r.HandleFunc("/api/auth/verify-device", auth.VerifyDevice).Methods("POST")
-	r.HandleFunc("/api/auth/login", auth.Login).Methods("POST")
-	r.HandleFunc("/api/auth/get-onboarding-totp", auth.GetOnboardingTotp).Methods("POST")
-	// TODO: r.HandleFunc("/api/auth/resend-email-verification", auth.ResendEmailVerification).Methods("POST")
+	r.HandleFunc(routes.ApiAuthorizeGrant.String(), auth.AuthorizeGrant).Methods("POST")
+	r.HandleFunc(routes.ApiVerifyPassword.String(), auth.VerifyPassword).Methods("POST")
+	r.HandleFunc(routes.ApiVerifyEmail.String(), auth.VerifyEmail).Methods("GET")
+	r.HandleFunc(routes.ApiResetPassword.String(), auth.ResetPassword).Methods("POST")
+	r.HandleFunc(routes.ApiTotpOnboarding.String(), auth.TotpOnboarding).Methods("POST")
+	r.HandleFunc(routes.ApiVerifyTotp.String(), auth.VerifyTotp).Methods("POST")
+	r.HandleFunc(routes.ApiVerifyDevice.String(), auth.VerifyDevice).Methods("POST")
+	r.HandleFunc(routes.ApiLogin.String(), auth.Login).Methods("POST")
+	r.HandleFunc(routes.ApiGetOnboardingTotp.String(), auth.GetOnboardingTotp).Methods("POST")
+	//TODO: r.HandleFunc(routes.ApiResendEmailVerification.String(), auth.ResendEmailVerification).Methods("POST")
 
 	registerStatics(r)
 

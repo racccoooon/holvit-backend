@@ -124,7 +124,7 @@ func writeJson(w http.ResponseWriter, name string, data interface{}) error {
 }
 
 func writePage(w http.ResponseWriter, page Page) error {
-	_, err := w.Write([]byte(`<!doctype html><html><head>`))
+	_, err := w.Write([]byte(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"/>`))
 	if err != nil {
 		return err
 	}

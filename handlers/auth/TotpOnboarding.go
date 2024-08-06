@@ -88,15 +88,11 @@ func TotpOnboarding(w http.ResponseWriter, r *http.Request) {
 	totpSecret := utils.DecryptSymmetric(encryptedSecret, key)
 
 	userService := ioc.Get[services.UserService](scope)
-	err = userService.AddTotp(ctx, services.AddTotpRequest{
+	userService.AddTotp(ctx, services.AddTotpRequest{
 		UserId:      loginInfo.UserId,
 		DisplayName: h.FromPtr(request.DisplayName),
 		Secret:      totpSecret,
 	}, services.DangerousNoAuthStrategy{})
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
 
 	nextStep, err := getNextStep(ctx, currentStep, loginInfo)
 	if err != nil {
@@ -141,10 +137,7 @@ func (s *TotpOnboardingStep) NeedsToRun(ctx context.Context, info *services.Logi
 
 	userService := ioc.Get[services.UserService](scope)
 	requiresTotpOnboarding := userService.RequiresTotpOnboarding(ctx, info.UserId)
-	if requiresTotpOnboarding.IsOk() {
-		return requiresTotpOnboarding.Unwrap(), nil
-	}
-	return false, requiresTotpOnboarding.UnwrapErr()
+	return requiresTotpOnboarding, nil
 }
 
 func (s *TotpOnboardingStep) Prepare(ctx context.Context, info *services.LoginInfo) error {

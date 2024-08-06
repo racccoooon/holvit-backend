@@ -109,14 +109,11 @@ func seedData(ctx context.Context) {
 		logging.Logger.Fatal(err)
 	}
 
-	err = userService.SetPassword(ctx, services.SetPasswordRequest{
+	userService.SetPassword(ctx, services.SetPasswordRequest{
 		UserId:    adminUserId,
 		Password:  config.C.InitialAdminPassword,
 		Temporary: true,
 	}, services.DangerousNoAuthStrategy{})
-	if err != nil {
-		logging.Logger.Fatal(err)
-	}
 }
 
 func configureServices() *ioc.DependencyProvider {

@@ -101,10 +101,7 @@ func (s *VerifyTotpStep) NeedsToRun(ctx context.Context, info *services.LoginInf
 
 	userService := ioc.Get[services.UserService](scope)
 	requiresTotpOnboarding := userService.RequiresTotpOnboarding(ctx, info.UserId)
-	if requiresTotpOnboarding.IsOk() {
-		return requiresTotpOnboarding.Unwrap(), nil
-	}
-	return false, requiresTotpOnboarding.UnwrapErr()
+	return requiresTotpOnboarding, nil
 }
 
 func (s *VerifyTotpStep) Prepare(ctx context.Context, info *services.LoginInfo) error {

@@ -17,27 +17,26 @@ import (
 )
 
 type AuthStrategy interface {
-	Authorize(ctx context.Context, userId uuid.UUID) // TODO: maybe return an error?
+	Authorize(ctx context.Context, userId uuid.UUID) bool // TODO: maybe return an error?
 }
 
 type DangerousNoAuthStrategy struct{}
 
-func (DangerousNoAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) {}
+func (DangerousNoAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) bool {
+	return true
+}
 
 type TotpAuthStrategy struct {
 	Code string
 }
 
-func (s TotpAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) {
+func (s TotpAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) bool {
 	scope := middlewares.GetScope(ctx)
-
-	userRepository := ioc.Get[repos.UserRepository](scope)
-	user := userRepository.FindUserById(ctx, userId).Unwrap()
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
 	credentials := credentialRepository.FindCredentials(ctx, repos.CredentialFilter{
-		UserId: h.Some(user.Id),
+		UserId: h.Some(userId),
 		Type:   h.Some(constants.CredentialTypeTotp),
 	}).Unwrap()
 	if !credentials.Any() {
@@ -71,16 +70,17 @@ func (s TotpAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) {
 
 		if isValid {
 			// we found a matching totp for the user
-			return
+			return true
 		}
 	}
+	return false
 }
 
 type PasswordAuthStrategy struct {
 	Password string
 }
 
-func (s PasswordAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) {
+func (s PasswordAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) bool {
 	scope := middlewares.GetScope(ctx)
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
@@ -89,14 +89,15 @@ func (s PasswordAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) {
 		BaseFilter: repos.BaseFilter{},
 		UserId:     h.Some(userId),
 		Type:       h.Some(constants.CredentialTypePassword),
-	}).Unwrap().FirstOrNone().UnwrapErr(httpErrors.Unauthorized().WithMessage("no password for user"))
+	}).Unwrap().SingleOrNone()
 
-	details := credential.Details.(repos.CredentialPasswordDetails)
+	if credential, ok := credential.Get(); ok {
+		details := credential.Details.(repos.CredentialPasswordDetails)
 
-	valid := utils.CompareHash(s.Password, details.HashedPassword)
-	if !valid {
-		panic(httpErrors.Unauthorized().WithMessage("failed to verify password"))
+		valid := utils.CompareHash(s.Password, details.HashedPassword)
+		return valid
 	}
+	return false
 }
 
 type CreateUserRequest struct {
@@ -136,11 +137,11 @@ type AddTotpRequest struct {
 type UserService interface {
 	CreateUser(ctx context.Context, request CreateUserRequest) h.Result[uuid.UUID]
 
-	SetPassword(ctx context.Context, request SetPasswordRequest, strategy AuthStrategy) error
+	SetPassword(ctx context.Context, request SetPasswordRequest, strategy AuthStrategy)
 	IsPasswordTemporary(ctx context.Context, userId uuid.UUID) bool
 
-	AddTotp(ctx context.Context, request AddTotpRequest, strategy AuthStrategy) error
-	RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) h.Result[bool]
+	AddTotp(ctx context.Context, request AddTotpRequest, strategy AuthStrategy)
+	RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) bool
 	HasTotpConfigured(ctx context.Context, userId uuid.UUID) bool
 
 	VerifyLogin(ctx context.Context, request VerifyLoginRequest) VerifyLoginResponse
@@ -166,8 +167,10 @@ func (u *UserServiceImpl) CreateUser(ctx context.Context, request CreateUserRequ
 	})
 }
 
-func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRequest, strategy AuthStrategy) error {
-	strategy.Authorize(ctx, request.UserId)
+func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRequest, strategy AuthStrategy) {
+	if !strategy.Authorize(ctx, request.UserId) {
+		//TODO: panic or return error
+	}
 
 	scope := middlewares.GetScope(ctx)
 
@@ -182,7 +185,7 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 	if existingCredential, ok := credential.Get(); ok {
 		err := credentialRepository.DeleteCredential(ctx, existingCredential.Id)
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 
@@ -198,10 +201,8 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 		},
 	}).UnwrapErr()
 	if err != nil {
-		return err
+		panic(err)
 	}
-
-	return nil
 }
 
 func (u *UserServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.UUID) bool {
@@ -218,8 +219,10 @@ func (u *UserServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.U
 	return credential.Details.(repos.CredentialPasswordDetails).Temporary
 }
 
-func (u *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest, strategy AuthStrategy) error {
-	strategy.Authorize(ctx, request.UserId)
+func (u *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest, strategy AuthStrategy) {
+	if !strategy.Authorize(ctx, request.UserId) {
+		//TODO:
+	}
 
 	scope := middlewares.GetScope(ctx)
 
@@ -229,22 +232,17 @@ func (u *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest, s
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
-	err := credentialRepository.CreateCredential(ctx, &repos.Credential{
+	_ = credentialRepository.CreateCredential(ctx, &repos.Credential{
 		UserId: request.UserId,
 		Type:   constants.CredentialTypeTotp,
 		Details: repos.CredentialTotpDetails{
 			DisplayName:           request.DisplayName.OrDefault("New Totp"),
 			EncryptedSecretBase64: encryptedSecretBase64,
 		},
-	}).UnwrapErr()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	}).Unwrap()
 }
 
-func (u *UserServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) h.Result[bool] {
+func (u *UserServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) bool {
 	scope := middlewares.GetScope(ctx)
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
@@ -263,7 +261,7 @@ func (u *UserServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uui
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realm := realmRepository.FindRealmById(ctx, user.RealmId).Unwrap()
 
-	return h.Ok(!anyTotp && realm.RequireTotp)
+	return !anyTotp && realm.RequireTotp
 }
 
 func (u *UserServiceImpl) HasTotpConfigured(ctx context.Context, userId uuid.UUID) bool {

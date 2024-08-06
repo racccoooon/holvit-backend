@@ -64,6 +64,7 @@ type AddTotpRequest struct {
 type UserService interface {
 	CreateUser(ctx context.Context, request CreateUserRequest) (*CreateUserResponse, error)
 	SetPassword(ctx context.Context, request SetPasswordRequest) error
+	SetPasswordDangerouslyWithoutVerifyingOldPassword(ctx context.Context, request SetPasswordRequest) error
 	VerifyLogin(ctx context.Context, request VerifyLoginRequest) (*VerifyLoginResponse, error)
 	IsPasswordTemporary(ctx context.Context, userId uuid.UUID) (bool, error)
 	RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) (bool, error)

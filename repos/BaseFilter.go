@@ -1,6 +1,7 @@
 package repos
 
 import (
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
@@ -28,10 +29,10 @@ func (i PagingInfo) SqlString() string {
 type FilterResult[T any] interface {
 	Values() []T
 	Count() int
+	Single() h.Result[T]
 	FirstOrNone() h.Optional[T]
-	FirstOrDefault(defaultValue T) T
 	First() T
-	Single() h.Optional[T]
+	SingleOrNone() h.Result[h.Optional[T]]
 }
 
 func first[T any](r FilterResult[T]) h.Optional[T] {
@@ -42,14 +43,15 @@ func first[T any](r FilterResult[T]) h.Optional[T] {
 	return h.Some(values[0])
 }
 
-func single[T any](r FilterResult[T]) h.Optional[T] {
+func single[T any](r FilterResult[T]) h.Result[h.Optional[T]] {
 	values := r.Values()
 	if len(values) == 1 {
-		return h.Some(values[0])
+		return h.Ok(h.Some(values[0]))
 	} else if len(values) == 0 {
-		return h.None[T]()
+		return h.Ok(h.None[T]())
 	}
-	panic("too many values") // TODO: create a `InvariantViolationError` or something?
+
+	return h.Err[h.Optional[T]](errors.New("too many values"))
 }
 
 type pagedResult[T any] struct {
@@ -72,19 +74,21 @@ func (p *pagedResult[T]) Count() int {
 	return p.totalCount
 }
 
-func (p *pagedResult[T]) FirstOrNone() h.Optional[T] {
-	return first[T](p)
-}
-
-func (p *pagedResult[T]) FirstOrDefault(defaultValue T) T {
-	return first[T](p).UnwrapOr(defaultValue)
-}
-
 func (p *pagedResult[T]) First() T {
 	return first[T](p).Unwrap()
 }
 
-func (p *pagedResult[T]) Single() h.Optional[T] {
+func (p *pagedResult[T]) FirstOrNone() h.Optional[T] {
+	return first[T](p)
+}
+
+func (p *pagedResult[T]) Single() h.Result[T] {
+	return h.MapResult[h.Optional[T], T](single[T](p), func(optional h.Optional[T]) T {
+		return optional.Unwrap()
+	})
+}
+
+func (p *pagedResult[T]) SingleOrNone() h.Result[h.Optional[T]] {
 	return single[T](p)
 }
 

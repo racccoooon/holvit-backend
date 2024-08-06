@@ -56,3 +56,10 @@ func (r Result[T]) Match(ok func(T), err func(error)) {
 		err(r.err)
 	}
 }
+
+func MapResult[T1 any, T2 any](result Result[T1], mapping func(T1) T2) Result[T2] {
+	if result.IsOk() {
+		return Ok(mapping(result.Unwrap()))
+	}
+	return Err[T2](result.err)
+}

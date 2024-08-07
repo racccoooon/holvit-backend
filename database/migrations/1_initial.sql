@@ -1,4 +1,6 @@
 -- +migrate Up
+create extension ltree;
+
 create table "realms"
 (
     "id"                          uuid  not null default gen_random_uuid(),
@@ -203,7 +205,55 @@ create table "queued_jobs"
     primary key ("id")
 );
 
+create table "roles"
+(
+    "id"           uuid not null default gen_random_uuid(),
+    "realm_id"     uuid not null,
+    "client_id"    uuid,
+    "display_name" text not null,
+    "name"         text not null,
+    "description"  text not null,
+    primary key ("id")
+);
+
+create unique index "idx_unique_role_per_realm" on "roles" ("name", "realm_id");
+
+alter table "roles"
+    add constraint "fk_roles_realms" foreign key ("realm_id") references "realms";
+
+alter table "roles"
+    add constraint "fk_roles_clients" foreign key ("client_id") references "clients";
+
+create table "implied_roles" (
+    "id" uuid not null default gen_random_uuid(),
+    "role_id" uuid not null,
+    "implied_role_id" uuid not null,
+    primary key ("id")
+);
+
+alter table "implied_roles"
+    add constraint "fk_implied_roles_role" foreign key ("role_id") references "roles";
+
+alter table "implied_roles"
+    add constraint "fk_implied_roles_implied_role" foreign key ("implied_role_id") references "roles";
+
+create table "user_roles"
+(
+    "id"      uuid not null default gen_random_uuid(),
+    "user_id" uuid not null,
+    "role_id" uuid not null,
+    primary key ("id")
+);
+
+alter table "user_roles"
+    add constraint "fk_user_roles_users" foreign key ("user_id") references "users";
+alter table "user_roles"
+    add constraint "fk_user_roles_roles" foreign key ("role_id") references "roles";
+
 -- +migrate Down
+drop table "user_roles" cascade;
+drop table "implied_roles" cascade;
+drop table "roles" cascade;
 drop table "queued_jobs" cascade;
 drop table "user_devices" cascade;
 drop table "sessions" cascade;

@@ -21,7 +21,7 @@ type OnboardingTotpRequest struct {
 }
 
 type OnboardingTotpResponse struct {
-	SecretBase32 string `json:"secret_base32"`
+	SecretBase32 string `json:"secretBase32"`
 }
 
 func GetOnboardingTotp(w http.ResponseWriter, r *http.Request) {

@@ -38,7 +38,7 @@ func ErrorHandlingMiddleware(next http.Handler) http.Handler {
 					message = ""
 				}
 
-				logging.Logger.Error(err)
+				logging.Logger.Info(err)
 				http.Error(w, message, httpErr.Status())
 				break
 

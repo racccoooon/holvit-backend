@@ -14,6 +14,7 @@ type NextAuthenticationStep interface {
 
 func getNextStep(ctx context.Context, currentStep string, info *services.LoginInfo) (NextAuthenticationStep, error) {
 	var nextStep NextAuthenticationStep
+	// TODO: gwen would really like to make this less brittle and more understandable
 	switch currentStep {
 	case constants.AuthenticateStepVerifyPassword:
 		nextStep = &VerifyEmailStep{}
@@ -25,7 +26,7 @@ func getNextStep(ctx context.Context, currentStep string, info *services.LoginIn
 		nextStep = &TotpOnboardingStep{}
 		break
 	case constants.AuthenticateStepTotpOnboarding:
-		nextStep = &VerifyTotpStep{}
+		nextStep = &VerifyDeviceStep{}
 		break
 	case constants.AuthenticateStepVerifyTotp:
 		nextStep = &VerifyDeviceStep{}

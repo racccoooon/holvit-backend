@@ -17,7 +17,7 @@ type VerifyPasswordRequest struct {
 	Username   string `json:"username"`
 	Password   string `json:"password"`
 	Token      string `json:"token"`
-	RememberMe bool   `json:"remember_me"`
+	RememberMe bool   `json:"rememberMe"`
 }
 
 func VerifyPassword(w http.ResponseWriter, r *http.Request) {

@@ -15,7 +15,7 @@ import (
 
 type ResetPasswordRequest struct {
 	Password    string `json:"password"`
-	NewPassword string `json:"new_password"`
+	NewPassword string `json:"newPassword"`
 	Token       string `json:"token"`
 }
 

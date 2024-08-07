@@ -281,9 +281,14 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 		Username: h.Some(request.Username),
 	}).Unwrap().First()
 
-	PasswordAuthStrategy{
+	isValid := PasswordAuthStrategy{
 		Password: request.Password,
 	}.Authorize(ctx, user.Id)
+
+	if !isValid {
+		// TODO: also do this for all other authroize things
+		panic(httpErrors.Unauthorized().WithMessage("invalid username or password"))
+	}
 
 	return VerifyLoginResponse{
 		UserId: user.Id,

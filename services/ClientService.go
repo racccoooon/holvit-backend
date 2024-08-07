@@ -15,6 +15,7 @@ import (
 
 type CreateClientRequest struct {
 	RealmId     uuid.UUID
+	ClientId    h.Optional[string]
 	DisplayName string
 }
 
@@ -62,30 +63,30 @@ func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClie
 
 	clientRepository := ioc.Get[repos.ClientRepository](scope)
 
-	clientId, err := uuid.NewRandom()
-	if err != nil {
-		return nil, err
-	}
-	clientIdString := clientId.String()
+	clientId := request.ClientId.UnwrapOrElse(func() string {
+		id, err := uuid.NewRandom()
+		if err != nil {
+			panic(err)
+		}
+		return id.String()
+	})
 
 	clientSecret := utils.GenerateRandomStringBase64(32)
 
 	hashAlgorithm := config.C.GetHashAlgorithm()
 	hashedClientSecret := hashAlgorithm.Hash(clientSecret)
 
-	client := repos.Client{
+	clientDbId := clientRepository.CreateClient(ctx, &repos.Client{
 		RealmId:      request.RealmId,
 		DisplayName:  request.DisplayName,
-		ClientId:     clientIdString,
+		ClientId:     clientId,
 		ClientSecret: hashedClientSecret,
 		RedirectUris: make([]string, 0),
-	}
-
-	clientDbId := clientRepository.CreateClient(ctx, &client)
+	}).Unwrap()
 
 	return &CreateClientResponse{
-		Id:           clientDbId.Unwrap(),
-		ClientId:     clientIdString,
+		Id:           clientDbId,
+		ClientId:     clientId,
 		ClientSecret: "secret_" + clientSecret,
 	}, nil
 }

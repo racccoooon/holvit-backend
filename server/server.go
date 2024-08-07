@@ -36,20 +36,21 @@ func ServeApi(dp *ioc.DependencyProvider) {
 	r.HandleFunc(routes.ApiHealth.String(), handlers.Health).Methods("GET")
 
 	r.HandleFunc(routes.OidcAuthorize.String(), oidc.Authorize).Methods("GET", "POST")
-	r.HandleFunc(routes.OidcToken.String(), oidc.Token)
-	r.HandleFunc(routes.OidcUserInfo.String(), oidc.Token).Methods("GET", "POST")
-	r.HandleFunc(routes.OidcJwks.String(), oidc.Token)
-	r.HandleFunc(routes.OidcLogout.String(), oidc.Token)
+	r.HandleFunc(routes.OidcToken.String(), oidc.Token).Methods("POST")
+	r.HandleFunc(routes.OidcUserInfo.String(), oidc.UserInfo).Methods("GET", "POST")
+	r.HandleFunc(routes.OidcJwks.String(), oidc.Jwks)
+	r.HandleFunc(routes.OidcLogout.String(), oidc.EndSession)
 
-	r.HandleFunc(routes.ApiAuthorizeGrant.String(), auth.AuthorizeGrant).Methods("POST")
 	r.HandleFunc(routes.ApiVerifyPassword.String(), auth.VerifyPassword).Methods("POST")
-	r.HandleFunc(routes.ApiVerifyEmail.String(), auth.VerifyEmail).Methods("GET")
 	r.HandleFunc(routes.ApiResetPassword.String(), auth.ResetPassword).Methods("POST")
 	r.HandleFunc(routes.ApiTotpOnboarding.String(), auth.TotpOnboarding).Methods("POST")
 	r.HandleFunc(routes.ApiVerifyTotp.String(), auth.VerifyTotp).Methods("POST")
 	r.HandleFunc(routes.ApiVerifyDevice.String(), auth.VerifyDevice).Methods("POST")
-	r.HandleFunc(routes.ApiLogin.String(), auth.Login).Methods("POST")
 	r.HandleFunc(routes.ApiGetOnboardingTotp.String(), auth.GetOnboardingTotp).Methods("POST")
+
+	r.HandleFunc(routes.AuthorizeGrant.String(), auth.AuthorizeGrant).Methods("POST")
+	r.HandleFunc(routes.AuthVerifyEmail.String(), auth.VerifyEmail).Methods("GET")
+	r.HandleFunc(routes.LoginComplete.String(), auth.CompleteAuthFlow).Methods("POST")
 	//TODO: r.HandleFunc(routes.ApiResendEmailVerification.String(), auth.ResendEmailVerification).Methods("POST")
 
 	registerStatics(r)

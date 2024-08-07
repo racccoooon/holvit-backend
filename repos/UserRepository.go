@@ -69,17 +69,17 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 	args := []interface{}{}
 	filter.Id.IfSome(func(x uuid.UUID) {
 		args = append(args, x)
-		sqlString += fmt.Sprintf(" id = $%d", len(args))
+		sqlString += fmt.Sprintf(" and id = $%d", len(args))
 	})
 
 	filter.RealmId.IfSome(func(x uuid.UUID) {
 		args = append(args, x)
-		sqlString += fmt.Sprintf(" realm_id = $%d", len(args))
+		sqlString += fmt.Sprintf(" and realm_id = $%d", len(args))
 	})
 
 	filter.Username.IfSome(func(x string) {
 		args = append(args, x)
-		sqlString += fmt.Sprintf(" username = lower($%d)", len(args))
+		sqlString += fmt.Sprintf(" and username = lower($%d)", len(args))
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
@@ -101,7 +101,7 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 			&row.Id,
 			&row.RealmId,
 			&row.Username,
-			row.Email.ToNillablePtr(),
+			row.Email.AsMutPtr(),
 			&row.EmailVerified)
 		if err != nil {
 			return h.Err[FilterResult[User]](err)

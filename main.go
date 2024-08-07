@@ -11,6 +11,7 @@ import (
 	"holvit/config"
 	"holvit/crons"
 	"holvit/database"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -90,6 +91,7 @@ func seedData(ctx context.Context) {
 	clientService := ioc.Get[services.ClientService](scope)
 	clientResponse, err := clientService.CreateClient(ctx, services.CreateClientRequest{
 		RealmId:     masterRealm.Id,
+		ClientId:    h.Some("holvit_admin"),
 		DisplayName: "Holvit Admin",
 	})
 	if err != nil {

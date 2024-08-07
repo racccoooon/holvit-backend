@@ -11,12 +11,13 @@ import (
 	"holvit/middlewares"
 	"holvit/repos"
 	"holvit/requestContext"
+	"holvit/routes"
 	"holvit/services"
 	"net/http"
 	"strings"
 )
 
-func login(w http.ResponseWriter, r *http.Request, realmName string, request services.AuthorizationRequest) error {
+func login(w http.ResponseWriter, r *http.Request, realmName string) error {
 	ctx := r.Context()
 	scope := middlewares.GetScope(ctx)
 
@@ -31,9 +32,9 @@ func login(w http.ResponseWriter, r *http.Request, realmName string, request ser
 
 	tokenService := ioc.Get[services.TokenService](scope)
 	loginToken, err := tokenService.StoreLoginCode(ctx, services.LoginInfo{
-		NextStep: constants.AuthenticateStepVerifyPassword,
-		RealmId:  realm.Id,
-		Request:  request,
+		NextStep:    constants.AuthenticateStepVerifyPassword,
+		RealmId:     realm.Id,
+		OriginalUrl: r.URL.String(),
 	})
 	if err != nil {
 		return err
@@ -42,14 +43,17 @@ func login(w http.ResponseWriter, r *http.Request, realmName string, request ser
 	frontendData := services.AuthFrontendData{
 		Mode: constants.FrontendModeAuthenticate,
 		Authenticate: &services.AuthFrontendDataAuthenticate{
-			Token:         loginToken,
-			UseRememberMe: realm.EnableRememberMe,
+			ClientName:       "TODO (client name)",
+			Token:            loginToken,
+			UseRememberMe:    realm.EnableRememberMe,
+			RegisterUrl:      "TODO (register URL)",
+			LoginCompleteUrl: routes.LoginComplete.Url(realmName),
 		},
 	}
 
 	frontendService := ioc.Get[services.FrontendService](scope)
 
-	err = frontendService.WriteAuthFrontend(w, frontendData)
+	err = frontendService.WriteAuthFrontend(w, realmName, frontendData)
 	if err != nil {
 		return err
 	}
@@ -82,7 +86,7 @@ func Authorize(w http.ResponseWriter, r *http.Request) {
 	currentUserService := ioc.Get[services.CurrentUserService](scope)
 
 	if err := currentUserService.VerifyAuthorized(); err != nil {
-		err := login(w, r, realmName, request)
+		err := login(w, r, realmName)
 		if err != nil {
 			rcs.Error(err)
 			return
@@ -185,6 +189,7 @@ func Jwks(w http.ResponseWriter, r *http.Request) {
 }
 
 func EndSession(w http.ResponseWriter, r *http.Request) {
+
 }
 
 func Discovery(w http.ResponseWriter, r *http.Request) {

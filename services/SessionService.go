@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/google/uuid"
 	"holvit/h"
-	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
 	"holvit/repos"
@@ -19,8 +18,8 @@ type CreateSessionRequest struct {
 }
 
 type SessionService interface {
-	CreateSession(ctx context.Context, request CreateSessionRequest) (string, error)
-	ValidateSession(ctx context.Context, token string) (*repos.Session, error)
+	CreateSession(ctx context.Context, request CreateSessionRequest) string
+	LookupSession(ctx context.Context, token string) h.Optional[repos.Session]
 }
 
 func NewSessionService() SessionService {
@@ -29,7 +28,7 @@ func NewSessionService() SessionService {
 
 type SessionServiceImpl struct{}
 
-func (s *SessionServiceImpl) CreateSession(ctx context.Context, request CreateSessionRequest) (string, error) {
+func (s *SessionServiceImpl) CreateSession(ctx context.Context, request CreateSessionRequest) string {
 	scope := middlewares.GetScope(ctx)
 
 	clockService := ioc.Get[utils.ClockService](scope)
@@ -47,10 +46,10 @@ func (s *SessionServiceImpl) CreateSession(ctx context.Context, request CreateSe
 		HashedToken:  hashedToken,
 	})
 
-	return token, nil
+	return token
 }
 
-func (s *SessionServiceImpl) ValidateSession(ctx context.Context, token string) (*repos.Session, error) {
+func (s *SessionServiceImpl) LookupSession(ctx context.Context, token string) h.Optional[repos.Session] {
 	scope := middlewares.GetScope(ctx)
 
 	clockService := ioc.Get[utils.ClockService](scope)
@@ -61,11 +60,11 @@ func (s *SessionServiceImpl) ValidateSession(ctx context.Context, token string) 
 	sessionRepository := ioc.Get[repos.SessionRepository](scope)
 	session := sessionRepository.FindSessions(ctx, repos.SessionFilter{
 		HashedToken: h.Some(hashedToken),
-	}).First()
+	}).FirstOrNone()
 
-	if session.ValidUntil.Compare(now) < 0 {
-		return nil, httpErrors.Unauthorized().WithMessage("session not valid")
+	if session, ok := session.Get(); ok && session.ValidUntil.Compare(now) < 0 {
+		return h.None[repos.Session]()
 	}
 
-	return &session, nil
+	return session
 }

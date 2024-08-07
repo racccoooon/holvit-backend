@@ -1,5 +1,5 @@
 package auth
 
 type VerifyLoginStepResponse struct {
-	NextStep string `json:"next_step"`
+	NextStep string `json:"nextStep"`
 }

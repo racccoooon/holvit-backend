@@ -16,28 +16,28 @@ import (
 )
 
 type GrantInfo struct {
-	ClientId             uuid.UUID            `json:"client_id"`
-	RealmId              uuid.UUID            `json:"realm_id"`
-	AuthorizationRequest AuthorizationRequest `json:"authorization_request"`
+	ClientId             uuid.UUID            `json:"clientId"`
+	RealmId              uuid.UUID            `json:"realmId"`
+	AuthorizationRequest AuthorizationRequest `json:"authorizationRequest"`
 }
 
 type CodeInfo struct {
-	RealmId         uuid.UUID   `json:"realm_id"`
-	ClientId        string      `json:"client_id"`
-	UserId          uuid.UUID   `json:"user_id"`
-	RedirectUri     string      `json:"redirect_uri"`
-	GrantedScopes   []string    `json:"granted_scopes"`
-	GrantedScopeIds []uuid.UUID `json:"granted_scope_ids"`
+	RealmId         uuid.UUID   `json:"realmId"`
+	ClientId        string      `json:"clientId"`
+	UserId          uuid.UUID   `json:"userId"`
+	RedirectUri     string      `json:"redirectUri"`
+	GrantedScopes   []string    `json:"grantedScopes"`
+	GrantedScopeIds []uuid.UUID `json:"grantedScopeIds"`
 }
 
 type LoginInfo struct {
-	NextStep                            string               `json:"next_step"`
-	RealmId                             uuid.UUID            `json:"realm_id"`
-	UserId                              uuid.UUID            `json:"user_id"`
-	DeviceId                            string               `json:"device_id"`
-	RememberMe                          bool                 `json:"remember_me"`
-	Request                             AuthorizationRequest `json:"request"`
-	EncryptedTotpOnboardingSecretBase64 string               `json:"totp_secret"`
+	NextStep                            string    `json:"nextStep"`
+	RealmId                             uuid.UUID `json:"realmId"`
+	UserId                              uuid.UUID `json:"userId"`
+	DeviceId                            string    `json:"deviceId"`
+	RememberMe                          bool      `json:"rememberMe"`
+	EncryptedTotpOnboardingSecretBase64 string    `json:"totpSecret"`
+	OriginalUrl                         string    `json:"originalUrl"`
 }
 
 type TokenService interface {

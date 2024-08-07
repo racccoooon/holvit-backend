@@ -22,7 +22,7 @@ import (
 type TotpOnboardingRequest struct {
 	Token       string  `json:"token"`
 	Code        string  `json:"code"`
-	DisplayName *string `json:"display_name"`
+	DisplayName *string `json:"displayName"`
 }
 
 func TotpOnboarding(w http.ResponseWriter, r *http.Request) {

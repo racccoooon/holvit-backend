@@ -89,6 +89,10 @@ func (o Optional[T]) ToNillablePtr() *T {
 	return o.value
 }
 
+func (o *Optional[T]) AsMutPtr() **T {
+	return &o.value
+}
+
 func (o Optional[T]) Expect(msg string) T {
 	return o.UnwrapErr(errors.New(fmt.Sprintf("tried to unwrap an empty option: %s", msg)))
 }

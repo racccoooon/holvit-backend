@@ -33,7 +33,7 @@ func (DuplicatePasswordOnUserError) Error() string {
 }
 
 type CredentialPasswordDetails struct {
-	HashedPassword string `json:"hashed_password"`
+	HashedPassword string `json:"hashedPassword"`
 	Temporary      bool   `json:"temporary"`
 }
 
@@ -51,8 +51,8 @@ func (d *CredentialPasswordDetails) Scan(value interface{}) error {
 }
 
 type CredentialTotpDetails struct {
-	DisplayName           string `json:"display_name"`
-	EncryptedSecretBase64 string `json:"encrypted_secret_base64"`
+	DisplayName           string `json:"displayName"`
+	EncryptedSecretBase64 string `json:"encryptedSecretBase64"`
 }
 
 func (d CredentialTotpDetails) Value() (driver.Value, error) {

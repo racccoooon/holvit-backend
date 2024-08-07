@@ -72,15 +72,15 @@ func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request
 			},
 			Scopes:    scopes,
 			Token:     c.Token,
-			GrantUrl:  routes.ApiAuthorizeGrant.Url(realmName),
-			RefuseUrl: c.RedirectUri,
+			RefuseUrl: c.RedirectUri, // TODO: are we sure?
 			LogoutUrl: routes.OidcLogout.Url(realmName),
+			GrantUrl:  routes.AuthorizeGrant.Url(realmName),
 		},
 	}
 
 	frontendService := ioc.Get[FrontendService](scope)
 
-	err := frontendService.WriteAuthFrontend(w, frontendData)
+	err := frontendService.WriteAuthFrontend(w, realmName, frontendData)
 	if err != nil {
 		rcs.Error(err)
 	}

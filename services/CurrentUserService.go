@@ -177,8 +177,8 @@ func CurrentUserMiddleware(next http.Handler) http.Handler {
 		sessionToken, err := r.Cookie(constants.SessionCookieName(realmName))
 		if err == nil {
 			sessionService := ioc.Get[SessionService](scope)
-			session, err := sessionService.ValidateSession(ctx, sessionToken.Value)
-			if err == nil {
+			session := sessionService.LookupSession(ctx, sessionToken.Value)
+			if session, ok := session.Get(); ok {
 				serviceImpl.realmId = &session.RealmId
 				serviceImpl.userId = &session.UserId
 			}

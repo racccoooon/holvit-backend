@@ -3,12 +3,13 @@ package services
 import (
 	"encoding/json"
 	"holvit/config"
+	"holvit/routes"
 	"holvit/services/generated"
 	"net/http"
 )
 
 type FrontendService interface {
-	WriteAuthFrontend(w http.ResponseWriter, frontendData AuthFrontendData) error
+	WriteAuthFrontend(w http.ResponseWriter, realmName string, frontendData AuthFrontendData) error
 }
 
 func NewFrontendService() FrontendService {
@@ -46,11 +47,12 @@ type frontendServiceImpl struct {
 	authPage Page
 }
 
-func (f *frontendServiceImpl) WriteAuthFrontend(w http.ResponseWriter, frontendData AuthFrontendData) error {
+func (f *frontendServiceImpl) WriteAuthFrontend(w http.ResponseWriter, realmName string, frontendData AuthFrontendData) error {
 	page := f.authPage
 	page.Title = "TODO"
 	page.JsonData = map[string]interface{}{
-		"auth_info": frontendData,
+		"authInfo": frontendData,
+		"apiBase":  routes.ApiBase.Url(realmName),
 	}
 	return writePage(w, page)
 }
@@ -62,25 +64,26 @@ type AuthFrontendUser struct {
 type AuthFrontendScope struct {
 	Required    bool   `json:"required"`
 	Name        string `json:"name"`
-	DisplayName string `json:"display_name"`
+	DisplayName string `json:"displayName"`
 	Description string `json:"description"`
 }
 
 type AuthFrontendDataAuthorize struct {
-	ClientName string              `json:"client_name"`
+	ClientName string              `json:"clientName"`
 	User       AuthFrontendUser    `json:"user"`
 	Scopes     []AuthFrontendScope `json:"scopes"`
 	Token      string              `json:"token"`
-	GrantUrl   string              `json:"grant_url"`
-	RefuseUrl  string              `json:"refuse_url"`
-	LogoutUrl  string              `json:"logout_url"`
+	RefuseUrl  string              `json:"refuseUrl"`
+	LogoutUrl  string              `json:"logoutUrl"`
+	GrantUrl   string              `json:"grantUrl"`
 }
 
 type AuthFrontendDataAuthenticate struct {
-	ClientName    string `json:"client_name"`
-	Token         string `json:"token"`
-	UseRememberMe bool   `json:"use_remember_me"`
-	RegisterUrl   string `json:"register_url"`
+	ClientName       string `json:"clientName"`
+	Token            string `json:"token"`
+	UseRememberMe    bool   `json:"useRememberMe"`
+	RegisterUrl      string `json:"registerUrl"`
+	LoginCompleteUrl string `json:"loginCompleteUrl"`
 }
 
 type AuthFrontendData struct {

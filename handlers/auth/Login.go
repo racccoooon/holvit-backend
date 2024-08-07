@@ -14,7 +14,7 @@ import (
 	"net/http"
 )
 
-func Login(w http.ResponseWriter, r *http.Request) {
+func CompleteAuthFlow(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
@@ -81,26 +81,15 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sessionService := ioc.Get[services.SessionService](scope)
-	sessionToken, err := sessionService.CreateSession(ctx, services.CreateSessionRequest{
+	sessionToken := sessionService.CreateSession(ctx, services.CreateSessionRequest{
 		UserId:   loginInfo.UserId,
 		RealmId:  loginInfo.RealmId,
 		DeviceId: *deviceUuid,
 	})
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
 
 	currentUser.SetSession(w, loginInfo.UserId, loginInfo.RememberMe, realm.Name, sessionToken)
 
-	oidcService := ioc.Get[services.OidcService](scope)
-	response, err := oidcService.Authorize(ctx, loginInfo.Request)
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
-
-	response.HandleHttp(w, r)
+	http.Redirect(w, r, loginInfo.OriginalUrl, http.StatusFound)
 }
 
 type SubmitLoginStep struct {

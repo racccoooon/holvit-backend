@@ -22,8 +22,6 @@ func NewFrontendService() FrontendService {
 			scripts = append(scripts, Script{Url: config.C.Development.AuthFrontendUrl + "@vite/client", Type: "module"})
 			scripts = append(scripts, Script{Url: config.C.Development.AuthFrontendUrl + "src/main.js", Type: "module"})
 		} else {
-			scripts = append(scripts, Script{Url: "/static/auth.js"})
-			styles = append(styles, "/static/auth.css")
 			scripts = append(scripts, Script{Url: "/static/" + generated.AuthManifest.JsEntrypoint})
 			for _, name := range generated.AuthManifest.Stylesheets {
 				styles = append(styles, "/static/"+name)

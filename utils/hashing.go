@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"crypto/sha512"
+	"crypto/sha256"
 	"fmt"
 	"github.com/go-crypt/crypt"
 	"golang.org/x/crypto/bcrypt"
@@ -34,7 +34,7 @@ func (b *BCryptHashAlgorithm) Hash(plain string) string {
 }
 
 func CheapHash(input string) string {
-	hash := sha512.New()
+	hash := sha256.New()
 	hash.Write([]byte(input))
 	hashedData := hash.Sum(nil)
 	return fmt.Sprintf("%x", hashedData)

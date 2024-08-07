@@ -189,17 +189,14 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 	hashAlgorithm := config.C.GetHashAlgorithm()
 	hashed := hashAlgorithm.Hash(request.Password)
 
-	err := credentialRepository.CreateCredential(ctx, &repos.Credential{
+	credentialRepository.CreateCredential(ctx, &repos.Credential{
 		UserId: request.UserId,
 		Type:   constants.CredentialTypePassword,
 		Details: repos.CredentialPasswordDetails{
 			HashedPassword: hashed,
 			Temporary:      request.Temporary,
 		},
-	}).UnwrapErr()
-	if err != nil {
-		panic(err)
-	}
+	}).Unwrap()
 }
 
 func (u *UserServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.UUID) bool {

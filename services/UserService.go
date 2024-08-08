@@ -94,8 +94,11 @@ func (s PasswordAuthStrategy) Authorize(ctx context.Context, userId uuid.UUID) b
 	if credential, ok := credential.Get(); ok {
 		details := credential.Details.(repos.CredentialPasswordDetails)
 
-		valid := utils.CompareHash(s.Password, details.HashedPassword)
-		return valid
+		result := utils.ValidateHash(s.Password, details.HashedPassword, config.C.GetHasher())
+		if result.IsValid && result.NeedsRehash {
+			// TODO: rehash password!
+		}
+		return result.IsValid
 	}
 	return false
 }
@@ -187,7 +190,7 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 		credentialRepository.DeleteCredential(ctx, existingCredential.Id).Unwrap()
 	}
 
-	hashAlgorithm := config.C.GetHashAlgorithm()
+	hashAlgorithm := config.C.GetHasher()
 	hashed := hashAlgorithm.Hash(request.Password)
 
 	credentialRepository.CreateCredential(ctx, &repos.Credential{

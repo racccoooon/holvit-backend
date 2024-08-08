@@ -9,6 +9,14 @@ type Optional[T any] struct {
 	value *T
 }
 
+func (o Optional[T]) String() string {
+	if o.value == nil {
+		return "<none>"
+	} else {
+		return fmt.Sprintf("%v", *o.value)
+	}
+}
+
 func Some[T any](v T) Optional[T] {
 	return Optional[T]{
 		value: &v,

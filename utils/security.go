@@ -36,7 +36,7 @@ func GenerateRandomStringBase64(length int) string {
 		panic(err)
 	}
 
-	return base64.StdEncoding.EncodeToString(bytes)
+	return base64.URLEncoding.EncodeToString(bytes)
 }
 
 func GenerateKeyPair() (ed25519.PrivateKey, ed25519.PublicKey) {

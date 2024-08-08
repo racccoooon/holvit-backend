@@ -39,8 +39,8 @@ func Fuzz_BCryptAlgorithm(f *testing.F) {
 		hashed, err1 := algorithm.Hash(input)
 		hashedAgain, err2 := algorithm.Hash(input)
 
-		err3 := CompareHash(input, hashed)
-		err4 := CompareHash(input, hashedAgain)
+		err3 := ValidateHash(input, hashed)
+		err4 := ValidateHash(input, hashedAgain)
 
 		// assert
 		assert.NoError(t, err1)

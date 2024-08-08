@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/spf13/viper"
-	"golang.org/x/crypto/bcrypt"
 	"holvit/constants"
 	"holvit/utils"
 	"time"
@@ -27,8 +26,10 @@ type HolvitConfig struct {
 	AdminUserName        string
 	InitialAdminPassword string
 
-	HashAlgorithm  string
-	BCryptSettings utils.BCryptHashAlgorithm
+	HashAlgorithm    string
+	BCryptSettings   utils.BcryptHashSettings
+	SCryptSettings   utils.ScryptHashSettings
+	Argon2idSettings utils.Argon2idHashSettings
 
 	Totp struct {
 		Period uint
@@ -95,12 +96,22 @@ func (c *HolvitConfig) IsDevelopment() bool {
 	return !(c.IsStaging() || c.IsProduction())
 }
 
-func (c *HolvitConfig) GetHashAlgorithm() utils.HashAlgorithm {
+var hasher utils.Hasher
+
+func (c *HolvitConfig) GetHasher() utils.Hasher {
+	return hasher
+}
+
+func (c *HolvitConfig) getHashSettings() utils.HashSettings {
 	switch C.HashAlgorithm {
 	case constants.HashAlgorithmBCrypt:
 		return &C.BCryptSettings
+	case constants.HashAlgorithmSCrypt:
+		return &C.SCryptSettings
+	case constants.HashAlgorithmArgon2id:
+		return &C.Argon2idSettings
 	default:
-		panic(fmt.Sprint("Hash algorithm '%s' is not supported", c.HashAlgorithm))
+		panic(fmt.Errorf("hash algorithm '%s' is not supported", c.HashAlgorithm))
 	}
 }
 
@@ -116,6 +127,7 @@ func Init() {
 	setDefaultConfigValues()
 	readConfigValues()
 	validateConfig()
+	hasher = C.getHashSettings().MakeHasher()
 }
 
 func readFlags() {
@@ -129,8 +141,18 @@ func setDefaultConfigValues() {
 	C.Development.AuthFrontendUrl = "http://localhost:5173/"
 	C.StaticRoot = "/static/"
 
-	C.HashAlgorithm = constants.HashAlgorithmBCrypt
-	C.BCryptSettings.Cost = bcrypt.DefaultCost
+	C.HashAlgorithm = constants.HashAlgorithmArgon2id
+	C.BCryptSettings.Cost = 12
+	C.SCryptSettings.R = 8
+	C.SCryptSettings.LogN = 32768
+	C.SCryptSettings.Parallelism = 1
+	C.SCryptSettings.SaltLength = 32
+	C.SCryptSettings.OutputLength = 32
+	C.Argon2idSettings.OpsCost = 3
+	C.Argon2idSettings.Parallelism = 1
+	C.Argon2idSettings.MemoryCost = 64 * 1024
+	C.Argon2idSettings.SaltLength = 16
+	C.Argon2idSettings.OutputLength = 32
 
 	C.Totp.Period = 30
 	C.Totp.Skew = 1

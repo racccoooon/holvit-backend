@@ -22,6 +22,8 @@ const UserInfoPropertyEmailVerified = "email_verified"
 const UserInfoPropertyUsername = "username"
 
 const HashAlgorithmBCrypt = "bcrypt"
+const HashAlgorithmSCrypt = "scrypt"
+const HashAlgorithmArgon2id = "argon2id"
 
 const AuthorizationResponseModeQuery = "query"
 
@@ -29,6 +31,8 @@ const AuthorizationResponseTypeCode = "code"
 
 const TokenGrantTypeAuthorizationCode = "authorization_code"
 const TokenGrantTypeRefreshToken = "refresh_token"
+
+const CodeChallengeMethodS256 = "S256"
 
 const FrontendModeAuthenticate = "authenticate"
 const FrontendModeAuthorize = "authorize"

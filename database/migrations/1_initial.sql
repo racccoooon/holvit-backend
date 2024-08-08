@@ -1,5 +1,4 @@
 -- +migrate Up
-create extension ltree;
 
 create table "realms"
 (
@@ -25,7 +24,7 @@ create table "clients"
     "realm_id"             uuid   not null,
     "display_name"         text   not null,
     "client_id"            text   not null,
-    "hashed_client_secret" text   not null,
+    "hashed_client_secret" text   null,
     "redirect_uris"        text[] not null,
     primary key ("id")
 );
@@ -37,11 +36,11 @@ alter table "clients"
 
 create table "users"
 (
-    "id"             uuid not null default gen_random_uuid(),
-    "realm_id"       uuid not null,
-    "username"       text not null,
-    "email"          citext,
-    "email_verified" bool not null default false,
+    "id"             uuid   not null default gen_random_uuid(),
+    "realm_id"       uuid   not null,
+    "username"       text   not null,
+    "email"          citext null,
+    "email_verified" bool   not null default false,
     primary key ("id")
 );
 
@@ -196,12 +195,12 @@ $$;
 
 create table "queued_jobs"
 (
-    "id"            uuid  not null default gen_random_uuid(),
-    "status"        job_status     default 'pending',
-    "type"          text  not null,
-    "details"       jsonb not null,
-    "failure_count" int   not null,
-    "error"         text,
+    "id"            uuid       not null default gen_random_uuid(),
+    "status"        job_status not null default 'pending',
+    "type"          text       not null,
+    "details"       jsonb      not null,
+    "failure_count" int        not null,
+    "error"         text       null,
     primary key ("id")
 );
 
@@ -209,7 +208,7 @@ create table "roles"
 (
     "id"           uuid not null default gen_random_uuid(),
     "realm_id"     uuid not null,
-    "client_id"    uuid,
+    "client_id"    uuid null,
     "display_name" text not null,
     "name"         text not null,
     "description"  text not null,
@@ -224,9 +223,10 @@ alter table "roles"
 alter table "roles"
     add constraint "fk_roles_clients" foreign key ("client_id") references "clients";
 
-create table "implied_roles" (
-    "id" uuid not null default gen_random_uuid(),
-    "role_id" uuid not null,
+create table "implied_roles"
+(
+    "id"              uuid not null default gen_random_uuid(),
+    "role_id"         uuid not null,
     "implied_role_id" uuid not null,
     primary key ("id")
 );

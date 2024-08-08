@@ -75,13 +75,15 @@ func Authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	request := services.AuthorizationRequest{
-		ResponseTypes: strings.Split(r.Form.Get("response_type"), " "),
-		RealmName:     realmName,
-		ClientId:      r.Form.Get("client_id"),
-		RedirectUri:   r.Form.Get("redirect_uri"),
-		Scopes:        strings.Split(r.Form.Get("scope"), " "),
-		State:         r.Form.Get("state"),
-		ResponseMode:  r.Form.Get("response_mode"),
+		ResponseTypes:       strings.Split(r.Form.Get("response_type"), " "),
+		RealmName:           realmName,
+		ClientId:            r.Form.Get("client_id"),
+		RedirectUri:         r.Form.Get("redirect_uri"),
+		Scopes:              strings.Split(r.Form.Get("scope"), " "),
+		State:               r.Form.Get("state"),
+		ResponseMode:        r.Form.Get("response_mode"),
+		PKCEChallenge:       r.Form.Get("code_challenge"),
+		PKCEChallengeMethod: r.Form.Get("code_challenge_method"),
 	}
 
 	currentUserService := ioc.Get[services.CurrentSessionService](scope)
@@ -117,7 +119,20 @@ func Token(w http.ResponseWriter, r *http.Request) {
 
 	grantType := r.Form.Get("grant_type")
 
-	clientId, clientSecret, _ := r.BasicAuth()
+	clientId, clientSecretStr, hasBasicAuth := r.BasicAuth()
+
+	clientSecret := h.None[string]()
+	if hasBasicAuth {
+		clientSecret = h.Some(clientSecretStr)
+	} else {
+		clientId = r.Form.Get("client_id")
+	}
+
+	pkceVerifierStr := r.Form.Get("code_verifier")
+	pkceVerifier := h.None[string]()
+	if pkceVerifierStr != "" {
+		pkceVerifier = h.Some(pkceVerifierStr)
+	}
 
 	oidcService := ioc.Get[services.OidcService](scope)
 
@@ -131,6 +146,7 @@ func Token(w http.ResponseWriter, r *http.Request) {
 			Code:         r.Form.Get("code"),
 			ClientId:     clientId,
 			ClientSecret: clientSecret,
+			PKCEVerifier: pkceVerifier,
 		})
 		break
 	case constants.TokenGrantTypeRefreshToken:

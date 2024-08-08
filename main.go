@@ -93,6 +93,7 @@ func seedData(ctx context.Context) {
 		RealmId:     masterRealm.Id,
 		ClientId:    h.Some("holvit_admin"),
 		DisplayName: "Holvit Admin",
+		WithSecret:  true,
 	})
 	if err != nil {
 		logging.Logger.Fatal(err)

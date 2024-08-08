@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -22,13 +23,15 @@ import (
 )
 
 type AuthorizationRequest struct {
-	ResponseTypes []string `json:"response_types"`
-	RealmName     string   `json:"realm_name"`
-	ClientId      string   `json:"client_id"`
-	RedirectUri   string   `json:"redirect_uri"`
-	Scopes        []string `json:"scopes"`
-	State         string   `json:"state"`
-	ResponseMode  string   `json:"response_mode"`
+	ResponseTypes       []string `json:"responseTypes"`
+	RealmName           string   `json:"realmName"`
+	ClientId            string   `json:"clientId"`
+	RedirectUri         string   `json:"redirectUri"`
+	Scopes              []string `json:"scopes"`
+	State               string   `json:"state"`
+	ResponseMode        string   `json:"responseMode"`
+	PKCEChallenge       string   `json:"pkceChallenge"`
+	PKCEChallengeMethod string   `json:"pkceChallengeMethod"`
 }
 
 type AuthorizationResponse interface {
@@ -133,13 +136,14 @@ type AuthorizationCodeTokenRequest struct {
 	RedirectUri  string
 	Code         string
 	ClientId     string
-	ClientSecret string
+	ClientSecret h.Optional[string]
+	PKCEVerifier h.Optional[string]
 }
 
 type RefreshTokenRequest struct {
 	RefreshToken string
 	ClientId     string
-	ClientSecret string
+	ClientSecret h.Optional[string]
 	ScopeNames   []string
 }
 
@@ -193,9 +197,18 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	if err != nil {
 		return nil, err
 	}
-
 	if codeInfo.ClientId != client.ClientId {
-		return nil, httpErrors.Unauthorized().WithMessage("invalid client id")
+		return nil, httpErrors.Unauthorized().WithMessage("wrong client id")
+	}
+
+	if client.ClientSecret.IsNone() {
+		codeChallenge := codeInfo.PKCEChallenge.UnwrapErr(httpErrors.Unauthorized().WithMessage("PKCE required"))
+		codeVerifier := request.PKCEVerifier.UnwrapErr(httpErrors.Unauthorized().WithMessage("PKCE required"))
+		hashedVerifier := base64.URLEncoding.EncodeToString(utils.Sha256(codeVerifier))
+
+		if codeChallenge != hashedVerifier { // don't need constant time compare because we're comparing hashes
+			return nil, httpErrors.Unauthorized().WithMessage("wrong PKCE code verifier")
+		}
 	}
 
 	claimsService := ioc.Get[ClaimsService](scope)
@@ -423,6 +436,19 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 		ClientId: h.Some(authorizationRequest.ClientId),
 	}).First()
 
+	pkceChallenge := h.None[string]()
+	if client.ClientSecret.IsSome() && authorizationRequest.PKCEChallenge != "" {
+		return nil, httpErrors.BadRequest().WithMessage("clients with a secret cannot use PKCE")
+	} else if client.ClientSecret.IsNone() {
+		if authorizationRequest.PKCEChallenge == "" {
+			return nil, httpErrors.BadRequest().WithMessage("clients without a secret must use PKCE")
+		}
+		if authorizationRequest.PKCEChallengeMethod != constants.CodeChallengeMethodS256 {
+			return nil, httpErrors.BadRequest().WithMessage(fmt.Sprintf("Unsupported PKCE code challenge method '%v'", authorizationRequest.PKCEChallengeMethod))
+		}
+		pkceChallenge = h.Some(authorizationRequest.PKCEChallenge)
+	}
+
 	currentUser := ioc.Get[CurrentSessionService](scope)
 
 	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
@@ -482,6 +508,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 		UserId:        userid,
 		RedirectUri:   authorizationRequest.RedirectUri,
 		GrantedScopes: grantedScopes,
+		PKCEChallenge: pkceChallenge,
 	})
 	if err != nil {
 		return nil, err

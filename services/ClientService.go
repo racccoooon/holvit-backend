@@ -17,17 +17,18 @@ type CreateClientRequest struct {
 	RealmId     uuid.UUID
 	ClientId    h.Optional[string]
 	DisplayName string
+	WithSecret  bool
 }
 
 type CreateClientResponse struct {
 	Id           uuid.UUID
 	ClientId     string
-	ClientSecret string
+	ClientSecret h.Optional[string]
 }
 
 type AuthenticateClientRequest struct {
 	ClientId     string
-	ClientSecret string
+	ClientSecret h.Optional[string]
 }
 
 type ClientService interface {
@@ -41,6 +42,8 @@ func NewClientService() ClientService {
 	return &ClientServiceImpl{}
 }
 
+// TODO: make sure all error responses in oidc comply with https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
+
 func (c *ClientServiceImpl) Authenticate(ctx context.Context, request AuthenticateClientRequest) (*repos.Client, error) {
 	scope := middlewares.GetScope(ctx)
 
@@ -49,13 +52,24 @@ func (c *ClientServiceImpl) Authenticate(ctx context.Context, request Authentica
 		ClientId: h.Some(request.ClientId),
 	}).First()
 
-	requestClientSecret, _ := strings.CutPrefix(request.ClientSecret, "secret_")
-	valid := utils.CompareHash(requestClientSecret, client.ClientSecret)
-	if !valid {
-		return nil, httpErrors.Unauthorized()
+	if hashedSecret, ok := client.ClientSecret.Get(); ok {
+		if providedSecret, ok := request.ClientSecret.Get(); ok {
+			requestClientSecret, hasPrefix := strings.CutPrefix(providedSecret, "secret_")
+			if !hasPrefix {
+				return nil, httpErrors.Unauthorized().WithMessage("missing secret_ prefix")
+			}
+			result := utils.ValidateHash(requestClientSecret, hashedSecret, config.C.GetHasher())
+			if result.IsValid {
+				if result.NeedsRehash {
+					// TODO: rehash the client secret!
+				}
+				return &client, nil
+			}
+			return nil, httpErrors.Unauthorized().WithMessage("wrong client secret")
+		}
+		return nil, httpErrors.Unauthorized().WithMessage("client requires a secret")
 	}
-
-	return &client, nil
+	return nil, httpErrors.Unauthorized().WithMessage("secret provided for secret-less client")
 }
 
 func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClientRequest) (*CreateClientResponse, error) {
@@ -71,10 +85,12 @@ func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClie
 		return id.String()
 	})
 
-	clientSecret := utils.GenerateRandomStringBase64(32)
-
-	hashAlgorithm := config.C.GetHashAlgorithm()
-	hashedClientSecret := hashAlgorithm.Hash(clientSecret)
+	clientSecret := h.None[string]()
+	if request.WithSecret {
+		clientSecret = h.Some(utils.GenerateRandomStringBase64(33))
+	}
+	hashAlgorithm := config.C.GetHasher()
+	hashedClientSecret := clientSecret.Map(hashAlgorithm.Hash)
 
 	clientDbId := clientRepository.CreateClient(ctx, &repos.Client{
 		RealmId:      request.RealmId,
@@ -87,6 +103,6 @@ func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClie
 	return &CreateClientResponse{
 		Id:           clientDbId,
 		ClientId:     clientId,
-		ClientSecret: "secret_" + clientSecret,
+		ClientSecret: clientSecret.Map(func(secret string) string { return "secret_" + secret }),
 	}, nil
 }

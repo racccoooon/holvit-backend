@@ -21,7 +21,7 @@ type Client struct {
 	DisplayName string
 
 	ClientId     string
-	ClientSecret string
+	ClientSecret h.Optional[string]
 
 	RedirectUris []string
 }
@@ -111,7 +111,7 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 			&row.RealmId,
 			&row.DisplayName,
 			&row.ClientId,
-			&row.ClientSecret,
+			row.ClientSecret.AsMutPtr(),
 			pq.Array(&row.RedirectUris))
 		if err != nil {
 			panic(err)
@@ -140,7 +140,7 @@ func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client)
 		client.RealmId,
 		client.DisplayName,
 		client.ClientId,
-		client.ClientSecret,
+		client.ClientSecret.AsMutPtr(),
 		pq.Array(client.RedirectUris)).Scan(&resultingId)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {

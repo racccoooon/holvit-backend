@@ -12,7 +12,7 @@ GET localhost:8080/oidc/admin/authorize?state=test&scope={{scope}}&response_type
 
 ### get tokens using authorization code
 < {%
- client.global.set('code', 'Lv78QzYXyt4ucYl7fX6Q%2Fxo4sVhKZNAzdXRQpYbcjDs%3D')
+ client.global.set('code', 'QoZqtnb%2B2gKkkBXhhuSit3HYWDpelY3%2BKEp%2BwlKfcS0%3D')
 %}
 POST localhost:8080/oidc/admin/token
 Content-Type: application/x-www-form-urlencoded

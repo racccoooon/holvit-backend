@@ -22,11 +22,11 @@ var (
 )
 
 type JobExecutor interface {
-	Execute(ctx context.Context, details repos.QueuedJobDetails) error
+	Execute(ctx context.Context, details repos.QueuedJobDetails) h.Result[h.Unit]
 }
 
 type JobService interface {
-	QueueJob(ctx context.Context, job repos.QueuedJobDetails) error
+	QueueJob(ctx context.Context, job repos.QueuedJobDetails)
 }
 
 func NewJobService(c *cron.Cron) JobService {
@@ -52,11 +52,11 @@ func executeQueuedJobs() {
 	})
 
 	for _, job := range queuedJobs.Values() {
-		err := executors[job.Type].Execute(ctx, job.Details)
+		result := executors[job.Type].Execute(ctx, job.Details)
 
-		if err != nil {
+		if result.IsErr() {
 			upd := repos.QueuedJobUpdate{
-				Error:        h.Some(err.Error()),
+				Error:        h.Some(result.UnwrapErr().Error()),
 				FailureCount: h.Some(job.FailureCount + 1),
 				Status:       h.Some("pending"),
 			}
@@ -77,7 +77,7 @@ func executeQueuedJobs() {
 type JobServiceImpl struct {
 }
 
-func (s *JobServiceImpl) QueueJob(ctx context.Context, job repos.QueuedJobDetails) error {
+func (s *JobServiceImpl) QueueJob(ctx context.Context, job repos.QueuedJobDetails) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -87,7 +87,7 @@ func (s *JobServiceImpl) QueueJob(ctx context.Context, job repos.QueuedJobDetail
 		Type:         job.Type(),
 		Details:      job,
 		FailureCount: 0,
-		Error:        nil,
+		Error:        h.None[string](),
 	})
 
 	rcs.OnAfterTx(func(args requestContext.AfterTxEventArgs) {
@@ -95,6 +95,4 @@ func (s *JobServiceImpl) QueueJob(ctx context.Context, job repos.QueuedJobDetail
 			executeQueuedJobs()
 		}
 	})
-
-	return nil
 }

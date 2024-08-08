@@ -25,7 +25,7 @@ type QueuedJob struct {
 	Details QueuedJobDetails
 
 	FailureCount int
-	Error        *string
+	Error        h.Optional[string]
 }
 
 type QueuedJobDetails interface {
@@ -145,7 +145,7 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 			&row.Type,
 			&detailsRaw,
 			&row.FailureCount,
-			&row.Error)
+			row.Error.AsMutPtr())
 		if err != nil {
 			panic(err)
 		}
@@ -186,7 +186,7 @@ func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job *Queu
 		job.Type,
 		job.Details,
 		job.FailureCount,
-		job.Error).Scan(&resultingId)
+		job.Error.ToNillablePtr()).Scan(&resultingId)
 	if err != nil {
 		panic(err)
 	}

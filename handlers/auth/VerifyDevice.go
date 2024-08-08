@@ -55,14 +55,10 @@ func VerifyDevice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deviceService := ioc.Get[services.DeviceService](scope)
-	_, err = deviceService.AddKnownDevice(ctx, services.AddDeviceRequest{
+	deviceService.AddKnownDevice(ctx, services.AddDeviceRequest{
 		UserId:   loginInfo.UserId,
 		DeviceId: deviceIdString,
 	})
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
 
 	nextStep, err := getNextStep(ctx, currentStep, loginInfo)
 	if err != nil {
@@ -106,15 +102,12 @@ func (s *VerifyDeviceStep) NeedsToRun(ctx context.Context, info *services.LoginI
 	scope := middlewares.GetScope(ctx)
 
 	deviceService := ioc.Get[services.DeviceService](scope)
-	response, err := deviceService.IsKnownUserDevice(ctx, services.IsKnownDeviceRequest{
+	response := deviceService.IsKnownUserDevice(ctx, services.IsKnownDeviceRequest{
 		UserId:   info.UserId,
 		DeviceId: info.DeviceId,
 	})
-	if err != nil {
-		return false, err
-	}
 
-	return !response.IsKnown && response.RequiresVerification, nil
+	return response.Id.IsNone() && response.RequiresVerification, nil
 }
 
 func (s *VerifyDeviceStep) Prepare(ctx context.Context, info *services.LoginInfo) error {

@@ -5,13 +5,14 @@ import (
 	"crypto/tls"
 	mail "github.com/xhit/go-simple-mail/v2"
 	"holvit/config"
+	"holvit/h"
 	"holvit/repos"
 	"time"
 )
 
 type SendMailExecutor struct{}
 
-func (e *SendMailExecutor) Execute(ctx context.Context, details repos.QueuedJobDetails) error {
+func (e *SendMailExecutor) Execute(ctx context.Context, details repos.QueuedJobDetails) h.Result[h.Unit] {
 	d := details.(repos.SendMailJobDetails)
 
 	server := mail.NewSMTPClient()
@@ -34,7 +35,7 @@ func (e *SendMailExecutor) Execute(ctx context.Context, details repos.QueuedJobD
 	smtpClient, err := server.Connect()
 
 	if err != nil {
-		return err
+		return h.UErr(err)
 	}
 
 	email := mail.NewMSG()
@@ -56,13 +57,13 @@ func (e *SendMailExecutor) Execute(ctx context.Context, details repos.QueuedJobD
 	email.SetBody(mail.TextHTML, d.Body)
 
 	if email.Error != nil {
-		return email.Error
+		return h.UErr(email.Error)
 	}
 
 	err = email.Send(smtpClient)
 	if err != nil {
-		return err
+		return h.UErr(err)
 	}
 
-	return nil
+	return h.UOk()
 }

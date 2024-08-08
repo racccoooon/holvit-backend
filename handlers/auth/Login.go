@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"holvit/constants"
 	"holvit/httpErrors"
 	"holvit/ioc"
@@ -26,7 +27,6 @@ func CompleteAuthFlow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tokenService := ioc.Get[services.TokenService](scope)
-	//TODO: i think we can get rid of all the peeks in the code and replace them with retrieve
 	loginInfo, err := tokenService.RetrieveLoginCode(ctx, r.Form.Get("token"))
 	if err != nil {
 		rcs.Error(err)
@@ -54,37 +54,25 @@ func CompleteAuthFlow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deviceService := ioc.Get[services.DeviceService](scope)
-	isKnownDeviceResponse, err := deviceService.IsKnownUserDevice(ctx, services.IsKnownDeviceRequest{
+	isKnownDeviceResponse := deviceService.IsKnownUserDevice(ctx, services.IsKnownDeviceRequest{
 		UserId:   loginInfo.UserId,
 		DeviceId: loginInfo.DeviceId,
 	})
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
 
-	deviceUuid := isKnownDeviceResponse.Id
-
-	if !isKnownDeviceResponse.IsKnown {
-		id, err := deviceService.AddKnownDevice(ctx, services.AddDeviceRequest{
+	deviceId := isKnownDeviceResponse.Id.OrElseDefault(func() uuid.UUID {
+		return deviceService.AddKnownDevice(ctx, services.AddDeviceRequest{
 			UserId:    loginInfo.UserId,
 			DeviceId:  deviceIdString,
 			UserAgent: r.UserAgent(),
 			Ip:        utils.GetRequestIp(r),
 		})
-		if err != nil {
-			rcs.Error(err)
-			return
-		}
-
-		deviceUuid = id
-	}
+	})
 
 	sessionService := ioc.Get[services.SessionService](scope)
 	sessionToken := sessionService.CreateSession(ctx, services.CreateSessionRequest{
 		UserId:   loginInfo.UserId,
 		RealmId:  loginInfo.RealmId,
-		DeviceId: *deviceUuid,
+		DeviceId: deviceId,
 	})
 
 	currentUser.SetSession(w, loginInfo.UserId, loginInfo.RememberMe, realm.Name, sessionToken)

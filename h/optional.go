@@ -93,6 +93,13 @@ func (o Optional[T]) OrElse(fn func() Optional[T]) Optional[T] {
 	return fn()
 }
 
+func (o Optional[T]) OrElseDefault(fn func() T) T {
+	if o.value != nil {
+		return *o.value
+	}
+	return fn()
+}
+
 func (o Optional[T]) ToNillablePtr() *T {
 	return o.value
 }

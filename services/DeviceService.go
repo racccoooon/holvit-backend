@@ -18,9 +18,8 @@ type IsKnownDeviceRequest struct {
 }
 
 type IsKnownDeviceResponse struct {
-	IsKnown              bool
+	Id                   h.Optional[uuid.UUID]
 	RequiresVerification bool
-	Id                   *uuid.UUID
 }
 
 type SendVerificationRequest struct {
@@ -41,9 +40,9 @@ type AddDeviceRequest struct {
 }
 
 type DeviceService interface {
-	IsKnownUserDevice(ctx context.Context, request IsKnownDeviceRequest) (*IsKnownDeviceResponse, error)
-	SendVerificationEmail(ctx context.Context, request SendVerificationRequest) (*SendVerificationResponse, error)
-	AddKnownDevice(ctx context.Context, request AddDeviceRequest) (*uuid.UUID, error)
+	IsKnownUserDevice(ctx context.Context, request IsKnownDeviceRequest) IsKnownDeviceResponse
+	SendVerificationEmail(ctx context.Context, request SendVerificationRequest) SendVerificationResponse
+	AddKnownDevice(ctx context.Context, request AddDeviceRequest) uuid.UUID
 }
 
 func NewDeviceService() DeviceService {
@@ -52,7 +51,7 @@ func NewDeviceService() DeviceService {
 
 type DeviceServiceImpl struct{}
 
-func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDeviceRequest) (*uuid.UUID, error) {
+func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDeviceRequest) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 
 	userDeviceRepository := ioc.Get[repos.UserDeviceRepository](scope)
@@ -61,7 +60,7 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 		DeviceId: h.Some(request.DeviceId),
 	})
 	if devices.Count() > 0 {
-		return utils.Ptr(devices.First().Id), nil
+		return devices.First().Id
 	}
 
 	ua := user_agent.New(request.UserAgent)
@@ -80,31 +79,30 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 		LastLoginAt: now,
 	})
 
-	return &id, nil
+	return id
 }
 
-func (d *DeviceServiceImpl) SendVerificationEmail(ctx context.Context, request SendVerificationRequest) (*SendVerificationResponse, error) {
+func (d *DeviceServiceImpl) SendVerificationEmail(ctx context.Context, request SendVerificationRequest) SendVerificationResponse {
 	scope := middlewares.GetScope(ctx)
 	jobService := ioc.Get[JobService](scope)
 
 	num := utils.GenerateRandomNumber(999_999)
 	code := fmt.Sprintf("%d", num)
 
-	err := jobService.QueueJob(ctx, repos.SendMailJobDetails{
+	//TODO: save the code in redis
+
+	jobService.QueueJob(ctx, repos.SendMailJobDetails{
 		To:      nil,
 		Subject: "Device Verification Code",
 		Body:    fmt.Sprintf(`<html><body>Enter the following code:<br/>%v</body></html>`, code),
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	return &SendVerificationResponse{
+	return SendVerificationResponse{
 		Code: code,
-	}, nil
+	}
 }
 
-func (d *DeviceServiceImpl) IsKnownUserDevice(ctx context.Context, request IsKnownDeviceRequest) (*IsKnownDeviceResponse, error) {
+func (d *DeviceServiceImpl) IsKnownUserDevice(ctx context.Context, request IsKnownDeviceRequest) IsKnownDeviceResponse {
 	scope := middlewares.GetScope(ctx)
 
 	userDeviceRepository := ioc.Get[repos.UserDeviceRepository](scope)
@@ -113,11 +111,10 @@ func (d *DeviceServiceImpl) IsKnownUserDevice(ctx context.Context, request IsKno
 		DeviceId: h.Some(request.DeviceId),
 	})
 	if devices.Count() > 0 {
-		return &IsKnownDeviceResponse{
-			IsKnown:              true,
+		return IsKnownDeviceResponse{
 			RequiresVerification: false,
-			Id:                   utils.Ptr(devices.Values()[0].Id),
-		}, nil
+			Id:                   h.Some(devices.Values()[0].Id),
+		}
 	}
 
 	userRepository := ioc.Get[repos.UserRepository](scope)
@@ -126,9 +123,8 @@ func (d *DeviceServiceImpl) IsKnownUserDevice(ctx context.Context, request IsKno
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realm := realmRepository.FindRealmById(ctx, user.RealmId).Unwrap()
 
-	return &IsKnownDeviceResponse{
-		IsKnown:              false,
+	return IsKnownDeviceResponse{
 		RequiresVerification: realm.RequireDeviceVerification,
-		Id:                   nil,
-	}, nil
+		Id:                   h.None[uuid.UUID](),
+	}
 }

@@ -10,6 +10,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/utils"
 )
 
 type User struct {
@@ -91,7 +92,7 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 	if err != nil {
 		return h.Err[FilterResult[User]](err)
 	}
-	defer rows.Close()
+	defer utils.PanicOnErr(rows.Close)
 
 	var totalCount int
 	var result []User

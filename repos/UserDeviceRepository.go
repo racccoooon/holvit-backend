@@ -10,6 +10,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/utils"
 	"time"
 )
 
@@ -87,7 +88,7 @@ func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter U
 	if err != nil {
 		panic(err)
 	}
-	defer rows.Close()
+	defer utils.PanicOnErr(rows.Close)
 
 	var totalCount int
 	var result []UserDevice

@@ -116,7 +116,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 	if err != nil {
 		panic(err)
 	}
-	defer rows.Close()
+	defer utils.PanicOnErr(rows.Close)
 
 	var totalCount int
 	var result []ClaimMapper

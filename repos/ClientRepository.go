@@ -10,6 +10,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/utils"
 )
 
 type Client struct {
@@ -99,7 +100,7 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 	if err != nil {
 		panic(err)
 	}
-	defer rows.Close()
+	defer utils.PanicOnErr(rows.Close)
 
 	var totalCount int
 	var result []Client

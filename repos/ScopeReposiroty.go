@@ -11,6 +11,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/utils"
 )
 
 type Scope struct {
@@ -132,7 +133,7 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 	if err != nil {
 		panic(err)
 	}
-	defer rows.Close()
+	defer utils.PanicOnErr(rows.Close)
 
 	var totalCount int
 	var result []Scope

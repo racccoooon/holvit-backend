@@ -108,7 +108,7 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 	if err != nil {
 		panic(err)
 	}
-	defer rows.Close()
+	defer utils.PanicOnErr(rows.Close)
 
 	var totalCount int
 	var result []Session

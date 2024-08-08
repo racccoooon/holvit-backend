@@ -167,7 +167,7 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 	if err != nil {
 		panic(err)
 	}
-	defer rows.Close()
+	defer utils.PanicOnErr(rows.Close)
 
 	var totalCount int
 	var result []Credential

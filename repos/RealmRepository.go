@@ -10,6 +10,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/utils"
 )
 
 type Realm struct {
@@ -98,7 +99,7 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 	if err != nil {
 		panic(err)
 	}
-	defer rows.Close()
+	defer utils.PanicOnErr(rows.Close)
 
 	var totalCount int
 	var result []Realm

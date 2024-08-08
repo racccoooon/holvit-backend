@@ -10,6 +10,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/utils"
 	"time"
 )
 
@@ -92,7 +93,7 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 	if err != nil {
 		panic(err)
 	}
-	defer rows.Close()
+	defer utils.PanicOnErr(rows.Close)
 
 	var totalCount int
 	var result []RefreshToken

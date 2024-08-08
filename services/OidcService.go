@@ -190,13 +190,11 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	}
 
 	clientService := ioc.Get[ClientService](scope)
-	client, err := clientService.Authenticate(ctx, AuthenticateClientRequest{
+	client := clientService.Authenticate(ctx, AuthenticateClientRequest{
 		ClientId:     request.ClientId,
 		ClientSecret: request.ClientSecret,
-	})
-	if err != nil {
-		return nil, err
-	}
+	}).Unwrap() //TODO: handle unauthorized
+
 	if codeInfo.ClientId != client.ClientId {
 		return nil, httpErrors.Unauthorized().WithMessage("wrong client id")
 	}
@@ -294,13 +292,10 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 	now := clockService.Now()
 
 	clientService := ioc.Get[ClientService](scope)
-	client, err := clientService.Authenticate(ctx, AuthenticateClientRequest{
+	client := clientService.Authenticate(ctx, AuthenticateClientRequest{
 		ClientId:     request.ClientId,
 		ClientSecret: request.ClientSecret,
-	})
-	if err != nil {
-		return nil, err
-	}
+	}).Unwrap() // TODO: handle 404
 
 	refreshTokenService := ioc.Get[RefreshTokenService](scope)
 	refreshTokenString, refreshToken, err := refreshTokenService.ValidateAndRefresh(ctx, request.RefreshToken, client.Id)

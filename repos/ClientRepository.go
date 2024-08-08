@@ -42,13 +42,14 @@ type ClientFilter struct {
 type ClientUpdate struct {
 	DisplayName  h.Optional[string]
 	RedirectUris h.Optional[[]string]
+	ClientSecret h.Optional[string]
 }
 
 type ClientRepository interface {
 	FindClientById(ctx context.Context, id uuid.UUID) h.Optional[Client]
 	FindClients(ctx context.Context, filter ClientFilter) FilterResult[Client]
-	CreateClient(ctx context.Context, client *Client) h.Result[uuid.UUID]
-	UpdateClient(ctx context.Context, id uuid.UUID, upd *ClientUpdate) h.Result[h.Unit]
+	CreateClient(ctx context.Context, client Client) h.Result[uuid.UUID]
+	UpdateClient(ctx context.Context, id uuid.UUID, upd ClientUpdate) h.Result[h.Unit]
 }
 
 type ClientRepositoryImpl struct{}
@@ -122,7 +123,7 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 	return NewPagedResult(result, totalCount)
 }
 
-func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client) h.Result[uuid.UUID] {
+func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client Client) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -159,7 +160,7 @@ func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client *Client)
 	return h.Ok(resultingId)
 }
 
-func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, upd *ClientUpdate) h.Result[h.Unit] {
+func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, upd ClientUpdate) h.Result[h.Unit] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -176,6 +177,10 @@ func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, u
 
 	upd.RedirectUris.IfSome(func(x []string) {
 		sb.Set(sb.Assign("redirect_uris", x))
+	})
+
+	upd.ClientSecret.IfSome(func(x string) {
+		sb.Set(sb.Assign("hashed_client_secret", x))
 	})
 
 	sb.Where(sb.Equal("id", id))

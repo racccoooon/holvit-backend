@@ -89,7 +89,7 @@ func seedData(ctx context.Context) {
 	}
 
 	clientService := ioc.Get[services.ClientService](scope)
-	clientResponse, err := clientService.CreateClient(ctx, services.CreateClientRequest{
+	clientResponse := clientService.CreateClient(ctx, services.CreateClientRequest{
 		RealmId:     masterRealm.Id,
 		ClientId:    h.Some("holvit_admin"),
 		DisplayName: "Holvit Admin",

@@ -32,8 +32,8 @@ type AuthenticateClientRequest struct {
 }
 
 type ClientService interface {
-	CreateClient(ctx context.Context, request CreateClientRequest) (*CreateClientResponse, error)
-	Authenticate(ctx context.Context, request AuthenticateClientRequest) (*repos.Client, error)
+	CreateClient(ctx context.Context, request CreateClientRequest) CreateClientResponse
+	Authenticate(ctx context.Context, request AuthenticateClientRequest) h.Result[repos.Client]
 }
 
 type ClientServiceImpl struct{}
@@ -44,7 +44,7 @@ func NewClientService() ClientService {
 
 // TODO: make sure all error responses in oidc comply with https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
 
-func (c *ClientServiceImpl) Authenticate(ctx context.Context, request AuthenticateClientRequest) (*repos.Client, error) {
+func (c *ClientServiceImpl) Authenticate(ctx context.Context, request AuthenticateClientRequest) h.Result[repos.Client] {
 	scope := middlewares.GetScope(ctx)
 
 	clientRepository := ioc.Get[repos.ClientRepository](scope)
@@ -56,23 +56,26 @@ func (c *ClientServiceImpl) Authenticate(ctx context.Context, request Authentica
 		if providedSecret, ok := request.ClientSecret.Get(); ok {
 			requestClientSecret, hasPrefix := strings.CutPrefix(providedSecret, "secret_")
 			if !hasPrefix {
-				return nil, httpErrors.Unauthorized().WithMessage("missing secret_ prefix")
+				return h.Err[repos.Client](httpErrors.Unauthorized().WithMessage("missing secret_ prefix"))
 			}
 			result := utils.ValidateHash(requestClientSecret, hashedSecret, config.C.GetHasher())
 			if result.IsValid {
 				if result.NeedsRehash {
-					// TODO: rehash the client secret!
+					reHashed := config.C.GetHasher().Hash(requestClientSecret)
+					clientRepository.UpdateClient(ctx, client.Id, repos.ClientUpdate{
+						ClientSecret: h.Some(reHashed),
+					}).Unwrap()
 				}
-				return &client, nil
+				return h.Ok(client)
 			}
-			return nil, httpErrors.Unauthorized().WithMessage("wrong client secret")
+			return h.Err[repos.Client](httpErrors.Unauthorized().WithMessage("wrong client secret"))
 		}
-		return nil, httpErrors.Unauthorized().WithMessage("client requires a secret")
+		return h.Err[repos.Client](httpErrors.Unauthorized().WithMessage("client requires a secret"))
 	}
-	return nil, httpErrors.Unauthorized().WithMessage("secret provided for secret-less client")
+	return h.Err[repos.Client](httpErrors.Unauthorized().WithMessage("secret provided for secret-less client"))
 }
 
-func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClientRequest) (*CreateClientResponse, error) {
+func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClientRequest) CreateClientResponse {
 	scope := middlewares.GetScope(ctx)
 
 	clientRepository := ioc.Get[repos.ClientRepository](scope)
@@ -92,7 +95,7 @@ func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClie
 	hashAlgorithm := config.C.GetHasher()
 	hashedClientSecret := clientSecret.Map(hashAlgorithm.Hash)
 
-	clientDbId := clientRepository.CreateClient(ctx, &repos.Client{
+	clientDbId := clientRepository.CreateClient(ctx, repos.Client{
 		RealmId:      request.RealmId,
 		DisplayName:  request.DisplayName,
 		ClientId:     clientId,
@@ -100,9 +103,9 @@ func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClie
 		RedirectUris: make([]string, 0),
 	}).Unwrap()
 
-	return &CreateClientResponse{
+	return CreateClientResponse{
 		Id:           clientDbId,
 		ClientId:     clientId,
 		ClientSecret: clientSecret.Map(func(secret string) string { return "secret_" + secret }),
-	}, nil
+	}
 }

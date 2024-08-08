@@ -35,7 +35,7 @@ type DependencyProvider struct {
 	closeHandlers        map[reflect.Type]CloseHandler[any]
 }
 
-func (dp *DependencyProvider) Close() []error {
+func (dp *DependencyProvider) Close() error {
 	var errors []error
 
 	for chType, ch := range dp.closeHandlers {
@@ -63,7 +63,10 @@ func (dp *DependencyProvider) Close() []error {
 		}
 	}
 
-	return errors
+	if len(errors) == 0 {
+		return nil
+	}
+	return errors[0]
 }
 
 func newDependencyProvider(dependencies *dependencyCollection, closeHandlers map[reflect.Type]CloseHandler[any]) *DependencyProvider {

@@ -8,6 +8,7 @@ import (
 	"github.com/rubenv/sql-migrate"
 	"holvit/config"
 	"holvit/logging"
+	"holvit/utils"
 )
 
 //go:embed migrations/*
@@ -57,7 +58,7 @@ func Migrate() {
 	}
 
 	db := ConnectToDatabase()
-	defer db.Close()
+	defer utils.PanicOnErr(db.Close)
 
 	logging.Logger.Info("Applying migrations...")
 

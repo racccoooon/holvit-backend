@@ -6,13 +6,14 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/repos"
+	"holvit/utils"
 )
 
 func SessionCleanup() {
 	logging.Logger.Debug("Cleaning sessions...")
 
 	scope := ioc.RootScope.NewScope()
-	defer scope.Close()
+	defer utils.PanicOnErr(scope.Close)
 	ctx := middlewares.ContextWithNewScope(context.Background(), scope)
 
 	sessionRepository := ioc.Get[repos.SessionRepository](scope)

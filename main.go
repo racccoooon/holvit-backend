@@ -45,7 +45,7 @@ func main() {
 
 func initialize(dp *ioc.DependencyProvider) {
 	scope := dp.NewScope()
-	defer scope.Close()
+	defer utils.PanicOnErr(scope.Close)
 
 	ctx := middlewares.ContextWithNewScope(context.Background(), scope)
 

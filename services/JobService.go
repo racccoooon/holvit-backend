@@ -12,6 +12,7 @@ import (
 	"holvit/repos"
 	"holvit/requestContext"
 	"holvit/services/jobs"
+	"holvit/utils"
 )
 
 var (
@@ -41,7 +42,7 @@ func executeQueuedJobs() {
 	logging.Logger.Debug("Scheduler is executing queued jobs")
 
 	scope := ioc.RootScope.NewScope()
-	defer scope.Close()
+	defer utils.PanicOnErr(scope.Close)
 	ctx := middlewares.ContextWithNewScope(context.Background(), scope)
 
 	queuedJobRepository := ioc.Get[repos.QueuedJobRepository](scope)

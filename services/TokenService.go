@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"holvit/config"
 	"holvit/h"
+	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
@@ -42,94 +45,70 @@ type LoginInfo struct {
 }
 
 type TokenService interface {
-	StoreGrantInfo(ctx context.Context, info GrantInfo) h.Result[string]
-	RetrieveGrantInfo(ctx context.Context, token string) (*GrantInfo, error)
+	StoreGrantInfo(ctx context.Context, info GrantInfo) string
+	RetrieveGrantInfo(ctx context.Context, token string) h.Optional[GrantInfo]
 
-	StoreOidcCode(ctx context.Context, info CodeInfo) (string, error)
-	RetrieveOidcCode(ctx context.Context, token string) (*CodeInfo, error)
+	StoreOidcCode(ctx context.Context, info CodeInfo) string
+	RetrieveOidcCode(ctx context.Context, token string) h.Optional[CodeInfo]
 
-	StoreLoginCode(ctx context.Context, info LoginInfo) (string, error)
-	OverwriteLoginCode(ctx context.Context, token string, info LoginInfo) error
-	PeekLoginCode(ctx context.Context, token string) (*LoginInfo, error)
-	RetrieveLoginCode(ctx context.Context, token string) (*LoginInfo, error)
+	StoreLoginCode(ctx context.Context, info LoginInfo) string
+	OverwriteLoginCode(ctx context.Context, token string, info LoginInfo) h.Result[h.Unit]
+	PeekLoginCode(ctx context.Context, token string) h.Optional[LoginInfo]
+	RetrieveLoginCode(ctx context.Context, token string) h.Optional[LoginInfo]
 }
 
 type TokenServiceImpl struct{}
 
-func (s *TokenServiceImpl) OverwriteLoginCode(ctx context.Context, token string, info LoginInfo) error {
-	err := s.overwriteInfo(ctx, info, "loginCode", token, time.Minute*30) // TODO config
-	if err != nil {
-		return err
+func (s *TokenServiceImpl) OverwriteLoginCode(ctx context.Context, token string, info LoginInfo) h.Result[h.Unit] {
+	found := s.overwriteInfo(ctx, info, "loginCode", token, time.Minute*30) // TODO config
+	if !found {
+		return h.UErr(httpErrors.NotFound().WithMessage(fmt.Sprintf("login code %s not found", token)))
 	}
-	return nil
+	return h.UOk()
 }
 
-func (s *TokenServiceImpl) StoreLoginCode(ctx context.Context, info LoginInfo) (string, error) {
-	token, err := s.storeInfo(ctx, info, "loginCode", time.Minute*30) // TODO config
-	if err != nil {
-		return "", err
-	}
-	return token, nil
+func (s *TokenServiceImpl) StoreLoginCode(ctx context.Context, info LoginInfo) string {
+	return s.storeInfo(ctx, info, "loginCode", time.Minute*30) // TODO config
 }
 
-func (s *TokenServiceImpl) PeekLoginCode(ctx context.Context, token string) (*LoginInfo, error) {
+func (s *TokenServiceImpl) PeekLoginCode(ctx context.Context, token string) h.Optional[LoginInfo] {
 	var result LoginInfo
-	err := s.peekInfo(ctx, "loginCode", token, &result)
-	if err != nil {
-		return nil, err
-	}
-	return &result, nil
+	found := s.peekInfo(ctx, "loginCode", token, &result)
+	return h.SomeIf(found, result)
 }
 
-func (s *TokenServiceImpl) RetrieveLoginCode(ctx context.Context, token string) (*LoginInfo, error) {
+func (s *TokenServiceImpl) RetrieveLoginCode(ctx context.Context, token string) h.Optional[LoginInfo] {
 	var result LoginInfo
-	err := s.retrieveInfo(ctx, "loginCode", token, &result)
-	if err != nil {
-		return nil, err
-	}
-	return &result, nil
+	found := s.retrieveInfo(ctx, "loginCode", token, &result)
+	return h.SomeIf(found, result)
 }
 
-func (s *TokenServiceImpl) StoreOidcCode(ctx context.Context, info CodeInfo) (string, error) {
-	token, err := s.storeInfo(ctx, info, "oidcCode", time.Second*30)
-	if err != nil {
-		return "", err
-	}
-	return token, nil
+func (s *TokenServiceImpl) StoreOidcCode(ctx context.Context, info CodeInfo) string {
+	return s.storeInfo(ctx, info, "oidcCode", time.Second*30)
 }
 
-func (s *TokenServiceImpl) RetrieveOidcCode(ctx context.Context, token string) (*CodeInfo, error) {
+func (s *TokenServiceImpl) RetrieveOidcCode(ctx context.Context, token string) h.Optional[CodeInfo] {
 	var result CodeInfo
-	err := s.retrieveInfo(ctx, "oidcCode", token, &result)
-	if err != nil {
-		return nil, err
-	}
-	return &result, nil
+	found := s.retrieveInfo(ctx, "oidcCode", token, &result)
+	return h.SomeIf(found, result)
 }
 
-func (s *TokenServiceImpl) StoreGrantInfo(ctx context.Context, info GrantInfo) h.Result[string] {
-	token, err := s.storeInfo(ctx, info, "grantInfo", time.Minute*5)
-	if err != nil {
-		return h.Err[string](err)
-	}
-	return h.Ok(token)
+func (s *TokenServiceImpl) StoreGrantInfo(ctx context.Context, info GrantInfo) string {
+	return s.storeInfo(ctx, info, "grantInfo", time.Minute*5)
 }
 
-func (s *TokenServiceImpl) RetrieveGrantInfo(ctx context.Context, token string) (*GrantInfo, error) {
+func (s *TokenServiceImpl) RetrieveGrantInfo(ctx context.Context, token string) h.Optional[GrantInfo] {
 	var result GrantInfo
-	err := s.retrieveInfo(ctx, "grantInfo", token, &result)
-	if err != nil {
-		return nil, err
-	}
-	return &result, nil
+	found := s.retrieveInfo(ctx, "grantInfo", token, &result)
+	return h.SomeIf(found, result)
 }
 
-func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name string, expiration time.Duration) (string, error) {
+func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name string, expiration time.Duration) string {
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)
 	tokenBytes, err := utils.GenerateRandomBytes(32)
 	if err != nil {
-		return "", err
+		panic(err)
 	}
 
 	token := base64.StdEncoding.EncodeToString(tokenBytes)
@@ -137,7 +116,7 @@ func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name
 
 	dataBytes, err := json.Marshal(info)
 	if err != nil {
-		return "", err
+		panic(err)
 	}
 
 	data := string(dataBytes)
@@ -146,13 +125,13 @@ func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name
 		expiration = time.Hour * 24
 	}
 	if err := redisClient.Set(ctx, name+":"+token, data, expiration).Err(); err != nil {
-		return "", err
+		panic(err)
 	}
 
-	return token, nil
+	return token
 }
 
-func (s *TokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, name string, token string, expiration time.Duration) error {
+func (s *TokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, name string, token string, expiration time.Duration) bool {
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)
 
@@ -160,7 +139,7 @@ func (s *TokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, 
 
 	dataBytes, err := json.Marshal(info)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	data := string(dataBytes)
@@ -170,40 +149,46 @@ func (s *TokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, 
 	}
 	//TODO: check if it was in redis to begin with
 	if err := redisClient.Set(ctx, name+":"+token, data, expiration).Err(); err != nil {
-		return err
+		panic(err)
 	}
 
-	return nil
+	return true
 }
 
-func (s *TokenServiceImpl) retrieveInfo(ctx context.Context, name string, token string, info interface{}) error {
+func (s *TokenServiceImpl) retrieveInfo(ctx context.Context, name string, token string, info interface{}) bool {
 	logging.Logger.Debugf("retrieving redis: %s:%s", name, token)
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)
 	val, err := redisClient.GetDel(ctx, name+":"+token).Result()
+	if errors.Is(err, redis.Nil) {
+		return false
+	}
 	if err != nil {
-		return err
+		panic(err)
 	}
 	err = json.Unmarshal([]byte(val), info)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
-	return nil
+	return true
 }
 
-func (s *TokenServiceImpl) peekInfo(ctx context.Context, name string, token string, info interface{}) error {
+func (s *TokenServiceImpl) peekInfo(ctx context.Context, name string, token string, info interface{}) bool {
 	logging.Logger.Debugf("peeking redis: %s:%s", name, token)
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)
 	val, err := redisClient.Get(ctx, name+":"+token).Result()
+	if errors.Is(err, redis.Nil) {
+		return false
+	}
 	if err != nil {
-		return err
+		panic(err)
 	}
 	err = json.Unmarshal([]byte(val), info)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
-	return nil
+	return true
 }

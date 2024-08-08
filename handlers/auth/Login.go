@@ -27,11 +27,7 @@ func CompleteAuthFlow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tokenService := ioc.Get[services.TokenService](scope)
-	loginInfo, err := tokenService.RetrieveLoginCode(ctx, r.Form.Get("token"))
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
+	loginInfo := tokenService.RetrieveLoginCode(ctx, r.Form.Get("token")).UnwrapErr(httpErrors.Unauthorized().WithMessage("token not found"))
 
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realm := realmRepository.FindRealmById(ctx, loginInfo.RealmId).Unwrap()

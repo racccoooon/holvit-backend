@@ -31,15 +31,12 @@ func login(w http.ResponseWriter, r *http.Request, realmName string) error {
 	}).First()
 
 	tokenService := ioc.Get[services.TokenService](scope)
-	loginToken, err := tokenService.StoreLoginCode(ctx, services.LoginInfo{
+	loginToken := tokenService.StoreLoginCode(ctx, services.LoginInfo{
 		NextStep: constants.AuthenticateStepVerifyPassword,
 		RealmId:  realm.Id,
 		// TODO: the original url thing does not work if the initial request was a POST request -- how to deal with that?
 		OriginalUrl: r.URL.String(),
 	})
-	if err != nil {
-		return err
-	}
 
 	frontendData := services.AuthFrontendData{
 		Mode: constants.FrontendModeAuthenticate,
@@ -54,7 +51,7 @@ func login(w http.ResponseWriter, r *http.Request, realmName string) error {
 
 	frontendService := ioc.Get[services.FrontendService](scope)
 
-	err = frontendService.WriteAuthFrontend(w, realmName, frontendData)
+	err := frontendService.WriteAuthFrontend(w, realmName, frontendData)
 	if err != nil {
 		return err
 	}

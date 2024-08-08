@@ -37,11 +37,7 @@ func GetOnboardingTotp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tokenService := ioc.Get[services.TokenService](scope)
-	loginInfo, err := tokenService.PeekLoginCode(ctx, request.Token)
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
+	loginInfo := tokenService.PeekLoginCode(ctx, request.Token).UnwrapErr(httpErrors.Unauthorized().WithMessage("token not found"))
 
 	currentUser := ioc.Get[services.CurrentSessionService](scope)
 	deviceIdString, err := currentUser.DeviceIdString()

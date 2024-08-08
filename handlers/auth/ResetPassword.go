@@ -32,11 +32,7 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tokenService := ioc.Get[services.TokenService](scope)
-	loginInfo, err := tokenService.PeekLoginCode(ctx, request.Token)
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
+	loginInfo := tokenService.PeekLoginCode(ctx, request.Token).UnwrapErr(httpErrors.Unauthorized().WithMessage("token not found"))
 
 	currentUser := ioc.Get[services.CurrentSessionService](scope)
 	deviceIdString, err := currentUser.DeviceIdString()
@@ -62,12 +58,12 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 		Temporary: false,
 	}, services.DangerousNoAuthStrategy{})
 
-	nextStep, err := getNextStep(ctx, currentStep, loginInfo)
+	nextStep, err := getNextStep(ctx, currentStep, &loginInfo)
 	if err != nil {
 		rcs.Error(err)
 		return
 	}
-	err = nextStep.Prepare(ctx, loginInfo)
+	err = nextStep.Prepare(ctx, &loginInfo)
 	if err != nil {
 		rcs.Error(err)
 		return
@@ -75,11 +71,7 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 
 	loginInfo.NextStep = nextStep.Name()
 
-	err = tokenService.OverwriteLoginCode(ctx, request.Token, *loginInfo)
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
+	tokenService.OverwriteLoginCode(ctx, request.Token, loginInfo).SetErr(httpErrors.Unauthorized().WithMessage("token not found")).Unwrap()
 
 	w.Header().Set("Content-Type", "application/json")
 

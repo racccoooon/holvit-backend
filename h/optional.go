@@ -27,6 +27,13 @@ func None[T any]() Optional[T] {
 	return Optional[T]{}
 }
 
+func SomeIf[T any](cond bool, t T) Optional[T] {
+	if cond {
+		return None[T]()
+	}
+	return Some(t)
+}
+
 func FromPtr[T any](p *T) Optional[T] {
 	return Optional[T]{
 		value: p,

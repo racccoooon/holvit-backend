@@ -180,10 +180,7 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	now := clockService.Now()
 
 	tokenService := ioc.Get[TokenService](scope)
-	codeInfo, err := tokenService.RetrieveOidcCode(ctx, request.Code)
-	if err != nil {
-		return nil, err
-	}
+	codeInfo := tokenService.RetrieveOidcCode(ctx, request.Code).UnwrapErr(httpErrors.Unauthorized().WithMessage("token not found"))
 
 	if request.RedirectUri != codeInfo.RedirectUri {
 		return nil, httpErrors.Unauthorized().WithMessage("invalid redirect uri")
@@ -474,7 +471,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 
 		return &ScopeConsentResponse{
 			RequiredGrants: missingGrants,
-			Token:          token.Unwrap(),
+			Token:          token,
 			Client:         &client,
 			User:           user.Unwrap(),
 			RedirectUri:    authorizationRequest.RedirectUri,
@@ -491,7 +488,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	}
 
 	tokenService := ioc.Get[TokenService](scope)
-	code, err := tokenService.StoreOidcCode(ctx, CodeInfo{
+	code := tokenService.StoreOidcCode(ctx, CodeInfo{
 		RealmId:       realm.Id,
 		ClientId:      client.ClientId,
 		UserId:        userid,
@@ -499,9 +496,6 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 		GrantedScopes: grantedScopes,
 		PKCEChallenge: pkceChallenge,
 	})
-	if err != nil {
-		return nil, err
-	}
 
 	return &CodeAuthorizationResponse{
 		Code:        code,

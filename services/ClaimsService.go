@@ -23,7 +23,7 @@ type GetClaimsRequest struct {
 }
 
 type ClaimsService interface {
-	GetClaims(ctx context.Context, request GetClaimsRequest) ([]*ClaimResponse, error)
+	GetClaims(ctx context.Context, request GetClaimsRequest) []ClaimResponse
 }
 
 func NewClaimsService() ClaimsService {
@@ -32,7 +32,7 @@ func NewClaimsService() ClaimsService {
 
 type ClaimsServiceImpl struct{}
 
-func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequest) ([]*ClaimResponse, error) {
+func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequest) []ClaimResponse {
 	scope := middlewares.GetScope(ctx)
 
 	claimMapperRepository := ioc.Get[repos.ClaimMapperRepository](scope)
@@ -40,7 +40,7 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 		ScopeIds: h.Some(request.ScopeIds),
 	})
 
-	claims := make([]*ClaimResponse, 0, len(mappers.Values()))
+	claims := make([]ClaimResponse, 0, len(mappers.Values()))
 
 	userInfoMappers := make([]interface{}, 0)
 	for _, mapper := range mappers.Values() {
@@ -60,20 +60,20 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 
 			switch mapper.Property {
 			case constants.UserInfoPropertyId:
-				claims = append(claims, &ClaimResponse{
+				claims = append(claims, ClaimResponse{
 					Name:  mapper.ClaimName,
 					Claim: user.Id.String(),
 				})
 				break
 			case constants.UserInfoPropertyUsername:
-				claims = append(claims, &ClaimResponse{
+				claims = append(claims, ClaimResponse{
 					Name:  mapper.ClaimName,
 					Claim: user.Username,
 				})
 				break
 			case constants.UserInfoPropertyEmail:
 				user.Email.IfSome(func(x string) {
-					claims = append(claims, &ClaimResponse{
+					claims = append(claims, ClaimResponse{
 						Name:  mapper.ClaimName,
 						Claim: x,
 					})
@@ -81,7 +81,7 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 				break
 			case constants.UserInfoPropertyEmailVerified:
 				if user.Email.IsSome() {
-					claims = append(claims, &ClaimResponse{
+					claims = append(claims, ClaimResponse{
 						Name:  mapper.ClaimName,
 						Claim: fmt.Sprintf("%t", user.EmailVerified),
 					})
@@ -93,5 +93,5 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 		}
 	}
 
-	return claims, nil
+	return claims
 }

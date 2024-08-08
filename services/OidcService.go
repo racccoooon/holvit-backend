@@ -212,13 +212,10 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	}
 
 	claimsService := ioc.Get[ClaimsService](scope)
-	claims, err := claimsService.GetClaims(ctx, GetClaimsRequest{
+	claims := claimsService.GetClaims(ctx, GetClaimsRequest{
 		UserId:   codeInfo.UserId,
 		ScopeIds: codeInfo.GrantedScopeIds,
 	})
-	if err != nil {
-		return nil, err
-	}
 
 	idTokenValidTime := time.Hour * 1     //TODO: add this to realm and maybe to scopes
 	accessTokenValidTime := time.Hour * 1 //TODO: add this to realm and maybe to scopes
@@ -327,13 +324,10 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 	}
 
 	claimsService := ioc.Get[ClaimsService](scope)
-	claims, err := claimsService.GetClaims(ctx, GetClaimsRequest{
+	claims := claimsService.GetClaims(ctx, GetClaimsRequest{
 		UserId:   refreshToken.UserId,
 		ScopeIds: grantedScopeIds,
 	})
-	if err != nil {
-		return nil, err
-	}
 
 	accessTokenValidTime := time.Hour * 1 //TODO: add this to realm and maybe to scopes
 	idTokenValidTime := time.Hour * 1     //TODO: add this to realm and maybe to scopes

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"holvit/constants"
+	"holvit/h"
 	"holvit/httpErrors"
 	"holvit/ioc"
 	"holvit/middlewares"
@@ -25,7 +26,7 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
-	currentUserService := ioc.Get[services.CurrentUserService](scope)
+	currentUserService := ioc.Get[services.CurrentSessionService](scope)
 	deviceIdString, err := currentUserService.DeviceIdString()
 	if err != nil {
 		rcs.Error(err)
@@ -61,8 +62,15 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userRepository := ioc.Get[repos.UserRepository](scope)
+	user := userRepository.FindUsers(ctx, repos.UserFilter{
+		RealmId:  h.Some(realm.Id),
+		Username: h.Some(request.Username),
+	}).Unwrap().First()
+
 	userService := ioc.Get[services.UserService](scope)
 	loginResponse := userService.VerifyLogin(ctx, services.VerifyLoginRequest{
+		UserId:   user.Id,
 		Username: request.Username,
 		Password: request.Password,
 		RealmId:  loginInfo.RealmId,

@@ -31,7 +31,7 @@ func ServeApi(dp *ioc.DependencyProvider) {
 	r.Use(middlewares.ScopeMiddleware(dp))
 	r.Use(middlewares.ErrorHandlingMiddleware)
 
-	r.Use(services.CurrentUserMiddleware)
+	r.Use(services.CurrentSessionMiddleware)
 
 	r.HandleFunc(routes.ApiHealth.String(), handlers.Health).Methods("GET")
 

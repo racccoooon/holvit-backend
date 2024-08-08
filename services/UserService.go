@@ -115,6 +115,7 @@ type SetPasswordRequest struct {
 
 type VerifyLoginRequest struct {
 	Username string
+	UserId   uuid.UUID
 	Password string
 	RealmId  uuid.UUID
 }
@@ -273,17 +274,9 @@ func (u *UserServiceImpl) HasTotpConfigured(ctx context.Context, userId uuid.UUI
 }
 
 func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRequest) VerifyLoginResponse {
-	scope := middlewares.GetScope(ctx)
-
-	userRepository := ioc.Get[repos.UserRepository](scope)
-	user := userRepository.FindUsers(ctx, repos.UserFilter{
-		RealmId:  h.Some(request.RealmId),
-		Username: h.Some(request.Username),
-	}).Unwrap().First()
-
 	isValid := PasswordAuthStrategy{
 		Password: request.Password,
-	}.Authorize(ctx, user.Id)
+	}.Authorize(ctx, request.UserId)
 
 	if !isValid {
 		// TODO: also do this for all other authroize things
@@ -291,12 +284,15 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 	}
 
 	return VerifyLoginResponse{
-		UserId: user.Id,
+		UserId: request.UserId,
 	}
 }
 
 func (u *UserServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequest) {
-	TotpAuthStrategy{
+	isValid := TotpAuthStrategy{
 		Code: request.Code,
 	}.Authorize(ctx, request.UserId)
+	if !isValid {
+		panic(httpErrors.Unauthorized().WithMessage("invalid totp code"))
+	}
 }

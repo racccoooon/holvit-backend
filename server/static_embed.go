@@ -11,5 +11,5 @@ import (
 )
 
 func registerStatics(r *mux.Router) {
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", static.StaticServer(embed.AuthStatic)))
+	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", static.Server(embed.AuthStatic)))
 }

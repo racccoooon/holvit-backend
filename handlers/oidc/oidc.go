@@ -32,8 +32,9 @@ func login(w http.ResponseWriter, r *http.Request, realmName string) error {
 
 	tokenService := ioc.Get[services.TokenService](scope)
 	loginToken, err := tokenService.StoreLoginCode(ctx, services.LoginInfo{
-		NextStep:    constants.AuthenticateStepVerifyPassword,
-		RealmId:     realm.Id,
+		NextStep: constants.AuthenticateStepVerifyPassword,
+		RealmId:  realm.Id,
+		// TODO: the original url thing does not work if the initial request was a POST request -- how to deal with that?
 		OriginalUrl: r.URL.String(),
 	})
 	if err != nil {
@@ -83,7 +84,7 @@ func Authorize(w http.ResponseWriter, r *http.Request) {
 		ResponseMode:  r.Form.Get("response_mode"),
 	}
 
-	currentUserService := ioc.Get[services.CurrentUserService](scope)
+	currentUserService := ioc.Get[services.CurrentSessionService](scope)
 
 	if err := currentUserService.VerifyAuthorized(); err != nil {
 		err := login(w, r, realmName)
@@ -189,6 +190,20 @@ func Jwks(w http.ResponseWriter, r *http.Request) {
 }
 
 func EndSession(w http.ResponseWriter, r *http.Request) {
+	//scope := middlewares.GetScope(r.Context())
+	//currentSessionService := ioc.Get[services.CurrentSessionService](scope)
+	//
+	//routeParams := mux.Vars(r)
+	//realmName := routeParams["realmName"]
+	//currentSessionService.DeleteSession(w, realmName)
+
+	// TODO: the oidc logout mechanism is distinct from the "normal" logout
+	//		 oidc logout should only log the user out of the client that requested the logout
+	//		 normal logout should log the user out of the holvit session, but not (usually) invalidate the tokens of clients that were signed in
+
+	// TODO: when a user signs into a client and has already authenticated and authorized previously,
+	// 		 instead of redirecting them immediately they should be prompted if they want to sign into that client with that account
+	//		 this choice should be remembered for the browser session (or longer) or until the user logs out of that client via the oidc logout
 
 }
 

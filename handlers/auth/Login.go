@@ -36,7 +36,7 @@ func CompleteAuthFlow(w http.ResponseWriter, r *http.Request) {
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realm := realmRepository.FindRealmById(ctx, loginInfo.RealmId).Unwrap()
 
-	currentUser := ioc.Get[services.CurrentUserService](scope)
+	currentUser := ioc.Get[services.CurrentSessionService](scope)
 	deviceIdString, err := currentUser.DeviceIdString()
 	if err != nil {
 		rcs.Error(err)

@@ -38,7 +38,7 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := ioc.Get[services.CurrentUserService](scope)
+	currentUser := ioc.Get[services.CurrentSessionService](scope)
 	deviceIdString, err := currentUser.DeviceIdString()
 	if err != nil {
 		rcs.Error(err)

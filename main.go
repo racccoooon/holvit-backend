@@ -138,8 +138,8 @@ func configureServices() *ioc.DependencyProvider {
 	ioc.AddCloseHandler[requestContext.RequestContextService](builder, func(rcs requestContext.RequestContextService) error {
 		return rcs.Close()
 	})
-	ioc.AddScoped(builder, func(dp *ioc.DependencyProvider) services.CurrentUserService {
-		return services.NewCurrentUserService()
+	ioc.AddScoped(builder, func(dp *ioc.DependencyProvider) services.CurrentSessionService {
+		return services.NewCurrentSessionService()
 	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.RealmRepository {

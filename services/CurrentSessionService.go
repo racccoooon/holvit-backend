@@ -14,9 +14,10 @@ import (
 	"holvit/repos"
 	"holvit/utils"
 	"net/http"
+	"time"
 )
 
-type CurrentUserService interface {
+type CurrentSessionService interface {
 	VerifyAuthorized() error
 
 	DeviceIdString() (string, error)
@@ -29,13 +30,14 @@ type CurrentUserService interface {
 	RealmId() (uuid.UUID, error)
 	Realm(ctx context.Context) (*repos.Realm, error)
 	SetSession(w http.ResponseWriter, userId uuid.UUID, rememberMe bool, realmName string, token string)
+	DeleteSession(w http.ResponseWriter, realmName string)
 }
 
-func NewCurrentUserService() CurrentUserService {
-	return &CurrentUserServiceImpl{}
+func NewCurrentSessionService() CurrentSessionService {
+	return &CurrentSessionServiceImpl{}
 }
 
-type CurrentUserServiceImpl struct {
+type CurrentSessionServiceImpl struct {
 	deviceIdString *string
 	deviceId       *uuid.UUID
 	device         *repos.UserDevice
@@ -47,26 +49,21 @@ type CurrentUserServiceImpl struct {
 	realm   *repos.Realm
 }
 
-func (s *CurrentUserServiceImpl) SetSession(w http.ResponseWriter, userId uuid.UUID, rememberMe bool, realmName string, token string) {
-	cookie := http.Cookie{
-		Name:     constants.SessionCookieName(realmName),
-		Value:    token,
-		Path:     "/",
-		Domain:   "localhost", //TODO: get from settings
-		MaxAge:   0,
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	}
+func (s *CurrentSessionServiceImpl) DeleteSession(w http.ResponseWriter, realmName string) {
+	setCookie(w, constants.SessionCookieName(realmName), "", -1)
+}
+
+func (s *CurrentSessionServiceImpl) SetSession(w http.ResponseWriter, userId uuid.UUID, rememberMe bool, realmName string, token string) {
+	maxAge := 0
 	if rememberMe {
-		cookie.MaxAge = 99999999 //TODO: get from realm settings
+		maxAge = int((24 * 14 * time.Hour).Seconds())
 	}
-	http.SetCookie(w, &cookie)
+	setCookie(w, constants.SessionCookieName(realmName), token, maxAge)
 
 	s.userId = &userId
 }
 
-func (s *CurrentUserServiceImpl) VerifyAuthorized() error {
+func (s *CurrentSessionServiceImpl) VerifyAuthorized() error {
 	if s.userId == nil {
 		return httpErrors.Unauthorized().WithMessage("not authorized")
 	}
@@ -74,7 +71,7 @@ func (s *CurrentUserServiceImpl) VerifyAuthorized() error {
 	return nil
 }
 
-func (s *CurrentUserServiceImpl) DeviceIdString() (string, error) {
+func (s *CurrentSessionServiceImpl) DeviceIdString() (string, error) {
 	if s.deviceIdString == nil {
 		return "", httpErrors.BadRequest().WithMessage("Missing device id cookie")
 	}
@@ -82,7 +79,7 @@ func (s *CurrentUserServiceImpl) DeviceIdString() (string, error) {
 	return *s.deviceIdString, nil
 }
 
-func (s *CurrentUserServiceImpl) DeviceId(ctx context.Context) (uuid.UUID, error) {
+func (s *CurrentSessionServiceImpl) DeviceId(ctx context.Context) (uuid.UUID, error) {
 	if err := s.VerifyAuthorized(); err != nil {
 		return uuid.UUID{}, err
 	}
@@ -110,7 +107,7 @@ func (s *CurrentUserServiceImpl) DeviceId(ctx context.Context) (uuid.UUID, error
 	return *s.deviceId, nil
 }
 
-func (s *CurrentUserServiceImpl) Device(ctx context.Context) (*repos.UserDevice, error) {
+func (s *CurrentSessionServiceImpl) Device(ctx context.Context) (*repos.UserDevice, error) {
 	_, err := s.DeviceId(ctx)
 	if err != nil {
 		return nil, err
@@ -119,7 +116,7 @@ func (s *CurrentUserServiceImpl) Device(ctx context.Context) (*repos.UserDevice,
 	return s.device, nil
 }
 
-func (s *CurrentUserServiceImpl) UserId() (uuid.UUID, error) {
+func (s *CurrentSessionServiceImpl) UserId() (uuid.UUID, error) {
 	if err := s.VerifyAuthorized(); err != nil {
 		return uuid.UUID{}, err
 	}
@@ -127,7 +124,7 @@ func (s *CurrentUserServiceImpl) UserId() (uuid.UUID, error) {
 	return *s.userId, nil
 }
 
-func (s *CurrentUserServiceImpl) User(ctx context.Context) h.Result[*repos.User] {
+func (s *CurrentSessionServiceImpl) User(ctx context.Context) h.Result[*repos.User] {
 	if err := s.VerifyAuthorized(); err != nil {
 		return h.Err[*repos.User](err)
 	}
@@ -141,7 +138,7 @@ func (s *CurrentUserServiceImpl) User(ctx context.Context) h.Result[*repos.User]
 	return h.Ok(s.user)
 }
 
-func (s *CurrentUserServiceImpl) RealmId() (uuid.UUID, error) {
+func (s *CurrentSessionServiceImpl) RealmId() (uuid.UUID, error) {
 	if err := s.VerifyAuthorized(); err != nil {
 		return uuid.UUID{}, err
 	}
@@ -149,7 +146,7 @@ func (s *CurrentUserServiceImpl) RealmId() (uuid.UUID, error) {
 	return *s.realmId, nil
 }
 
-func (s *CurrentUserServiceImpl) Realm(ctx context.Context) (*repos.Realm, error) {
+func (s *CurrentSessionServiceImpl) Realm(ctx context.Context) (*repos.Realm, error) {
 	if err := s.VerifyAuthorized(); err != nil {
 		return nil, err
 	}
@@ -163,24 +160,42 @@ func (s *CurrentUserServiceImpl) Realm(ctx context.Context) (*repos.Realm, error
 	return s.realm, nil
 }
 
-func CurrentUserMiddleware(next http.Handler) http.Handler {
+func setCookie(w http.ResponseWriter, name string, value string, maxAge int) {
+	cookie := http.Cookie{
+		Name:     name,
+		Value:    value,
+		Path:     "/",
+		Domain:   "localhost", //TODO: get from settings
+		MaxAge:   maxAge,
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	}
+	http.SetCookie(w, &cookie)
+}
+
+func CurrentSessionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		scope := middlewares.GetScope(ctx)
 
-		service := ioc.Get[CurrentUserService](scope)
-		serviceImpl := service.(*CurrentUserServiceImpl)
+		service := ioc.Get[CurrentSessionService](scope)
+		serviceImpl := service.(*CurrentSessionServiceImpl)
 
 		routeParams := mux.Vars(r)
 		realmName := routeParams["realmName"]
 
-		sessionToken, err := r.Cookie(constants.SessionCookieName(realmName))
+		sessionCookie, err := r.Cookie(constants.SessionCookieName(realmName))
 		if err == nil {
 			sessionService := ioc.Get[SessionService](scope)
-			session := sessionService.LookupSession(ctx, sessionToken.Value)
+			session := sessionService.LookupSession(ctx, sessionCookie.Value)
 			if session, ok := session.Get(); ok {
 				serviceImpl.realmId = &session.RealmId
 				serviceImpl.userId = &session.UserId
+				// session cookie was good, refresh it if it has a max-age so it doesn't expire too soon
+				if sessionCookie.MaxAge > 0 {
+					setCookie(w, constants.SessionCookieName(realmName), sessionCookie.Value, int((14 * 24 * time.Hour).Seconds()))
+				}
 			}
 		}
 
@@ -192,16 +207,7 @@ func CurrentUserMiddleware(next http.Handler) http.Handler {
 			}
 			deviceIdString := base64.StdEncoding.EncodeToString([]byte(deviceUuid.String()))
 
-			http.SetCookie(w, &http.Cookie{
-				Name:     constants.DeviceCookieName,
-				Value:    deviceIdString,
-				Path:     "/",
-				Domain:   "localhost", //TODO: get from config
-				MaxAge:   315360000,
-				Secure:   true,
-				HttpOnly: true,
-				SameSite: http.SameSiteLaxMode,
-			})
+			setCookie(w, constants.DeviceCookieName, deviceIdString, int((10 * 365 * 24 * time.Hour).Seconds()))
 			serviceImpl.deviceIdString = &deviceIdString
 		} else {
 			serviceImpl.deviceIdString = &deviceIdCookie.Value

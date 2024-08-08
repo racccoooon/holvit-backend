@@ -374,7 +374,7 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) (AuthorizationResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
-	currentUserService := ioc.Get[CurrentUserService](scope)
+	currentUserService := ioc.Get[CurrentSessionService](scope)
 
 	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
 	scopes := scopeRepository.FindScopes(ctx, repos.ScopeFilter{
@@ -423,7 +423,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 		ClientId: h.Some(authorizationRequest.ClientId),
 	}).First()
 
-	currentUser := ioc.Get[CurrentUserService](scope)
+	currentUser := ioc.Get[CurrentSessionService](scope)
 
 	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
 	userid, err := currentUser.UserId()

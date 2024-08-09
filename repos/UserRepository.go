@@ -19,7 +19,7 @@ type User struct {
 	RealmId uuid.UUID
 
 	Username      string
-	Email         h.Optional[string]
+	Email         h.Opt[string]
 	EmailVerified bool
 }
 
@@ -32,12 +32,12 @@ func (e DuplicateUsernameError) Error() string {
 type UserFilter struct {
 	BaseFilter
 
-	RealmId  h.Optional[uuid.UUID]
-	Username h.Optional[string]
+	RealmId  h.Opt[uuid.UUID]
+	Username h.Opt[string]
 }
 
 type UserRepository interface {
-	FindUserById(ctx context.Context, id uuid.UUID) h.Optional[User]
+	FindUserById(ctx context.Context, id uuid.UUID) h.Opt[User]
 	FindUsers(ctx context.Context, filter UserFilter) h.Result[FilterResult[User]]
 	CreateUser(ctx context.Context, user User) h.Result[uuid.UUID]
 }
@@ -48,7 +48,7 @@ func NewUserRepository() UserRepository {
 	return &UserRepositoryImpl{}
 }
 
-func (u *UserRepositoryImpl) FindUserById(ctx context.Context, id uuid.UUID) h.Optional[User] {
+func (u *UserRepositoryImpl) FindUserById(ctx context.Context, id uuid.UUID) h.Opt[User] {
 	return u.FindUsers(ctx, UserFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),

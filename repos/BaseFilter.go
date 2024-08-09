@@ -9,8 +9,8 @@ import (
 )
 
 type BaseFilter struct {
-	Id         h.Optional[uuid.UUID]
-	PagingInfo h.Optional[PagingInfo]
+	Id         h.Opt[uuid.UUID]
+	PagingInfo h.Opt[PagingInfo]
 }
 
 func (f *BaseFilter) CountCol() string {
@@ -37,13 +37,13 @@ type FilterResult[T any] interface {
 	Values() []T
 	Count() int
 	First() T
-	FirstOrNone() h.Optional[T]
+	FirstOrNone() h.Opt[T]
 	Single() T
-	SingleOrNone() h.Optional[T]
+	SingleOrNone() h.Opt[T]
 	Any() bool
 }
 
-func first[T any](r FilterResult[T]) h.Optional[T] {
+func first[T any](r FilterResult[T]) h.Opt[T] {
 	values := r.Values()
 	if len(values) == 0 {
 		return h.None[T]()
@@ -51,7 +51,7 @@ func first[T any](r FilterResult[T]) h.Optional[T] {
 	return h.Some(values[0])
 }
 
-func single[T any](r FilterResult[T]) h.Optional[T] {
+func single[T any](r FilterResult[T]) h.Opt[T] {
 	values := r.Values()
 	if len(values) == 1 {
 		return h.Some(values[0])
@@ -90,7 +90,7 @@ func (p *pagedResult[T]) First() T {
 	return first[T](p).Unwrap()
 }
 
-func (p *pagedResult[T]) FirstOrNone() h.Optional[T] {
+func (p *pagedResult[T]) FirstOrNone() h.Opt[T] {
 	return first[T](p)
 }
 
@@ -98,7 +98,7 @@ func (p *pagedResult[T]) Single() T {
 	return single[T](p).Unwrap()
 }
 
-func (p *pagedResult[T]) SingleOrNone() h.Optional[T] {
+func (p *pagedResult[T]) SingleOrNone() h.Opt[T] {
 	return single[T](p)
 }
 

@@ -70,13 +70,13 @@ func (d *CredentialTotpDetails) Scan(value interface{}) error {
 
 type CredentialFilter struct {
 	BaseFilter
-	UserId h.Optional[uuid.UUID]
-	Type   h.Optional[string]
+	UserId h.Opt[uuid.UUID]
+	Type   h.Opt[string]
 }
 
 type CredentialRepository interface {
 	CreateCredential(ctx context.Context, credential Credential) h.Result[uuid.UUID]
-	FindCredentialById(ctx context.Context, id uuid.UUID) h.Optional[Credential]
+	FindCredentialById(ctx context.Context, id uuid.UUID) h.Opt[Credential]
 	FindCredentials(ctx context.Context, filter CredentialFilter) FilterResult[Credential]
 	DeleteCredential(ctx context.Context, id uuid.UUID) h.Result[h.Unit]
 }
@@ -124,7 +124,7 @@ func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credent
 	return h.Ok(resultingId)
 }
 
-func (c *CredentialRepositoryImpl) FindCredentialById(ctx context.Context, id uuid.UUID) h.Optional[Credential] {
+func (c *CredentialRepositoryImpl) FindCredentialById(ctx context.Context, id uuid.UUID) h.Opt[Credential] {
 	return c.FindCredentials(ctx, CredentialFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),

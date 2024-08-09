@@ -45,17 +45,17 @@ type ScopeFilter struct {
 	BaseFilter
 
 	RealmId uuid.UUID
-	Names   h.Optional[[]string]
+	Names   h.Opt[[]string]
 
 	IncludeGrants bool
 	OnlyGranted   bool
 
-	UserId   h.Optional[uuid.UUID]
-	ClientId h.Optional[uuid.UUID]
+	UserId   h.Opt[uuid.UUID]
+	ClientId h.Opt[uuid.UUID]
 }
 
 type ScopeRepository interface {
-	FindScopeById(ctx context.Context, id uuid.UUID) h.Optional[Scope]
+	FindScopeById(ctx context.Context, id uuid.UUID) h.Opt[Scope]
 	FindScopes(ctx context.Context, filter ScopeFilter) FilterResult[Scope]
 	CreateScope(ctx context.Context, scope Scope) h.Result[uuid.UUID]
 	CreateGrants(ctx context.Context, userId uuid.UUID, clientId uuid.UUID, scopeIds []uuid.UUID)
@@ -67,7 +67,7 @@ func NewScopeReposiroty() ScopeRepository {
 	return &ScopeRepositoryImpl{}
 }
 
-func (s *ScopeRepositoryImpl) FindScopeById(ctx context.Context, id uuid.UUID) h.Optional[Scope] {
+func (s *ScopeRepositoryImpl) FindScopeById(ctx context.Context, id uuid.UUID) h.Opt[Scope] {
 	return s.FindScopes(ctx, ScopeFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),

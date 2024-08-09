@@ -27,14 +27,14 @@ type Session struct {
 type SessionFilter struct {
 	BaseFilter
 
-	RealmId h.Optional[uuid.UUID]
-	UserId  h.Optional[uuid.UUID]
+	RealmId h.Opt[uuid.UUID]
+	UserId  h.Opt[uuid.UUID]
 
-	HashedToken h.Optional[string]
+	HashedToken h.Opt[string]
 }
 
 type SessionRepository interface {
-	FindSessionById(ctx context.Context, id uuid.UUID) h.Optional[Session]
+	FindSessionById(ctx context.Context, id uuid.UUID) h.Opt[Session]
 	FindSessions(ctx context.Context, filter SessionFilter) FilterResult[Session]
 	CreateSession(ctx context.Context, session Session) uuid.UUID
 	DeleteOldSessions(ctx context.Context)
@@ -69,7 +69,7 @@ func (s *SessionRepositoryImpl) DeleteOldSessions(ctx context.Context) {
 	}
 }
 
-func (s *SessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUID) h.Optional[Session] {
+func (s *SessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUID) h.Opt[Session] {
 	return s.FindSessions(ctx, SessionFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),

@@ -107,7 +107,7 @@ type CreateUserRequest struct {
 	RealmId uuid.UUID
 
 	Username string
-	Email    h.Optional[string]
+	Email    h.Opt[string]
 }
 
 type SetPasswordRequest struct {
@@ -135,7 +135,7 @@ type VerifyTotpRequest struct {
 type AddTotpRequest struct {
 	UserId      uuid.UUID
 	Secret      []byte
-	DisplayName h.Optional[string]
+	DisplayName h.Opt[string]
 }
 
 type UserService interface {

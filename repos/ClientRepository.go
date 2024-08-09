@@ -21,7 +21,7 @@ type Client struct {
 	DisplayName string
 
 	ClientId     string
-	ClientSecret h.Optional[string]
+	ClientSecret h.Opt[string]
 
 	RedirectUris []string
 }
@@ -35,18 +35,18 @@ func (e DuplicateClientIdError) Error() string {
 type ClientFilter struct {
 	BaseFilter
 
-	RealmId  h.Optional[uuid.UUID]
-	ClientId h.Optional[string]
+	RealmId  h.Opt[uuid.UUID]
+	ClientId h.Opt[string]
 }
 
 type ClientUpdate struct {
-	DisplayName  h.Optional[string]
-	RedirectUris h.Optional[[]string]
-	ClientSecret h.Optional[string]
+	DisplayName  h.Opt[string]
+	RedirectUris h.Opt[[]string]
+	ClientSecret h.Opt[string]
 }
 
 type ClientRepository interface {
-	FindClientById(ctx context.Context, id uuid.UUID) h.Optional[Client]
+	FindClientById(ctx context.Context, id uuid.UUID) h.Opt[Client]
 	FindClients(ctx context.Context, filter ClientFilter) FilterResult[Client]
 	CreateClient(ctx context.Context, client Client) h.Result[uuid.UUID]
 	UpdateClient(ctx context.Context, id uuid.UUID, upd ClientUpdate) h.Result[h.Unit]
@@ -58,7 +58,7 @@ func NewClientRepository() ClientRepository {
 	return &ClientRepositoryImpl{}
 }
 
-func (c *ClientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID) h.Optional[Client] {
+func (c *ClientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID) h.Opt[Client] {
 	return c.FindClients(ctx, ClientFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),

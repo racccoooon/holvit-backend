@@ -16,7 +16,7 @@ type Role struct {
 	BaseModel
 
 	RealmId  uuid.UUID
-	ClientId h.Optional[uuid.UUID]
+	ClientId h.Opt[uuid.UUID]
 
 	DisplayName string
 	Name        string
@@ -28,7 +28,7 @@ type RoleFilter struct {
 }
 
 type RolesRepository interface {
-	FindRoleById(ctx context.Context, id uuid.UUID) h.Optional[Role]
+	FindRoleById(ctx context.Context, id uuid.UUID) h.Opt[Role]
 	FindRoles(ctx context.Context, filter RoleFilter) FilterResult[Role]
 }
 
@@ -38,7 +38,7 @@ func NewRolesRepository() RolesRepository {
 
 type RoleRepositoryImpl struct{}
 
-func (r *RoleRepositoryImpl) FindRoleById(ctx context.Context, id uuid.UUID) h.Optional[Role] {
+func (r *RoleRepositoryImpl) FindRoleById(ctx context.Context, id uuid.UUID) h.Opt[Role] {
 	return r.FindRoles(ctx, RoleFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),

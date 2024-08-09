@@ -19,7 +19,7 @@ type CreateSessionRequest struct {
 
 type SessionService interface {
 	CreateSession(ctx context.Context, request CreateSessionRequest) string
-	LookupSession(ctx context.Context, token string) h.Optional[repos.Session]
+	LookupSession(ctx context.Context, token string) h.Opt[repos.Session]
 }
 
 func NewSessionService() SessionService {
@@ -49,7 +49,7 @@ func (s *SessionServiceImpl) CreateSession(ctx context.Context, request CreateSe
 	return token
 }
 
-func (s *SessionServiceImpl) LookupSession(ctx context.Context, token string) h.Optional[repos.Session] {
+func (s *SessionServiceImpl) LookupSession(ctx context.Context, token string) h.Opt[repos.Session] {
 	scope := middlewares.GetScope(ctx)
 
 	clockService := ioc.Get[utils.ClockService](scope)

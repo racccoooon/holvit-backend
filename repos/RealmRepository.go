@@ -31,22 +31,22 @@ type Realm struct {
 type RealmFilter struct {
 	BaseFilter
 
-	Name h.Optional[string]
+	Name h.Opt[string]
 }
 
 type RealmUpdate struct {
-	DisplayName h.Optional[string]
-	Name        h.Optional[string]
+	DisplayName h.Opt[string]
+	Name        h.Opt[string]
 
-	RequireUsername           h.Optional[bool]
-	RequireEmail              h.Optional[bool]
-	RequireDeviceVerification h.Optional[bool]
-	RequireTotp               h.Optional[bool]
-	EnableRememberMe          h.Optional[bool]
+	RequireUsername           h.Opt[bool]
+	RequireEmail              h.Opt[bool]
+	RequireDeviceVerification h.Opt[bool]
+	RequireTotp               h.Opt[bool]
+	EnableRememberMe          h.Opt[bool]
 }
 
 type RealmRepository interface {
-	FindRealmById(ctx context.Context, id uuid.UUID) h.Optional[Realm]
+	FindRealmById(ctx context.Context, id uuid.UUID) h.Opt[Realm]
 	FindRealms(ctx context.Context, filter RealmFilter) FilterResult[Realm]
 	CreateRealm(ctx context.Context, realm Realm) h.Result[uuid.UUID]
 	UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) h.Result[h.Unit]
@@ -59,7 +59,7 @@ func NewRealmRepository() RealmRepository {
 	return &RealmRepositoryImpl{}
 }
 
-func (r *RealmRepositoryImpl) FindRealmById(ctx context.Context, id uuid.UUID) h.Optional[Realm] {
+func (r *RealmRepositoryImpl) FindRealmById(ctx context.Context, id uuid.UUID) h.Opt[Realm] {
 	return r.FindRealms(ctx, RealmFilter{
 		BaseFilter: BaseFilter{
 			Id:         h.Some(id),

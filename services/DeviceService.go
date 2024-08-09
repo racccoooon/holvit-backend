@@ -18,7 +18,7 @@ type IsKnownDeviceRequest struct {
 }
 
 type IsKnownDeviceResponse struct {
-	Id                   h.Optional[uuid.UUID]
+	Id                   h.Opt[uuid.UUID]
 	RequiresVerification bool
 }
 

@@ -5,11 +5,11 @@ import (
 	"fmt"
 )
 
-type Optional[T any] struct {
+type Opt[T any] struct {
 	value *T
 }
 
-func (o Optional[T]) String() string {
+func (o Opt[T]) String() string {
 	if o.value == nil {
 		return "<none>"
 	} else {
@@ -17,46 +17,46 @@ func (o Optional[T]) String() string {
 	}
 }
 
-func Some[T any](v T) Optional[T] {
-	return Optional[T]{
+func Some[T any](v T) Opt[T] {
+	return Opt[T]{
 		value: &v,
 	}
 }
 
-func None[T any]() Optional[T] {
-	return Optional[T]{}
+func None[T any]() Opt[T] {
+	return Opt[T]{}
 }
 
-func SomeIf[T any](cond bool, t T) Optional[T] {
+func SomeIf[T any](cond bool, t T) Opt[T] {
 	if cond {
 		return None[T]()
 	}
 	return Some(t)
 }
 
-func FromPtr[T any](p *T) Optional[T] {
-	return Optional[T]{
+func FromPtr[T any](p *T) Opt[T] {
+	return Opt[T]{
 		value: p,
 	}
 }
 
-func FromDefault[T comparable](v T) Optional[T] {
+func FromDefault[T comparable](v T) Opt[T] {
 	var zero T
 	if v == zero {
-		return Optional[T]{}
+		return Opt[T]{}
 	}
-	return Optional[T]{value: &v}
+	return Opt[T]{value: &v}
 }
 
-func (o Optional[T]) IsNone() bool {
+func (o Opt[T]) IsNone() bool {
 	return o.value == nil
 }
 
-func (o Optional[T]) IsSome() bool {
+func (o Opt[T]) IsSome() bool {
 	return o.value != nil
 }
 
-func (o Optional[T]) Get() (T, bool) {
+func (o Opt[T]) Get() (T, bool) {
 	if o.IsNone() {
 		var zero T
 		return zero, false
@@ -65,86 +65,86 @@ func (o Optional[T]) Get() (T, bool) {
 	}
 }
 
-func (o Optional[T]) And(other Optional[T]) Optional[T] {
+func (o Opt[T]) And(other Opt[T]) Opt[T] {
 	if o.value == nil {
 		return o
 	}
 	return other
 }
 
-func (o Optional[T]) AndThen(fn func(T) Optional[T]) Optional[T] {
+func (o Opt[T]) AndThen(fn func(T) Opt[T]) Opt[T] {
 	if o.value == nil {
 		return o
 	}
 	return fn(*o.value)
 }
 
-func (o Optional[T]) Or(other Optional[T]) Optional[T] {
+func (o Opt[T]) Or(other Opt[T]) Opt[T] {
 	if o.value == nil {
 		return other
 	}
 	return o
 }
 
-func (o Optional[T]) OrDefault(t T) T {
+func (o Opt[T]) OrDefault(t T) T {
 	if o.value == nil {
 		return t
 	}
 	return *o.value
 }
 
-func (o Optional[T]) OrElse(fn func() Optional[T]) Optional[T] {
+func (o Opt[T]) OrElse(fn func() Opt[T]) Opt[T] {
 	if o.value != nil {
 		return o
 	}
 	return fn()
 }
 
-func (o Optional[T]) OrElseDefault(fn func() T) T {
+func (o Opt[T]) OrElseDefault(fn func() T) T {
 	if o.value != nil {
 		return *o.value
 	}
 	return fn()
 }
 
-func (o Optional[T]) ToNillablePtr() *T {
+func (o Opt[T]) ToNillablePtr() *T {
 	return o.value
 }
 
-func (o *Optional[T]) AsMutPtr() **T {
+func (o *Opt[T]) AsMutPtr() **T {
 	return &o.value
 }
 
-func (o Optional[T]) Expect(msg string) T {
+func (o Opt[T]) Expect(msg string) T {
 	return o.UnwrapErr(fmt.Errorf("tried to unwrap an empty option: %s", msg))
 }
 
-func (o Optional[T]) Unwrap() T {
+func (o Opt[T]) Unwrap() T {
 	return o.UnwrapErr(errors.New("tried to unwrap an empty option"))
 }
 
-func (o Optional[T]) UnwrapErr(e error) T {
+func (o Opt[T]) UnwrapErr(e error) T {
 	if o.value == nil {
 		panic(e)
 	}
 	return *o.value
 }
 
-func (o Optional[T]) UnwrapOr(d T) T {
+func (o Opt[T]) UnwrapOr(d T) T {
 	if o.value == nil {
 		return d
 	}
 	return *o.value
 }
 
-func (o Optional[T]) UnwrapOrElse(f func() T) T {
+func (o Opt[T]) UnwrapOrElse(f func() T) T {
 	if o.value == nil {
 		return f()
 	}
 	return *o.value
 }
 
-func (o Optional[T]) UnwrapOrEmpty() T {
+func (o Opt[T]) UnwrapOrEmpty() T {
 	if o.value == nil {
 		var zero T
 		return zero
@@ -152,25 +152,25 @@ func (o Optional[T]) UnwrapOrEmpty() T {
 	return *o.value
 }
 
-func (o Optional[T]) Map(m func(T) T) Optional[T] {
+func (o Opt[T]) Map(m func(T) T) Opt[T] {
 	if o.value == nil {
 		return o
 	}
 	v := m(*o.value)
-	return Optional[T]{
+	return Opt[T]{
 		value: &v,
 	}
 }
 
-func MapOpt[From any, To any](from Optional[From], m func(From) To) Optional[To] {
+func MapOpt[From any, To any](from Opt[From], m func(From) To) Opt[To] {
 	if from.value == nil {
-		return Optional[To]{}
+		return Opt[To]{}
 	}
 	mapped := m(*from.value)
-	return Optional[To]{value: &mapped}
+	return Opt[To]{value: &mapped}
 }
 
-func (o Optional[T]) IfSome(f func(T)) {
+func (o Opt[T]) IfSome(f func(T)) {
 	if o.value == nil {
 		return
 	}

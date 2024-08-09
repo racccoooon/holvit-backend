@@ -25,7 +25,7 @@ type QueuedJob struct {
 	Details QueuedJobDetails
 
 	FailureCount int
-	Error        h.Optional[string]
+	Error        h.Opt[string]
 }
 
 type QueuedJobDetails interface {
@@ -62,17 +62,17 @@ type QueuedJobFilter struct {
 	BaseFilter
 
 	IgnoreLocked bool
-	Status       h.Optional[string]
+	Status       h.Opt[string]
 }
 
 type QueuedJobUpdate struct {
-	Status       h.Optional[string]
-	FailureCount h.Optional[int]
-	Error        h.Optional[string]
+	Status       h.Opt[string]
+	FailureCount h.Opt[int]
+	Error        h.Opt[string]
 }
 
 type QueuedJobRepository interface {
-	FindQueuedJobById(ctx context.Context, id uuid.UUID) h.Optional[QueuedJob]
+	FindQueuedJobById(ctx context.Context, id uuid.UUID) h.Opt[QueuedJob]
 	FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) FilterResult[QueuedJob]
 	CreateQueuedJob(ctx context.Context, job QueuedJob) uuid.UUID
 	UpdateQueuedJob(ctx context.Context, id uuid.UUID, upd QueuedJobUpdate)
@@ -84,7 +84,7 @@ func NewQueuedJobRepository() QueuedJobRepository {
 	return &QueuedJobRepositoryImpl{}
 }
 
-func (r *QueuedJobRepositoryImpl) FindQueuedJobById(ctx context.Context, id uuid.UUID) h.Optional[QueuedJob] {
+func (r *QueuedJobRepositoryImpl) FindQueuedJobById(ctx context.Context, id uuid.UUID) h.Opt[QueuedJob] {
 	return r.FindQueuedJobs(ctx, QueuedJobFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),

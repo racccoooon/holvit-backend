@@ -50,8 +50,8 @@ func (c *UserInfoClaimMapperDetails) Scan(value interface{}) error {
 type ClaimMapperFilter struct {
 	BaseFilter
 
-	RealmId  h.Optional[uuid.UUID]
-	ScopeIds h.Optional[[]uuid.UUID]
+	RealmId  h.Opt[uuid.UUID]
+	ScopeIds h.Opt[[]uuid.UUID]
 }
 
 type AssociateScopeClaimRequest struct {
@@ -60,7 +60,7 @@ type AssociateScopeClaimRequest struct {
 }
 
 type ClaimMapperRepository interface {
-	FindClaimMapperById(ctx context.Context, id uuid.UUID) h.Optional[ClaimMapper]
+	FindClaimMapperById(ctx context.Context, id uuid.UUID) h.Opt[ClaimMapper]
 	FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) FilterResult[ClaimMapper]
 	CreateClaimMapper(ctx context.Context, claimMapper ClaimMapper) uuid.UUID
 	AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) uuid.UUID
@@ -72,7 +72,7 @@ func NewClaimMapperRepository() ClaimMapperRepository {
 	return &ClaimMapperRepositoryImpl{}
 }
 
-func (c *ClaimMapperRepositoryImpl) FindClaimMapperById(ctx context.Context, id uuid.UUID) h.Optional[ClaimMapper] {
+func (c *ClaimMapperRepositoryImpl) FindClaimMapperById(ctx context.Context, id uuid.UUID) h.Opt[ClaimMapper] {
 	return c.FindClaimMappers(ctx, ClaimMapperFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),

@@ -15,7 +15,7 @@ import (
 
 type CreateClientRequest struct {
 	RealmId     uuid.UUID
-	ClientId    h.Optional[string]
+	ClientId    h.Opt[string]
 	DisplayName string
 	WithSecret  bool
 }
@@ -23,12 +23,12 @@ type CreateClientRequest struct {
 type CreateClientResponse struct {
 	Id           uuid.UUID
 	ClientId     string
-	ClientSecret h.Optional[string]
+	ClientSecret h.Opt[string]
 }
 
 type AuthenticateClientRequest struct {
 	ClientId     string
-	ClientSecret h.Optional[string]
+	ClientSecret h.Opt[string]
 }
 
 type ClientService interface {

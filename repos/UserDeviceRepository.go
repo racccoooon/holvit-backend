@@ -29,12 +29,12 @@ type UserDevice struct {
 type UserDeviceFilter struct {
 	BaseFilter
 
-	DeviceId h.Optional[string]
-	UserId   h.Optional[uuid.UUID]
+	DeviceId h.Opt[string]
+	UserId   h.Opt[uuid.UUID]
 }
 
 type UserDeviceRepository interface {
-	FindUserDeviceById(ctx context.Context, id uuid.UUID) h.Optional[UserDevice]
+	FindUserDeviceById(ctx context.Context, id uuid.UUID) h.Opt[UserDevice]
 	FindUserDevices(ctx context.Context, filter UserDeviceFilter) FilterResult[UserDevice]
 	CreateUserDevice(ctx context.Context, userDevice UserDevice) uuid.UUID
 }
@@ -45,7 +45,7 @@ func NewUserDeviceRepository() UserDeviceRepository {
 
 type UserDeviceRepositoryImpl struct{}
 
-func (r *UserDeviceRepositoryImpl) FindUserDeviceById(ctx context.Context, id uuid.UUID) h.Optional[UserDevice] {
+func (r *UserDeviceRepositoryImpl) FindUserDeviceById(ctx context.Context, id uuid.UUID) h.Opt[UserDevice] {
 	return r.FindUserDevices(ctx, UserDeviceFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),

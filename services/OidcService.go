@@ -132,14 +132,14 @@ type AuthorizationCodeTokenRequest struct {
 	RedirectUri  string
 	Code         string
 	ClientId     string
-	ClientSecret h.Optional[string]
-	PKCEVerifier h.Optional[string]
+	ClientSecret h.Opt[string]
+	PKCEVerifier h.Opt[string]
 }
 
 type RefreshTokenRequest struct {
 	RefreshToken string
 	ClientId     string
-	ClientSecret h.Optional[string]
+	ClientSecret h.Opt[string]
 	ScopeNames   []string
 }
 

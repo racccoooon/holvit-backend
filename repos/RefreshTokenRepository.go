@@ -33,12 +33,12 @@ type RefreshToken struct {
 type RefreshTokenFilter struct {
 	BaseFilter
 
-	HashedToken h.Optional[string]
-	ClientId    h.Optional[uuid.UUID]
+	HashedToken h.Opt[string]
+	ClientId    h.Opt[uuid.UUID]
 }
 
 type RefreshTokenRepository interface {
-	FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Optional[RefreshToken]
+	FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Opt[RefreshToken]
 	FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) FilterResult[RefreshToken]
 	CreateRefreshToken(ctx context.Context, refreshToken RefreshToken) uuid.UUID
 	DeleteRefreshToken(ctx context.Context, id uuid.UUID) h.Result[h.Unit]
@@ -50,7 +50,7 @@ func NewRefreshTokenRepository() RefreshTokenRepository {
 	return &RefreshTokenRepositoryImpl{}
 }
 
-func (r *RefreshTokenRepositoryImpl) FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Optional[RefreshToken] {
+func (r *RefreshTokenRepositoryImpl) FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Opt[RefreshToken] {
 	return r.FindRefreshTokens(ctx, RefreshTokenFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),

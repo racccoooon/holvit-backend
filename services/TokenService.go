@@ -25,13 +25,13 @@ type GrantInfo struct {
 }
 
 type CodeInfo struct {
-	RealmId         uuid.UUID          `json:"realmId"`
-	ClientId        string             `json:"clientId"`
-	UserId          uuid.UUID          `json:"userId"`
-	RedirectUri     string             `json:"redirectUri"`
-	GrantedScopes   []string           `json:"grantedScopes"`
-	GrantedScopeIds []uuid.UUID        `json:"grantedScopeIds"`
-	PKCEChallenge   h.Optional[string] `json:"pkceChallenge"`
+	RealmId         uuid.UUID     `json:"realmId"`
+	ClientId        string        `json:"clientId"`
+	UserId          uuid.UUID     `json:"userId"`
+	RedirectUri     string        `json:"redirectUri"`
+	GrantedScopes   []string      `json:"grantedScopes"`
+	GrantedScopeIds []uuid.UUID   `json:"grantedScopeIds"`
+	PKCEChallenge   h.Opt[string] `json:"pkceChallenge"`
 }
 
 type LoginInfo struct {
@@ -46,15 +46,15 @@ type LoginInfo struct {
 
 type TokenService interface {
 	StoreGrantInfo(ctx context.Context, info GrantInfo) string
-	RetrieveGrantInfo(ctx context.Context, token string) h.Optional[GrantInfo]
+	RetrieveGrantInfo(ctx context.Context, token string) h.Opt[GrantInfo]
 
 	StoreOidcCode(ctx context.Context, info CodeInfo) string
-	RetrieveOidcCode(ctx context.Context, token string) h.Optional[CodeInfo]
+	RetrieveOidcCode(ctx context.Context, token string) h.Opt[CodeInfo]
 
 	StoreLoginCode(ctx context.Context, info LoginInfo) string
 	OverwriteLoginCode(ctx context.Context, token string, info LoginInfo) h.Result[h.Unit]
-	PeekLoginCode(ctx context.Context, token string) h.Optional[LoginInfo]
-	RetrieveLoginCode(ctx context.Context, token string) h.Optional[LoginInfo]
+	PeekLoginCode(ctx context.Context, token string) h.Opt[LoginInfo]
+	RetrieveLoginCode(ctx context.Context, token string) h.Opt[LoginInfo]
 }
 
 type TokenServiceImpl struct{}
@@ -71,13 +71,13 @@ func (s *TokenServiceImpl) StoreLoginCode(ctx context.Context, info LoginInfo) s
 	return s.storeInfo(ctx, info, "loginCode", time.Minute*30) // TODO config
 }
 
-func (s *TokenServiceImpl) PeekLoginCode(ctx context.Context, token string) h.Optional[LoginInfo] {
+func (s *TokenServiceImpl) PeekLoginCode(ctx context.Context, token string) h.Opt[LoginInfo] {
 	var result LoginInfo
 	found := s.peekInfo(ctx, "loginCode", token, &result)
 	return h.SomeIf(found, result)
 }
 
-func (s *TokenServiceImpl) RetrieveLoginCode(ctx context.Context, token string) h.Optional[LoginInfo] {
+func (s *TokenServiceImpl) RetrieveLoginCode(ctx context.Context, token string) h.Opt[LoginInfo] {
 	var result LoginInfo
 	found := s.retrieveInfo(ctx, "loginCode", token, &result)
 	return h.SomeIf(found, result)
@@ -87,7 +87,7 @@ func (s *TokenServiceImpl) StoreOidcCode(ctx context.Context, info CodeInfo) str
 	return s.storeInfo(ctx, info, "oidcCode", time.Second*30)
 }
 
-func (s *TokenServiceImpl) RetrieveOidcCode(ctx context.Context, token string) h.Optional[CodeInfo] {
+func (s *TokenServiceImpl) RetrieveOidcCode(ctx context.Context, token string) h.Opt[CodeInfo] {
 	var result CodeInfo
 	found := s.retrieveInfo(ctx, "oidcCode", token, &result)
 	return h.SomeIf(found, result)
@@ -97,7 +97,7 @@ func (s *TokenServiceImpl) StoreGrantInfo(ctx context.Context, info GrantInfo) s
 	return s.storeInfo(ctx, info, "grantInfo", time.Minute*5)
 }
 
-func (s *TokenServiceImpl) RetrieveGrantInfo(ctx context.Context, token string) h.Optional[GrantInfo] {
+func (s *TokenServiceImpl) RetrieveGrantInfo(ctx context.Context, token string) h.Opt[GrantInfo] {
 	var result GrantInfo
 	found := s.retrieveInfo(ctx, "grantInfo", token, &result)
 	return h.SomeIf(found, result)

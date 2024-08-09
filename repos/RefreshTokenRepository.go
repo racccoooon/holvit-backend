@@ -41,7 +41,7 @@ type RefreshTokenRepository interface {
 	FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Optional[RefreshToken]
 	FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) FilterResult[RefreshToken]
 	CreateRefreshToken(ctx context.Context, refreshToken RefreshToken) uuid.UUID
-	DeleteRefreshToken(ctx context.Context, id uuid.UUID)
+	DeleteRefreshToken(ctx context.Context, id uuid.UUID) h.Result[h.Unit]
 }
 
 type RefreshTokenRepositoryImpl struct{}
@@ -154,7 +154,7 @@ func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, ref
 	return resultingId
 }
 
-func (r *RefreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id uuid.UUID) {
+func (r *RefreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id uuid.UUID) h.Result[h.Unit] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -168,8 +168,14 @@ func (r *RefreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id 
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
-	_, err = tx.Exec(sqlString, args...)
+	result, err := tx.Exec(sqlString, args...)
 	if err != nil {
 		panic(err)
 	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		panic(err)
+	}
+
+	return h.UErrIf(affected == 0, DbNotFoundError{})
 }

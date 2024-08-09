@@ -222,9 +222,6 @@ func (c *CredentialRepositoryImpl) DeleteCredential(ctx context.Context, id uuid
 	if err != nil {
 		panic(err)
 	}
-	if affected == 0 {
-		return h.UErr(DbNotFoundError{})
-	}
 
-	return h.UOk()
+	return h.UErrIf(affected == 0, DbNotFoundError{})
 }

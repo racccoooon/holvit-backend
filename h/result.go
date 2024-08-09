@@ -22,6 +22,13 @@ func UErr(err error) Result[Unit] {
 	return Err[Unit](err)
 }
 
+func UErrIf(cond bool, err error) Result[Unit] {
+	if cond {
+		return UErr(err)
+	}
+	return UOk()
+}
+
 func Err[T any](err error) Result[T] {
 	var zero T
 	return Result[T]{

@@ -49,7 +49,6 @@ type ScopeConsentResponse struct {
 func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	scope := middlewares.GetScope(ctx)
-	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "text/html")
@@ -83,10 +82,7 @@ func (c *ScopeConsentResponse) HandleHttp(w http.ResponseWriter, r *http.Request
 
 	frontendService := ioc.Get[FrontendService](scope)
 
-	err := frontendService.WriteAuthFrontend(w, realmName, frontendData)
-	if err != nil {
-		rcs.Error(err)
-	}
+	frontendService.WriteAuthFrontend(w, realmName, frontendData)
 }
 
 type CodeAuthorizationResponse struct {
@@ -258,7 +254,7 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	}
 
 	refreshTokenService := ioc.Get[RefreshTokenService](scope)
-	refreshTokenString, _, err := refreshTokenService.CreateRefreshToken(ctx, CreateRefreshTokenRequest{
+	refreshTokenString, _ := refreshTokenService.CreateRefreshToken(ctx, CreateRefreshTokenRequest{
 		ClientId: client.Id,
 		UserId:   codeInfo.UserId,
 		RealmId:  client.RealmId,
@@ -267,9 +263,6 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 		Audience: audience,
 		Scopes:   codeInfo.GrantedScopes,
 	})
-	if err != nil {
-		return nil, err
-	}
 
 	scopeString := strings.Join(codeInfo.GrantedScopes, " ")
 	return &TokenResponse{
@@ -295,10 +288,7 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 	}).Unwrap() // TODO: handle 404
 
 	refreshTokenService := ioc.Get[RefreshTokenService](scope)
-	refreshTokenString, refreshToken, err := refreshTokenService.ValidateAndRefresh(ctx, request.RefreshToken, client.Id)
-	if err != nil {
-		return nil, err
-	}
+	refreshTokenString, refreshToken := refreshTokenService.ValidateAndRefresh(ctx, request.RefreshToken, client.Id).Unwrap().Values() //TODO: handle unauthorized?
 
 	if !utils.IsSliceSubset(refreshToken.Scopes, request.ScopeNames) {
 		return nil, httpErrors.Unauthorized().WithMessage("too many scopes")

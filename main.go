@@ -68,10 +68,7 @@ func initializeApplicationData(ctx context.Context) {
 	logging.Logger.Info("Initializing application...")
 
 	realmService := ioc.Get[services.RealmService](scope)
-	err := realmService.InitializeRealmKeys(ctx)
-	if err != nil {
-		logging.Logger.Fatal(err)
-	}
+	realmService.InitializeRealmKeys(ctx)
 }
 
 func seedData(ctx context.Context) {
@@ -80,13 +77,10 @@ func seedData(ctx context.Context) {
 	logging.Logger.Info("Seeding data...")
 
 	realmService := ioc.Get[services.RealmService](scope)
-	masterRealm, err := realmService.CreateRealm(ctx, services.CreateRealmRequest{
+	masterRealm := realmService.CreateRealm(ctx, services.CreateRealmRequest{
 		Name:        config.C.MasterRealmName,
 		DisplayName: config.C.MasterRealmDisplayName,
 	})
-	if err != nil {
-		logging.Logger.Fatal(err)
-	}
 
 	clientService := ioc.Get[services.ClientService](scope)
 	clientResponse := clientService.CreateClient(ctx, services.CreateClientRequest{
@@ -95,9 +89,7 @@ func seedData(ctx context.Context) {
 		DisplayName: "Holvit Admin",
 		WithSecret:  true,
 	})
-	if err != nil {
-		logging.Logger.Fatal(err)
-	}
+
 	logging.Logger.Infof("admin client id=%s secret=%s", clientResponse.ClientId, clientResponse.ClientSecret)
 
 	userService := ioc.Get[services.UserService](scope)
@@ -105,9 +97,6 @@ func seedData(ctx context.Context) {
 		RealmId:  masterRealm.Id,
 		Username: config.C.AdminUserName,
 	}).Unwrap()
-	if err != nil {
-		logging.Logger.Fatal(err)
-	}
 
 	userService.SetPassword(ctx, services.SetPasswordRequest{
 		UserId:    adminUserId,

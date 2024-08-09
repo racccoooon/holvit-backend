@@ -5,10 +5,18 @@ type T2[Ta, Tb any] struct {
 	Second Tb
 }
 
+func (t T2[Ta, Tb]) Values() (Ta, Tb) {
+	return t.First, t.Second
+}
+
 type T3[Ta, Tb, Tc any] struct {
 	First  Ta
 	Second Tb
 	Third  Tc
+}
+
+func (t T3[Ta, Tb, Tc]) Values() (Ta, Tb, Tc) {
+	return t.First, t.Second, t.Third
 }
 
 type T4[Ta, Tb, Tc, Td any] struct {
@@ -16,6 +24,10 @@ type T4[Ta, Tb, Tc, Td any] struct {
 	Second Tb
 	Third  Tc
 	Fourth Td
+}
+
+func (t T4[Ta, Tb, Tc, Td]) Values() (Ta, Tb, Tc, Td) {
+	return t.First, t.Second, t.Third, t.Fourth
 }
 
 func NewT2[Ta, Tb any](first Ta, second Tb) T2[Ta, Tb] {

@@ -28,8 +28,8 @@ type CreateRealmResponse struct {
 }
 
 type RealmService interface {
-	CreateRealm(ctx context.Context, request CreateRealmRequest) (*CreateRealmResponse, error)
-	InitializeRealmKeys(ctx context.Context) error
+	CreateRealm(ctx context.Context, request CreateRealmRequest) CreateRealmResponse
+	InitializeRealmKeys(ctx context.Context)
 }
 
 type RealmServiceImpl struct{}
@@ -38,7 +38,7 @@ func NewRealmService() RealmService {
 	return &RealmServiceImpl{}
 }
 
-func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmRequest) (*CreateRealmResponse, error) {
+func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmRequest) CreateRealmResponse {
 	scope := middlewares.GetScope(ctx)
 
 	key := config.C.GetSymmetricEncryptionKey()
@@ -56,7 +56,7 @@ func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 		RequireDeviceVerification: utils.GetOrDefault(request.RequireDeviceVerification, false),
 		RequireTotp:               utils.GetOrDefault(request.RequireTotp, false),
 		EnableRememberMe:          utils.GetOrDefault(request.EnableRememberMe, false),
-	}).Unwrap()
+	}).Unwrap() //TODO: handle duplicate name error
 
 	s.createOpenIdScope(ctx, realmId)
 	s.createEmailScope(ctx, realmId)
@@ -65,9 +65,9 @@ func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 	keyCache := ioc.Get[cache.KeyCache](scope)
 	keyCache.Set(realmId, privateKeyBytes)
 
-	return &CreateRealmResponse{
+	return CreateRealmResponse{
 		Id: realmId,
-	}, nil
+	}
 }
 
 func (s *RealmServiceImpl) createProfileScope(ctx context.Context, realmId uuid.UUID) {
@@ -183,7 +183,7 @@ func (s *RealmServiceImpl) createOpenIdScope(ctx context.Context, realmId uuid.U
 	})
 }
 
-func (s *RealmServiceImpl) InitializeRealmKeys(ctx context.Context) error {
+func (s *RealmServiceImpl) InitializeRealmKeys(ctx context.Context) {
 	scope := middlewares.GetScope(ctx)
 
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
@@ -198,6 +198,4 @@ func (s *RealmServiceImpl) InitializeRealmKeys(ctx context.Context) error {
 
 		keyCache.Set(realm.Id, privateKey)
 	}
-
-	return nil
 }

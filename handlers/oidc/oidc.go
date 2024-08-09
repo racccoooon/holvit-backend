@@ -51,11 +51,7 @@ func login(w http.ResponseWriter, r *http.Request, realmName string) error {
 
 	frontendService := ioc.Get[services.FrontendService](scope)
 
-	err := frontendService.WriteAuthFrontend(w, realmName, frontendData)
-	if err != nil {
-		return err
-	}
-
+	frontendService.WriteAuthFrontend(w, realmName, frontendData)
 	return nil
 }
 

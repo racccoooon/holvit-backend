@@ -9,7 +9,7 @@ import (
 )
 
 type FrontendService interface {
-	WriteAuthFrontend(w http.ResponseWriter, realmName string, frontendData AuthFrontendData) error
+	WriteAuthFrontend(w http.ResponseWriter, realmName string, frontendData AuthFrontendData)
 }
 
 func NewFrontendService() FrontendService {
@@ -47,14 +47,14 @@ type frontendServiceImpl struct {
 	authPage Page
 }
 
-func (f *frontendServiceImpl) WriteAuthFrontend(w http.ResponseWriter, realmName string, frontendData AuthFrontendData) error {
+func (f *frontendServiceImpl) WriteAuthFrontend(w http.ResponseWriter, realmName string, frontendData AuthFrontendData) {
 	page := f.authPage
 	page.Title = "TODO"
 	page.JsonData = map[string]interface{}{
 		"authInfo": frontendData,
 		"apiBase":  routes.ApiBase.Url(realmName),
 	}
-	return writePage(w, page)
+	writePage(w, page)
 }
 
 type AuthFrontendUser struct {
@@ -126,28 +126,28 @@ func writeJson(w http.ResponseWriter, name string, data interface{}) error {
 	return err
 }
 
-func writePage(w http.ResponseWriter, page Page) error {
+func writePage(w http.ResponseWriter, page Page) {
 	_, err := w.Write([]byte(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"/>`))
 	if err != nil {
-		return err
+		panic(err)
 	}
 	for name, data := range page.JsonData {
 		err = writeJson(w, name, data)
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 
 	for _, url := range page.Stylesheets {
 		err = writeMany(w, `<link rel="stylesheet" href="`, url, `" />`)
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 
 	_, err = w.Write([]byte(`</head><body><div id="app"></div>`))
 	if err != nil {
-		return err
+		panic(err)
 	}
 	for _, script := range page.Scripts {
 		if script.Type == "" {
@@ -156,11 +156,12 @@ func writePage(w http.ResponseWriter, page Page) error {
 			err = writeMany(w, `<script src="`, script.Url, `" type="`, script.Type, `"></script>`)
 		}
 		if err != nil {
-			return err
+			panic(err)
 		}
 	}
 	_, err = w.Write([]byte(`
 		</body></html>`))
-
-	return err
+	if err != nil {
+		panic(err)
+	}
 }

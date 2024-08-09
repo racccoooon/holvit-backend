@@ -17,6 +17,7 @@ import (
 	"holvit/middlewares"
 	"holvit/repos"
 	"holvit/requestContext"
+	"holvit/routes"
 	"holvit/server"
 	"holvit/services"
 	"holvit/utils"
@@ -88,7 +89,7 @@ func seedData(ctx context.Context) {
 		ClientId:     h.Some("holvit_admin"),
 		DisplayName:  "Holvit Admin",
 		WithSecret:   false,
-		RedirectUrls: []string{config.C.BaseUrl + "/admin"},
+		RedirectUrls: []string{routes.AdminFrontend.Url()},
 	})
 
 	logging.Logger.Infof("admin client id=%s secret=%s", clientResponse.ClientId, clientResponse.ClientSecret)

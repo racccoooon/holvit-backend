@@ -10,9 +10,10 @@ import (
 
 type FrontendService interface {
 	WriteAuthFrontend(w http.ResponseWriter, realmName string, frontendData AuthFrontendData)
+	WriteAdminFrontend(w http.ResponseWriter)
 }
 
-func NewFrontendService() FrontendService {
+func makeAuthPage() Page {
 	var scripts []Script
 	var styles []string
 
@@ -34,17 +35,49 @@ func NewFrontendService() FrontendService {
 			styles = append(styles, config.C.StaticRoot+name)
 		}
 	}
+	return Page{
+		Scripts:     scripts,
+		Stylesheets: styles,
+	}
+}
+func makeAdminPage() Page {
+	var scripts []Script
+	var styles []string
+
+	if config.C.IsDevelopment() {
+		if config.C.Development.AuthFrontendUrl != "" {
+			scripts = append(scripts, Script{Url: config.C.Development.AdminFrontendUrl + "@id/virtual:vue-devtools-path:overlay.js", Type: "module"})
+			scripts = append(scripts, Script{Url: config.C.Development.AdminFrontendUrl + "@id/virtual:vue-inspector-path:load.js", Type: "module"})
+			scripts = append(scripts, Script{Url: config.C.Development.AdminFrontendUrl + "@vite/client", Type: "module"})
+			scripts = append(scripts, Script{Url: config.C.Development.AdminFrontendUrl + "src/main.js", Type: "module"})
+		} else {
+			scripts = append(scripts, Script{Url: "/static/" + generated.AdminManifest.JsEntrypoint})
+			for _, name := range generated.AdminManifest.Stylesheets {
+				styles = append(styles, "/static/"+name)
+			}
+		}
+	} else {
+		scripts = append(scripts, Script{Url: config.C.StaticRoot + generated.AdminManifest.JsEntrypoint})
+		for _, name := range generated.AdminManifest.Stylesheets {
+			styles = append(styles, config.C.StaticRoot+name)
+		}
+	}
+	return Page{
+		Scripts:     scripts,
+		Stylesheets: styles,
+	}
+}
+
+func NewFrontendService() FrontendService {
 	return &frontendServiceImpl{
-		authPage: Page{
-			Title:       "",
-			Scripts:     scripts,
-			Stylesheets: styles,
-		},
+		authPage:  makeAuthPage(),
+		adminPage: makeAdminPage(),
 	}
 }
 
 type frontendServiceImpl struct {
-	authPage Page
+	authPage  Page
+	adminPage Page
 }
 
 func (f *frontendServiceImpl) WriteAuthFrontend(w http.ResponseWriter, realmName string, frontendData AuthFrontendData) {
@@ -52,7 +85,16 @@ func (f *frontendServiceImpl) WriteAuthFrontend(w http.ResponseWriter, realmName
 	page.Title = "TODO"
 	page.JsonData = map[string]interface{}{
 		"authInfo": frontendData,
-		"apiBase":  routes.ApiBase.Url(realmName),
+		"apiBase":  routes.RealmApiBase.Url(realmName),
+	}
+	writePage(w, page)
+}
+
+func (f *frontendServiceImpl) WriteAdminFrontend(w http.ResponseWriter) {
+	page := f.adminPage
+	page.Title = "Holvit Admin"
+	page.JsonData = map[string]interface{}{
+		"apiBase": routes.AdminApiBase.Url(),
 	}
 	writePage(w, page)
 }

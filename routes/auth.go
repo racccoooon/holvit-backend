@@ -2,17 +2,17 @@ package routes
 
 var ApiHealth = SimpleRoute("/api/health")
 
-const apiBase = "/api/realms/{realmName}"
+const realmApiBase = "/api/realms/{realmName}"
 
-var ApiBase = RealmRoute(apiBase)
+var RealmApiBase = RealmRoute(realmApiBase)
 
-var ApiVerifyPassword = RealmRoute(apiBase + "/auth/verify-password")
-var ApiResetPassword = RealmRoute(apiBase + "/auth/reset-password")
-var ApiTotpOnboarding = RealmRoute(apiBase + "/auth/totp-onboarding")
-var ApiVerifyTotp = RealmRoute(apiBase + "/auth/verify-totp")
-var ApiVerifyDevice = RealmRoute(apiBase + "/auth/verify-device")
-var ApiGetOnboardingTotp = RealmRoute(apiBase + "/auth/get-onboarding-totp")
-var ApiResendEmailVerification = RealmRoute(apiBase + "/auth/resend-email-verification")
+var ApiVerifyPassword = RealmRoute(realmApiBase + "/auth/verify-password")
+var ApiResetPassword = RealmRoute(realmApiBase + "/auth/reset-password")
+var ApiTotpOnboarding = RealmRoute(realmApiBase + "/auth/totp-onboarding")
+var ApiVerifyTotp = RealmRoute(realmApiBase + "/auth/verify-totp")
+var ApiVerifyDevice = RealmRoute(realmApiBase + "/auth/verify-device")
+var ApiGetOnboardingTotp = RealmRoute(realmApiBase + "/auth/get-onboarding-totp")
+var ApiResendEmailVerification = RealmRoute(realmApiBase + "/auth/resend-email-verification")
 
 var LoginComplete = RealmRoute("/auth/{realmName}/login-complete")
 var AuthorizeGrant = RealmRoute("/auth/{realmName}/authorize-grant")

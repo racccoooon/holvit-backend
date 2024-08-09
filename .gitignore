@@ -1,3 +1,5 @@
 /http-client.private.env.json
 /server/embed/auth_static.go
+/server/embed/admin_static.go
 /services/generated/frontend_manifest_auth.go
+/services/generated/frontend_manifest_admin.go

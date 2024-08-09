@@ -18,22 +18,16 @@ func getNextStep(ctx context.Context, currentStep string, info *services.LoginIn
 	switch currentStep {
 	case constants.AuthenticateStepVerifyPassword:
 		nextStep = &VerifyEmailStep{}
-		break
 	case constants.AuthenticateStepVerifyEmail:
 		nextStep = &ResetPasswordStep{}
-		break
 	case constants.AuthenticateStepResetPassword:
 		nextStep = &TotpOnboardingStep{}
-		break
 	case constants.AuthenticateStepTotpOnboarding:
 		nextStep = &VerifyDeviceStep{}
-		break
 	case constants.AuthenticateStepVerifyTotp:
 		nextStep = &VerifyDeviceStep{}
-		break
 	default:
 		nextStep = &SubmitLoginStep{}
-		break
 	}
 
 	needsToRun, err := nextStep.NeedsToRun(ctx, info)

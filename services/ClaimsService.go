@@ -47,7 +47,6 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 		switch mapper.Type {
 		case constants.ClaimMapperUserInfo:
 			userInfoMappers = append(userInfoMappers, mapper.Details)
-			break
 		}
 	}
 
@@ -64,13 +63,11 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 					Name:  mapper.ClaimName,
 					Claim: user.Id.String(),
 				})
-				break
 			case constants.UserInfoPropertyUsername:
 				claims = append(claims, ClaimResponse{
 					Name:  mapper.ClaimName,
 					Claim: user.Username,
 				})
-				break
 			case constants.UserInfoPropertyEmail:
 				user.Email.IfSome(func(x string) {
 					claims = append(claims, ClaimResponse{
@@ -78,7 +75,6 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 						Claim: x,
 					})
 				})
-				break
 			case constants.UserInfoPropertyEmailVerified:
 				if user.Email.IsSome() {
 					claims = append(claims, ClaimResponse{
@@ -86,7 +82,6 @@ func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 						Claim: fmt.Sprintf("%t", user.EmailVerified),
 					})
 				}
-				break
 			default:
 				logging.Logger.Fatalf("Unknown user property %s", mapper.Property)
 			}

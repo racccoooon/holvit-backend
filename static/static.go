@@ -101,7 +101,6 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			var httpErr *httpErrors.HttpError
 			errors.As(err, &httpErr)
 			http.Error(w, httpErr.Message(), httpErr.Status())
-			break
 		default:
 			msg := "An internal server error occurred"
 
@@ -110,7 +109,6 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 
 			http.Error(w, msg, http.StatusInternalServerError)
-			break
 		}
 	}
 }

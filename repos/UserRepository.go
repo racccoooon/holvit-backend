@@ -140,7 +140,6 @@ func (u *UserRepositoryImpl) CreateUser(ctx context.Context, user User) h.Result
 				if pqErr.Constraint == "idx_unique_username_per_realm" {
 					return h.Err[uuid.UUID](DuplicateUsernameError{})
 				}
-				break
 			}
 		} else {
 			panic(err)

@@ -116,7 +116,7 @@ func (o *Optional[T]) AsMutPtr() **T {
 }
 
 func (o Optional[T]) Expect(msg string) T {
-	return o.UnwrapErr(errors.New(fmt.Sprintf("tried to unwrap an empty option: %s", msg)))
+	return o.UnwrapErr(fmt.Errorf("tried to unwrap an empty option: %s", msg))
 }
 
 func (o Optional[T]) Unwrap() T {

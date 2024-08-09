@@ -157,7 +157,6 @@ func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm Realm) h.Re
 				if pqErr.Constraint == "idx_unique_realm_name" {
 					return h.Err[uuid.UUID](DuplicateUsernameError{})
 				}
-				break
 			}
 		} else {
 			panic(err)
@@ -218,7 +217,6 @@ func (r *RealmRepositoryImpl) UpdateRealm(ctx context.Context, id uuid.UUID, upd
 				if pqErr.Constraint == "idx_unique_realm_name" {
 					return h.Err[h.Unit](DuplicateUsernameError{})
 				}
-				break
 			}
 		} else {
 			panic(err)

@@ -194,7 +194,6 @@ func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope Scope) h.Re
 				if pqErr.Constraint == "idx_unique_scope_name_in_realm" {
 					return h.Err[uuid.UUID](DuplicateScopeError{})
 				}
-				break
 			}
 		} else {
 			panic(err)

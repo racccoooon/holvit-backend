@@ -20,10 +20,14 @@ func ScopeMiddleware(dp *ioc.DependencyProvider) mux.MiddlewareFunc {
 	}
 }
 
+type scopeKeyType int
+
+const scopeKey scopeKeyType = iota
+
 func ContextWithNewScope(ctx context.Context, scope *ioc.DependencyProvider) context.Context {
-	return context.WithValue(ctx, "scope", scope)
+	return context.WithValue(ctx, scopeKey, scope)
 }
 
 func GetScope(ctx context.Context) *ioc.DependencyProvider {
-	return ctx.Value("scope").(*ioc.DependencyProvider)
+	return ctx.Value(scopeKey).(*ioc.DependencyProvider)
 }

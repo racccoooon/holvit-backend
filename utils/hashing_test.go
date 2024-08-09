@@ -31,24 +31,22 @@ func Fuzz_BCryptAlgorithm(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, input string) {
 		// arrange
-		algorithm := BCryptHashAlgorithm{
+		settings := BcryptHashSettings{
 			Cost: bcrypt.DefaultCost,
 		}
+		hasher := settings.MakeHasher()
 
 		// act
-		hashed, err1 := algorithm.Hash(input)
-		hashedAgain, err2 := algorithm.Hash(input)
+		hashed := hasher.Hash(input)
+		hashedAgain := hasher.Hash(input)
 
-		err3 := ValidateHash(input, hashed)
-		err4 := ValidateHash(input, hashedAgain)
+		res1 := ValidateHash(input, hashed, hasher)
+		res2 := ValidateHash(input, hashedAgain, hasher)
 
 		// assert
-		assert.NoError(t, err1)
-		assert.NoError(t, err2)
-		assert.NoError(t, err3)
-		assert.NoError(t, err4)
-
 		assert.NotEqual(t, hashed, input)
 		assert.NotEqual(t, hashed, hashedAgain)
+		assert.True(t, res1.IsValid)
+		assert.True(t, res2.IsValid)
 	})
 }

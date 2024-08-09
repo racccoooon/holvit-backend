@@ -489,12 +489,13 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 
 	tokenService := ioc.Get[TokenService](scope)
 	code := tokenService.StoreOidcCode(ctx, CodeInfo{
-		RealmId:       realm.Id,
-		ClientId:      client.ClientId,
-		UserId:        userid,
-		RedirectUri:   authorizationRequest.RedirectUri,
-		GrantedScopes: grantedScopes,
-		PKCEChallenge: pkceChallenge,
+		RealmId:         realm.Id,
+		ClientId:        client.ClientId,
+		UserId:          userid,
+		RedirectUri:     authorizationRequest.RedirectUri,
+		GrantedScopes:   grantedScopes,
+		GrantedScopeIds: grantedScopeIds,
+		PKCEChallenge:   pkceChallenge,
 	})
 
 	return &CodeAuthorizationResponse{

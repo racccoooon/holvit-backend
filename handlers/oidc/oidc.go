@@ -145,7 +145,6 @@ func Token(w http.ResponseWriter, r *http.Request) {
 			ClientSecret: clientSecret,
 			PKCEVerifier: pkceVerifier,
 		})
-		break
 	case constants.TokenGrantTypeRefreshToken:
 		response, err = oidcService.HandleRefreshToken(ctx, services.RefreshTokenRequest{
 			RefreshToken: r.Form.Get("refresh_token"),
@@ -153,7 +152,6 @@ func Token(w http.ResponseWriter, r *http.Request) {
 			ClientSecret: clientSecret,
 			ScopeNames:   strings.Split(r.Form.Get("scope"), " "),
 		})
-		break
 	default:
 		rcs.Error(httpErrors.BadRequest().WithMessage(fmt.Sprintf("Unsupported grant_type '%s'", grantType)))
 	}

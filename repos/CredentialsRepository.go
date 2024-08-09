@@ -115,7 +115,6 @@ func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credent
 				if pqErr.Constraint == "idx_only_one_password_per_user" {
 					return h.Err[uuid.UUID](DuplicatePasswordOnUserError{})
 				}
-				break
 			}
 		} else {
 			panic(err)
@@ -186,10 +185,8 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 		switch row.Type {
 		case constants.CredentialTypePassword:
 			row.Details = utils.FromRawMessage[CredentialPasswordDetails](detailsRaw).Unwrap()
-			break
 		case constants.CredentialTypeTotp:
 			row.Details = utils.FromRawMessage[CredentialTotpDetails](detailsRaw).Unwrap()
-			break
 		default:
 			logging.Logger.Fatalf("Unsupported hash algorithm '%v' in password credential '%v'", row.Type, row.Id.String())
 		}

@@ -150,7 +150,6 @@ func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client Client) 
 				if pqErr.Constraint == "idx_unique_client_id_per_realm" {
 					return h.Err[uuid.UUID](DuplicateClientIdError{})
 				}
-				break
 			}
 		}
 
@@ -195,7 +194,6 @@ func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, u
 				if pqErr.Constraint == "idx_unique_client_id_per_realm" {
 					return h.UErr(DuplicateClientIdError{})
 				}
-				break
 			}
 		}
 

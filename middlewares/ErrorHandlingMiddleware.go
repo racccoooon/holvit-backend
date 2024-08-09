@@ -29,19 +29,15 @@ func ErrorHandlingMiddleware(next http.Handler) http.Handler {
 		errors := rcs.Errors()
 		if len(errors) != 0 {
 			err := errors[0]
-			switch err.(type) {
+			switch err := err.(type) {
 			case *httpErrors.HttpError:
-				httpErr := err.(*httpErrors.HttpError)
-
-				message := httpErr.Message()
-				if config.C.IsProduction() && httpErr.Status() == http.StatusUnauthorized {
+				message := err.Message()
+				if config.C.IsProduction() && err.Status() == http.StatusUnauthorized {
 					message = ""
 				}
 
 				logging.Logger.Info(err)
-				http.Error(w, message, httpErr.Status())
-				break
-
+				http.Error(w, message, err.Status())
 			default:
 				msg := "An internal server error occurred"
 
@@ -51,7 +47,6 @@ func ErrorHandlingMiddleware(next http.Handler) http.Handler {
 
 				logging.Logger.Error(err)
 				http.Error(w, msg, http.StatusInternalServerError)
-				break
 			}
 
 			return

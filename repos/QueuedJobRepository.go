@@ -153,7 +153,6 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 		switch row.Type {
 		case constants.QueuedJobSendMail:
 			row.Details = utils.FromRawMessage[SendMailJobDetails](detailsRaw).Unwrap()
-			break
 		default:
 			logging.Logger.Fatalf("Unsupported job type '%v' in queud job '%v'", row.Type, row.Id.String())
 		}

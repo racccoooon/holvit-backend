@@ -137,7 +137,6 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 		switch row.Type {
 		case constants.ClaimMapperUserInfo:
 			row.Details = utils.FromRawMessage[UserInfoClaimMapperDetails](detailsRaw).Unwrap()
-			break
 		default:
 			logging.Logger.Fatalf("Unsupported mapper type '%v' in claims mapper '%v'", row.Type, row.Id.String())
 		}

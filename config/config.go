@@ -12,8 +12,11 @@ import (
 type HolvitConfig struct {
 	Environment string
 
+	BaseUrl string
+
 	Development struct {
-		AuthFrontendUrl string
+		AuthFrontendUrl  string
+		AdminFrontendUrl string
 	}
 
 	StaticRoot string
@@ -137,8 +140,11 @@ func readFlags() {
 
 func setDefaultConfigValues() {
 	C.Environment = Production
+	C.BaseUrl = "http://localhost:8080"
 
 	C.Development.AuthFrontendUrl = "http://localhost:5173/"
+	C.Development.AdminFrontendUrl = "http://localhost:5174/"
+
 	C.StaticRoot = "/static/"
 
 	C.HashAlgorithm = constants.HashAlgorithmArgon2id
@@ -198,12 +204,14 @@ func readConfigValues() {
 	if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 		err = nil
 	}
-
 	if err != nil {
 		panic(err)
 	}
 
-	v.Unmarshal(&C)
+	err = v.Unmarshal(&C)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func validateConfig() {

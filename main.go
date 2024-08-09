@@ -84,10 +84,11 @@ func seedData(ctx context.Context) {
 
 	clientService := ioc.Get[services.ClientService](scope)
 	clientResponse := clientService.CreateClient(ctx, services.CreateClientRequest{
-		RealmId:     masterRealm.Id,
-		ClientId:    h.Some("holvit_admin"),
-		DisplayName: "Holvit Admin",
-		WithSecret:  true,
+		RealmId:      masterRealm.Id,
+		ClientId:     h.Some("holvit_admin"),
+		DisplayName:  "Holvit Admin",
+		WithSecret:   false,
+		RedirectUrls: []string{config.C.BaseUrl + "/admin"},
 	})
 
 	logging.Logger.Infof("admin client id=%s secret=%s", clientResponse.ClientId, clientResponse.ClientSecret)

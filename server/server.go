@@ -35,6 +35,8 @@ func ServeApi(dp *ioc.DependencyProvider) {
 
 	r.HandleFunc(routes.ApiHealth.String(), handlers.Health).Methods("GET")
 
+	r.HandleFunc(routes.AdminFrontend.String(), handlers.AdminFrontend).Methods("GET")
+
 	r.HandleFunc(routes.OidcAuthorize.String(), oidc.Authorize).Methods("GET", "POST")
 	r.HandleFunc(routes.OidcToken.String(), oidc.Token).Methods("POST")
 	r.HandleFunc(routes.OidcUserInfo.String(), oidc.UserInfo).Methods("GET", "POST")

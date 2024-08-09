@@ -14,10 +14,11 @@ import (
 )
 
 type CreateClientRequest struct {
-	RealmId     uuid.UUID
-	ClientId    h.Opt[string]
-	DisplayName string
-	WithSecret  bool
+	RealmId      uuid.UUID
+	ClientId     h.Opt[string]
+	DisplayName  string
+	WithSecret   bool
+	RedirectUrls []string
 }
 
 type CreateClientResponse struct {
@@ -100,7 +101,7 @@ func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClie
 		DisplayName:  request.DisplayName,
 		ClientId:     clientId,
 		ClientSecret: hashedClientSecret,
-		RedirectUris: make([]string, 0),
+		RedirectUris: request.RedirectUrls,
 	}).Unwrap()
 
 	return CreateClientResponse{

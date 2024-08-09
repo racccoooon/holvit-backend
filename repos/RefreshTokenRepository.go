@@ -40,7 +40,7 @@ type RefreshTokenFilter struct {
 type RefreshTokenRepository interface {
 	FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Optional[RefreshToken]
 	FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) FilterResult[RefreshToken]
-	CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) uuid.UUID
+	CreateRefreshToken(ctx context.Context, refreshToken RefreshToken) uuid.UUID
 	DeleteRefreshToken(ctx context.Context, id uuid.UUID)
 }
 
@@ -119,7 +119,7 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 	return NewPagedResult(result, totalCount)
 }
 
-func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, refreshToken *RefreshToken) uuid.UUID {
+func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, refreshToken RefreshToken) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

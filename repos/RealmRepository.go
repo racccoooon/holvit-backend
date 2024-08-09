@@ -48,7 +48,7 @@ type RealmUpdate struct {
 type RealmRepository interface {
 	FindRealmById(ctx context.Context, id uuid.UUID) h.Optional[Realm]
 	FindRealms(ctx context.Context, filter RealmFilter) FilterResult[Realm]
-	CreateRealm(ctx context.Context, realm *Realm) h.Result[uuid.UUID]
+	CreateRealm(ctx context.Context, realm Realm) h.Result[uuid.UUID]
 	UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) h.Result[h.Unit]
 }
 
@@ -124,7 +124,7 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 	return NewPagedResult(result, totalCount)
 }
 
-func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm *Realm) h.Result[uuid.UUID] {
+func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm Realm) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

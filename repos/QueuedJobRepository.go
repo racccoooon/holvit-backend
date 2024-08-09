@@ -74,7 +74,7 @@ type QueuedJobUpdate struct {
 type QueuedJobRepository interface {
 	FindQueuedJobById(ctx context.Context, id uuid.UUID) h.Optional[QueuedJob]
 	FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) FilterResult[QueuedJob]
-	CreateQueuedJob(ctx context.Context, job *QueuedJob) uuid.UUID
+	CreateQueuedJob(ctx context.Context, job QueuedJob) uuid.UUID
 	UpdateQueuedJob(ctx context.Context, id uuid.UUID, upd QueuedJobUpdate)
 }
 
@@ -164,7 +164,7 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 	return NewPagedResult(result, totalCount)
 }
 
-func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job *QueuedJob) uuid.UUID {
+func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job QueuedJob) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

@@ -38,7 +38,7 @@ func (s *SessionServiceImpl) CreateSession(ctx context.Context, request CreateSe
 	hashedToken := utils.CheapHash(token)
 
 	sessionRepository := ioc.Get[repos.SessionRepository](scope)
-	_ = sessionRepository.CreateSession(ctx, &repos.Session{
+	_ = sessionRepository.CreateSession(ctx, repos.Session{
 		UserId:       request.UserId,
 		UserDeviceId: request.DeviceId,
 		RealmId:      request.RealmId,

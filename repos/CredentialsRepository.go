@@ -75,7 +75,7 @@ type CredentialFilter struct {
 }
 
 type CredentialRepository interface {
-	CreateCredential(ctx context.Context, credential *Credential) h.Result[uuid.UUID]
+	CreateCredential(ctx context.Context, credential Credential) h.Result[uuid.UUID]
 	FindCredentialById(ctx context.Context, id uuid.UUID) h.Optional[Credential]
 	FindCredentials(ctx context.Context, filter CredentialFilter) FilterResult[Credential]
 	DeleteCredential(ctx context.Context, id uuid.UUID) h.Result[h.Unit]
@@ -87,7 +87,7 @@ func NewCredentialRepository() CredentialRepository {
 	return &CredentialRepositoryImpl{}
 }
 
-func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credential *Credential) h.Result[uuid.UUID] {
+func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credential Credential) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

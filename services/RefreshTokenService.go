@@ -85,7 +85,7 @@ func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, reques
 		Audience:    request.Audience,
 		Scopes:      request.Scopes,
 	}
-	tokenId := refreshTokenRepository.CreateRefreshToken(ctx, &refreshToken)
+	tokenId := refreshTokenRepository.CreateRefreshToken(ctx, refreshToken)
 
 	refreshToken.Id = tokenId
 

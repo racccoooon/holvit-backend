@@ -39,7 +39,7 @@ type UserFilter struct {
 type UserRepository interface {
 	FindUserById(ctx context.Context, id uuid.UUID) h.Optional[User]
 	FindUsers(ctx context.Context, filter UserFilter) h.Result[FilterResult[User]]
-	CreateUser(ctx context.Context, user *User) h.Result[uuid.UUID]
+	CreateUser(ctx context.Context, user User) h.Result[uuid.UUID]
 }
 
 type UserRepositoryImpl struct{}
@@ -114,7 +114,7 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 	return h.Ok(NewPagedResult(result, totalCount))
 }
 
-func (u *UserRepositoryImpl) CreateUser(ctx context.Context, user *User) h.Result[uuid.UUID] {
+func (u *UserRepositoryImpl) CreateUser(ctx context.Context, user User) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

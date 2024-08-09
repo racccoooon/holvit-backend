@@ -70,7 +70,7 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
-	id := userDeviceRepository.CreateUserDevice(ctx, &repos.UserDevice{
+	id := userDeviceRepository.CreateUserDevice(ctx, repos.UserDevice{
 		UserId:      request.UserId,
 		DisplayName: displayName,
 		DeviceId:    request.DeviceId,

@@ -36,7 +36,7 @@ type UserDeviceFilter struct {
 type UserDeviceRepository interface {
 	FindUserDeviceById(ctx context.Context, id uuid.UUID) h.Optional[UserDevice]
 	FindUserDevices(ctx context.Context, filter UserDeviceFilter) FilterResult[UserDevice]
-	CreateUserDevice(ctx context.Context, userDevice *UserDevice) uuid.UUID
+	CreateUserDevice(ctx context.Context, userDevice UserDevice) uuid.UUID
 }
 
 func NewUserDeviceRepository() UserDeviceRepository {
@@ -111,7 +111,7 @@ func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter U
 	return NewPagedResult(result, totalCount)
 }
 
-func (r *UserDeviceRepositoryImpl) CreateUserDevice(ctx context.Context, userDevice *UserDevice) uuid.UUID {
+func (r *UserDeviceRepositoryImpl) CreateUserDevice(ctx context.Context, userDevice UserDevice) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

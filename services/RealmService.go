@@ -47,7 +47,7 @@ func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 	encryptedPrivateKeyBytes := utils.EncryptSymmetric(privateKeyBytes, key)
 
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
-	realmId := realmRepository.CreateRealm(ctx, &repos.Realm{
+	realmId := realmRepository.CreateRealm(ctx, repos.Realm{
 		Name:                      request.Name,
 		DisplayName:               request.DisplayName,
 		EncryptedPrivateKey:       encryptedPrivateKeyBytes,
@@ -84,7 +84,7 @@ func (s *RealmServiceImpl) createProfileScope(ctx context.Context, realmId uuid.
 		SortIndex:   3,
 	})
 
-	mapperId := claimMapperRepository.CreateClaimMapper(ctx, &repos.ClaimMapper{
+	mapperId := claimMapperRepository.CreateClaimMapper(ctx, repos.ClaimMapper{
 		BaseModel:   repos.BaseModel{},
 		RealmId:     realmId,
 		DisplayName: "Username",
@@ -116,7 +116,7 @@ func (s *RealmServiceImpl) createEmailScope(ctx context.Context, realmId uuid.UU
 		SortIndex:   2,
 	}).Unwrap()
 
-	mapperId := claimMapperRepository.CreateClaimMapper(ctx, &repos.ClaimMapper{
+	mapperId := claimMapperRepository.CreateClaimMapper(ctx, repos.ClaimMapper{
 		BaseModel:   repos.BaseModel{},
 		RealmId:     realmId,
 		DisplayName: "Email address",
@@ -133,7 +133,7 @@ func (s *RealmServiceImpl) createEmailScope(ctx context.Context, realmId uuid.UU
 		ScopeId:       scopeId,
 	})
 
-	mapperId = claimMapperRepository.CreateClaimMapper(ctx, &repos.ClaimMapper{
+	mapperId = claimMapperRepository.CreateClaimMapper(ctx, repos.ClaimMapper{
 		BaseModel:   repos.BaseModel{},
 		RealmId:     realmId,
 		DisplayName: "Email address verified",
@@ -165,7 +165,7 @@ func (s *RealmServiceImpl) createOpenIdScope(ctx context.Context, realmId uuid.U
 		SortIndex:   1,
 	}).Unwrap()
 
-	mapperId := claimMapperRepository.CreateClaimMapper(ctx, &repos.ClaimMapper{
+	mapperId := claimMapperRepository.CreateClaimMapper(ctx, repos.ClaimMapper{
 		BaseModel:   repos.BaseModel{},
 		RealmId:     realmId,
 		DisplayName: "Subject Identifier",

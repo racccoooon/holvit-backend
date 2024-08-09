@@ -164,7 +164,7 @@ func (u *UserServiceImpl) CreateUser(ctx context.Context, request CreateUserRequ
 
 	userRepository := ioc.Get[repos.UserRepository](scope)
 
-	return userRepository.CreateUser(ctx, &repos.User{
+	return userRepository.CreateUser(ctx, repos.User{
 		RealmId:  request.RealmId,
 		Username: request.Username,
 		Email:    request.Email,
@@ -193,7 +193,7 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 	hashAlgorithm := config.C.GetHasher()
 	hashed := hashAlgorithm.Hash(request.Password)
 
-	credentialRepository.CreateCredential(ctx, &repos.Credential{
+	credentialRepository.CreateCredential(ctx, repos.Credential{
 		UserId: request.UserId,
 		Type:   constants.CredentialTypePassword,
 		Details: repos.CredentialPasswordDetails{
@@ -230,7 +230,7 @@ func (u *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest, s
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
 
-	_ = credentialRepository.CreateCredential(ctx, &repos.Credential{
+	_ = credentialRepository.CreateCredential(ctx, repos.Credential{
 		UserId: request.UserId,
 		Type:   constants.CredentialTypeTotp,
 		Details: repos.CredentialTotpDetails{
@@ -276,6 +276,7 @@ func (u *UserServiceImpl) HasTotpConfigured(ctx context.Context, userId uuid.UUI
 	}).Any()
 }
 
+// TODO: refactor looking up user by name and verifying password
 func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRequest) VerifyLoginResponse {
 	isValid := PasswordAuthStrategy{
 		Password: request.Password,
@@ -291,6 +292,7 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 	}
 }
 
+// TODO: refactor this away(just use the totp auth strategy where needed)
 func (u *UserServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequest) {
 	isValid := TotpAuthStrategy{
 		Code: request.Code,

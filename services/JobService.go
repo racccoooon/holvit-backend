@@ -82,7 +82,7 @@ func (s *JobServiceImpl) QueueJob(ctx context.Context, job repos.QueuedJobDetail
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	queuedJobRepository := ioc.Get[repos.QueuedJobRepository](scope)
-	queuedJobRepository.CreateQueuedJob(ctx, &repos.QueuedJob{
+	queuedJobRepository.CreateQueuedJob(ctx, repos.QueuedJob{
 		Status:       "pending",
 		Type:         job.Type(),
 		Details:      job,

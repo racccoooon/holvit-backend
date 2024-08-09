@@ -62,7 +62,7 @@ type AssociateScopeClaimRequest struct {
 type ClaimMapperRepository interface {
 	FindClaimMapperById(ctx context.Context, id uuid.UUID) h.Optional[ClaimMapper]
 	FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) FilterResult[ClaimMapper]
-	CreateClaimMapper(ctx context.Context, claimMapper *ClaimMapper) uuid.UUID
+	CreateClaimMapper(ctx context.Context, claimMapper ClaimMapper) uuid.UUID
 	AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) uuid.UUID
 }
 
@@ -148,7 +148,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 	return NewPagedResult(result, totalCount)
 }
 
-func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claimMapper *ClaimMapper) uuid.UUID {
+func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claimMapper ClaimMapper) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

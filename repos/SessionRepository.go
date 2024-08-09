@@ -36,7 +36,7 @@ type SessionFilter struct {
 type SessionRepository interface {
 	FindSessionById(ctx context.Context, id uuid.UUID) h.Optional[Session]
 	FindSessions(ctx context.Context, filter SessionFilter) FilterResult[Session]
-	CreateSession(ctx context.Context, session *Session) uuid.UUID
+	CreateSession(ctx context.Context, session Session) uuid.UUID
 	DeleteOldSessions(ctx context.Context)
 }
 
@@ -130,7 +130,7 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 	return NewPagedResult(result, totalCount)
 }
 
-func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session *Session) uuid.UUID {
+func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session Session) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

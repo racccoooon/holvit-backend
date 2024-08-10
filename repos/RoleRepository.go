@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/lib/pq"
 	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
@@ -23,6 +24,12 @@ type Role struct {
 	Description string
 }
 
+type DuplicateRoleError struct{}
+
+func (e DuplicateRoleError) Error() string {
+	return "Duplicate role"
+}
+
 type RoleFilter struct {
 	BaseFilter
 }
@@ -30,6 +37,7 @@ type RoleFilter struct {
 type RolesRepository interface {
 	FindRoleById(ctx context.Context, id uuid.UUID) h.Opt[Role]
 	FindRoles(ctx context.Context, filter RoleFilter) FilterResult[Role]
+	CreateRole(ctx context.Context, role Role) h.Result[uuid.UUID]
 }
 
 func NewRolesRepository() RolesRepository {
@@ -93,4 +101,43 @@ func (r *RoleRepositoryImpl) FindRoles(ctx context.Context, filter RoleFilter) F
 	}
 
 	return NewPagedResult(result, totalCount)
+}
+
+func (r *RoleRepositoryImpl) CreateRole(ctx context.Context, role Role) h.Result[uuid.UUID] {
+	scope := middlewares.GetScope(ctx)
+	rcs := ioc.Get[requestContext.RequestContextService](scope)
+
+	var resultingId uuid.UUID
+
+	tx, err := rcs.GetTx()
+	if err != nil {
+		return h.Err[uuid.UUID](err)
+	}
+
+	sqlString := `insert into "roles"
+				("realm_id", "client_id", "display_name", "name", "description")
+				values ($1, $2, $3, $4, $5)
+				returning "id"`
+
+	logging.Logger.Debugf("executing sql: %s", sqlString)
+	err = tx.QueryRow(sqlString,
+		role.RealmId,
+		role.ClientId.ToNillablePtr(),
+		role.DisplayName,
+		role.Name,
+		role.Description).Scan(&resultingId)
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			switch pqErr.Code.Name() {
+			case "unique_violation":
+				if pqErr.Constraint == "idx_unique_role_per_realm" {
+					return h.Err[uuid.UUID](DuplicateRoleError{})
+				}
+			}
+		} else {
+			panic(err)
+		}
+	}
+
+	return h.Ok(resultingId)
 }

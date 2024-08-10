@@ -177,16 +177,18 @@ func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope Scope) h.Re
 		return h.Err[uuid.UUID](err)
 	}
 
-	err = tx.QueryRow(`insert into "scopes"
+	sqlString := `insert into "scopes"
     			("realm_id", "name", "display_name", "description", "sort_index")
     			values ($1, $2, $3, $4, $5)
-    			returning "id"`,
+    			returning "id"`
+
+	logging.Logger.Debugf("executing sql: %s", sqlString)
+	err = tx.QueryRow(sqlString,
 		scope.RealmId,
 		scope.Name,
 		scope.DisplayName,
 		scope.Description,
-		scope.SortIndex).
-		Scan(&resultingId)
+		scope.SortIndex).Scan(&resultingId)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code.Name() {

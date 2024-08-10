@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"holvit/config"
+	"holvit/h"
 	"holvit/routes"
 	"holvit/services/generated"
 	"net/http"
@@ -65,6 +66,11 @@ func makeAdminPage() Page {
 	return Page{
 		Scripts:     scripts,
 		Stylesheets: styles,
+		Title:       "Holvit Admin",
+		Base:        h.Some(routes.AdminFrontend.Url()),
+		JsonData: map[string]interface{}{
+			"apiBase": routes.AdminApiBase.Url(),
+		},
 	}
 }
 
@@ -91,12 +97,7 @@ func (f *frontendServiceImpl) WriteAuthFrontend(w http.ResponseWriter, realmName
 }
 
 func (f *frontendServiceImpl) WriteAdminFrontend(w http.ResponseWriter) {
-	page := f.adminPage
-	page.Title = "Holvit Admin"
-	page.JsonData = map[string]interface{}{
-		"apiBase": routes.AdminApiBase.Url(),
-	}
-	writePage(w, page)
+	writePage(w, f.adminPage)
 }
 
 type AuthFrontendUser struct {
@@ -141,6 +142,7 @@ type Script struct {
 
 type Page struct {
 	Title       string
+	Base        h.Opt[string]
 	Scripts     []Script
 	Stylesheets []string
 	JsonData    map[string]interface{}
@@ -172,6 +174,12 @@ func writePage(w http.ResponseWriter, page Page) {
 	_, err := w.Write([]byte(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"/>`))
 	if err != nil {
 		panic(err)
+	}
+	if base, ok := page.Base.Get(); ok {
+		err := writeMany(w, `<base href="`, base, `" />`)
+		if err != nil {
+			panic(err)
+		}
 	}
 	for name, data := range page.JsonData {
 		err = writeJson(w, name, data)

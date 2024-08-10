@@ -38,7 +38,7 @@ func main() {
 	ioc.RootScope = configureServices()
 
 	initialize(ioc.RootScope)
-	server.ServeApi(ioc.RootScope)
+	server.Serve(ioc.RootScope)
 
 	logging.Logger.Info("Application shutting down...")
 	os.Exit(0)

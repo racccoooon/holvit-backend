@@ -16,12 +16,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 )
 
-func ServeApi(dp *ioc.DependencyProvider) {
+func Serve(dp *ioc.DependencyProvider) {
 	address := fmt.Sprintf("%s:%d", config.C.Server.Host, config.C.Server.Port)
-	logging.Logger.Infof("Serving api on %s", address)
+	logging.Logger.Infof("Serving api and frontend on %s", address)
 
 	r := mux.NewRouter()
 
@@ -33,9 +34,15 @@ func ServeApi(dp *ioc.DependencyProvider) {
 
 	r.Use(services.CurrentSessionMiddleware)
 
-	r.HandleFunc(routes.ApiHealth.String(), handlers.Health).Methods("GET")
+	r.HandleFunc(routes.AdminFrontend.String(), func(writer http.ResponseWriter, request *http.Request) {
+		http.Redirect(writer, request, routes.AdminFrontend.String()+"/", http.StatusFound)
+	}).Methods("GET")
 
-	r.HandleFunc(routes.AdminFrontend.String(), handlers.AdminFrontend).Methods("GET")
+	r.MatcherFunc(func(request *http.Request, match *mux.RouteMatch) bool {
+		return strings.HasPrefix(request.URL.Path, routes.AdminFrontend.String()+"/")
+	}).HandlerFunc(handlers.AdminFrontend)
+
+	r.HandleFunc(routes.ApiHealth.String(), handlers.Health).Methods("GET")
 
 	r.HandleFunc(routes.OidcAuthorize.String(), oidc.Authorize).Methods("GET", "POST")
 	r.HandleFunc(routes.OidcToken.String(), oidc.Token).Methods("POST")

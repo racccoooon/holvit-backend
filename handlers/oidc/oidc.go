@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"holvit/config"
 	"holvit/constants"
 	"holvit/h"
 	"holvit/httpErrors"
@@ -212,6 +213,45 @@ func EndSession(w http.ResponseWriter, r *http.Request) {
 	// 		 instead of redirecting them immediately they should be prompted if they want to sign into that client with that account
 	//		 this choice should be remembered for the browser session (or longer) or until the user logs out of that client via the oidc logout
 
+}
+
+type WellKnownResponse struct {
+	Issuer                           string   `json:"issuer"`
+	AuthorizationEndpoint            string   `json:"authorization_endpoint"`
+	JwksUri                          string   `json:"jwks_uri"`
+	ResponseTypesSupported           []string `json:"response_types_supported"`
+	SubjectTypesSupported            []string `json:"subject_types_supported"`
+	IdTokenSigningAlgValuesSupported []string `json:"id_token_signing_alg_values_supported"`
+	TokenEndpoint                    string   `json:"token_endpoint"`
+	UserinfoEndpoint                 string   `json:"userinfo_endpoint"`
+	ScopesSupported                  []string `json:"scopes_supported"`
+	ClaimsSupported                  []string `json:"claims_supported"`
+}
+
+func WellKnown(w http.ResponseWriter, r *http.Request) {
+	routeParams := mux.Vars(r)
+	realmName := routeParams["realmName"]
+
+	response := WellKnownResponse{
+		Issuer:                           config.C.BaseUrl,
+		AuthorizationEndpoint:            routes.OidcAuthorize.Url(realmName),
+		JwksUri:                          routes.OidcJwks.Url(realmName),
+		ResponseTypesSupported:           []string{"code", "id_token"},
+		SubjectTypesSupported:            []string{"public"},
+		IdTokenSigningAlgValuesSupported: []string{"EdDSA"},
+		TokenEndpoint:                    routes.OidcToken.Url(realmName),
+		UserinfoEndpoint:                 routes.OidcUserInfo.Url(realmName),
+		ScopesSupported:                  []string{"oidc", "email", "profile"}, //TODO: get that from database
+		ClaimsSupported:                  []string{"sub", "name", "email"},     //TODO: get that from database
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	encoder := json.NewEncoder(w)
+	err := encoder.Encode(response)
+	if err != nil {
+		return
+	}
 }
 
 func Discovery(w http.ResponseWriter, r *http.Request) {

@@ -49,6 +49,7 @@ func Serve(dp *ioc.DependencyProvider) {
 	r.HandleFunc(routes.OidcUserInfo.String(), oidc.UserInfo).Methods("GET", "POST")
 	r.HandleFunc(routes.OidcJwks.String(), oidc.Jwks)
 	r.HandleFunc(routes.OidcLogout.String(), oidc.EndSession)
+	r.HandleFunc(routes.WellKnown.String(), oidc.WellKnown)
 
 	r.HandleFunc(routes.ApiVerifyPassword.String(), auth.VerifyPassword).Methods("POST")
 	r.HandleFunc(routes.ApiResetPassword.String(), auth.ResetPassword).Methods("POST")

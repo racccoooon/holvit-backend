@@ -1,4 +1,5 @@
 -- +migrate Up
+create extension if not exists "citext";
 
 create table "realms"
 (

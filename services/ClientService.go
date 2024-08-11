@@ -72,8 +72,12 @@ func (c *ClientServiceImpl) Authenticate(ctx context.Context, request Authentica
 			return h.Err[repos.Client](httpErrors.Unauthorized().WithMessage("wrong client secret"))
 		}
 		return h.Err[repos.Client](httpErrors.Unauthorized().WithMessage("client requires a secret"))
+	} else {
+		if request.ClientSecret.IsSome() {
+			return h.Err[repos.Client](httpErrors.Unauthorized().WithMessage("secret provided for secret-less client, secret missing"))
+		}
+		return h.Ok(client)
 	}
-	return h.Err[repos.Client](httpErrors.Unauthorized().WithMessage("secret provided for secret-less client"))
 }
 
 func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClientRequest) CreateClientResponse {

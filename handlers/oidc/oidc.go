@@ -236,7 +236,7 @@ func WellKnown(w http.ResponseWriter, r *http.Request) {
 		Issuer:                           config.C.BaseUrl,
 		AuthorizationEndpoint:            routes.OidcAuthorize.Url(realmName),
 		JwksUri:                          routes.OidcJwks.Url(realmName),
-		ResponseTypesSupported:           []string{"code", "id_token"},
+		ResponseTypesSupported:           []string{"code"},
 		SubjectTypesSupported:            []string{"public"},
 		IdTokenSigningAlgValuesSupported: []string{"EdDSA"},
 		TokenEndpoint:                    routes.OidcToken.Url(realmName),

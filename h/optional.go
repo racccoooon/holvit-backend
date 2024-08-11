@@ -29,9 +29,9 @@ func None[T any]() Opt[T] {
 
 func SomeIf[T any](cond bool, t T) Opt[T] {
 	if cond {
-		return None[T]()
+		return Some(t)
 	}
-	return Some(t)
+	return None[T]()
 }
 
 func FromPtr[T any](p *T) Opt[T] {

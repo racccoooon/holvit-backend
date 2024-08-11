@@ -193,11 +193,13 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	}
 
 	if client.ClientSecret.IsNone() {
-		codeChallenge := codeInfo.PKCEChallenge.UnwrapErr(httpErrors.Unauthorized().WithMessage("PKCE required"))
+		if codeInfo.PKCEChallenge == "" {
+			panic(httpErrors.Unauthorized().WithMessage("PKCE required"))
+		}
 		codeVerifier := request.PKCEVerifier.UnwrapErr(httpErrors.Unauthorized().WithMessage("PKCE required"))
 		hashedVerifier := base64.URLEncoding.EncodeToString(utils.Sha256(codeVerifier))
 
-		if codeChallenge != hashedVerifier { // don't need constant time compare because we're comparing hashes
+		if utils.Sha256Compare(codeVerifier, hashedVerifier) {
 			return nil, httpErrors.Unauthorized().WithMessage("wrong PKCE code verifier")
 		}
 	}
@@ -412,7 +414,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 		ClientId: h.Some(authorizationRequest.ClientId),
 	}).First()
 
-	pkceChallenge := h.None[string]()
+	pkceChallenge := ""
 	if client.ClientSecret.IsSome() && authorizationRequest.PKCEChallenge != "" {
 		return nil, httpErrors.BadRequest().WithMessage("clients with a secret cannot use PKCE")
 	} else if client.ClientSecret.IsNone() {
@@ -422,7 +424,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 		if authorizationRequest.PKCEChallengeMethod != constants.CodeChallengeMethodS256 {
 			return nil, httpErrors.BadRequest().WithMessage(fmt.Sprintf("Unsupported PKCE code challenge method '%v'", authorizationRequest.PKCEChallengeMethod))
 		}
-		pkceChallenge = h.Some(authorizationRequest.PKCEChallenge)
+		pkceChallenge = authorizationRequest.PKCEChallenge
 	}
 
 	currentUser := ioc.Get[CurrentSessionService](scope)

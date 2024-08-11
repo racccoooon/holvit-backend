@@ -8,6 +8,7 @@ import (
 	"github.com/gwenya/go-crypt/algorithm/argon2"
 	"github.com/gwenya/go-crypt/algorithm/bcrypt"
 	"github.com/gwenya/go-crypt/algorithm/scrypt"
+	"strings"
 )
 
 type Hasher interface {
@@ -220,4 +221,9 @@ func CheapHash(input string) string {
 func Sha256(input string) []byte {
 	hash := sha256.Sum256([]byte(input))
 	return hash[:]
+}
+
+func Sha256Compare(hash1, hash2 string) bool {
+	// don't need constant time compare because we're comparing hashes
+	return strings.TrimRight(hash1, "=") == strings.TrimRight(hash2, "=")
 }

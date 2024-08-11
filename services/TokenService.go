@@ -25,13 +25,13 @@ type GrantInfo struct {
 }
 
 type CodeInfo struct {
-	RealmId         uuid.UUID     `json:"realmId"`
-	ClientId        string        `json:"clientId"`
-	UserId          uuid.UUID     `json:"userId"`
-	RedirectUri     string        `json:"redirectUri"`
-	GrantedScopes   []string      `json:"grantedScopes"`
-	GrantedScopeIds []uuid.UUID   `json:"grantedScopeIds"`
-	PKCEChallenge   h.Opt[string] `json:"pkceChallenge"`
+	RealmId         uuid.UUID   `json:"realmId"`
+	ClientId        string      `json:"clientId"`
+	UserId          uuid.UUID   `json:"userId"`
+	RedirectUri     string      `json:"redirectUri"`
+	GrantedScopes   []string    `json:"grantedScopes"`
+	GrantedScopeIds []uuid.UUID `json:"grantedScopeIds"`
+	PKCEChallenge   string      `json:"pkceChallenge"`
 }
 
 type LoginInfo struct {

@@ -31,7 +31,7 @@ func VerifyTotp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tokenService := ioc.Get[services.TokenService](scope)
-	loginInfo := tokenService.PeekLoginCode(ctx, request.Token).UnwrapErr(httpErrors.Unauthorized().WithMessage("token not found"))
+	loginInfo := tokenService.PeekLoginCode(ctx, request.Token).UnwrapErr(httpErrors.BadRequest().WithMessage("token not found"))
 
 	currentUser := ioc.Get[services.CurrentSessionService](scope)
 	deviceIdString, err := currentUser.DeviceIdString()
@@ -67,7 +67,7 @@ func VerifyTotp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenService.OverwriteLoginCode(ctx, request.Token, loginInfo).SetErr(httpErrors.Unauthorized().WithMessage("token not found")).Unwrap()
+	tokenService.OverwriteLoginCode(ctx, request.Token, loginInfo).SetErr(httpErrors.BadRequest().WithMessage("token not found")).Unwrap()
 
 	w.Header().Set("Content-Type", "application/json")
 

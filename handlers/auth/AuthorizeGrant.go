@@ -32,7 +32,7 @@ func AuthorizeGrant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tokenService := ioc.Get[services.TokenService](scope)
-	info := tokenService.RetrieveGrantInfo(ctx, token).UnwrapErr(httpErrors.Unauthorized().WithMessage("token not found"))
+	info := tokenService.RetrieveGrantInfo(ctx, token).UnwrapErr(httpErrors.BadRequest().WithMessage("token not found"))
 
 	oidcService := ioc.Get[services.OidcService](scope)
 	response, err := oidcService.Grant(ctx, services.GrantRequest{

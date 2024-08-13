@@ -38,7 +38,7 @@ type UserFilter struct {
 
 type UserRepository interface {
 	FindUserById(ctx context.Context, id uuid.UUID) h.Opt[User]
-	FindUsers(ctx context.Context, filter UserFilter) h.Result[FilterResult[User]]
+	FindUsers(ctx context.Context, filter UserFilter) FilterResult[User]
 	CreateUser(ctx context.Context, user User) h.Result[uuid.UUID]
 }
 
@@ -53,16 +53,16 @@ func (u *UserRepositoryImpl) FindUserById(ctx context.Context, id uuid.UUID) h.O
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).Unwrap().FirstOrNone()
+	}).FirstOrNone()
 }
 
-func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h.Result[FilterResult[User]] {
+func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) FilterResult[User] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	tx, err := rcs.GetTx()
 	if err != nil {
-		return h.Err[FilterResult[User]](err)
+		panic(err)
 	}
 
 	sqlString := `select ` + filter.CountCol() + `, "id", "realm_id", "username", "email", "email_verified" from users where true`
@@ -90,7 +90,7 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {
-		return h.Err[FilterResult[User]](err)
+		panic(err)
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -105,13 +105,13 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) h
 			row.Email.AsMutPtr(),
 			&row.EmailVerified)
 		if err != nil {
-			return h.Err[FilterResult[User]](err)
+			panic(err)
 		}
 
 		result = append(result, row)
 	}
 
-	return h.Ok(NewPagedResult(result, totalCount))
+	return NewPagedResult(result, totalCount)
 }
 
 func (u *UserRepositoryImpl) CreateUser(ctx context.Context, user User) h.Result[uuid.UUID] {

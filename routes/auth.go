@@ -1,7 +1,5 @@
 package routes
 
-var ApiHealth = SimpleRoute("/api/health")
-
 const realmApiBase = "/api/realms/{realmName}"
 
 var RealmApiBase = RealmRoute(realmApiBase)

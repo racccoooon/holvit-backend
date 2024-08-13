@@ -6,6 +6,7 @@ import (
 	"github.com/gorilla/mux"
 	"holvit/config"
 	"holvit/handlers"
+	"holvit/handlers/api"
 	"holvit/handlers/auth"
 	"holvit/handlers/oidc"
 	"holvit/ioc"
@@ -62,6 +63,8 @@ func Serve(dp *ioc.DependencyProvider) {
 	r.HandleFunc(routes.AuthVerifyEmail.String(), auth.VerifyEmail).Methods("GET")
 	r.HandleFunc(routes.LoginComplete.String(), auth.CompleteAuthFlow).Methods("POST")
 	//TODO: r.HandleFunc(routes.ApiResendEmailVerification.String(), auth.ResendEmailVerification).Methods("POST")
+
+	r.HandleFunc(routes.FindUsers.String(), api.FindUsers).Methods("GET")
 
 	registerStatics(r)
 

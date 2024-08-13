@@ -10,6 +10,7 @@ require (
 	github.com/gwenya/go-crypt v0.999.0
 	github.com/huandu/go-sqlbuilder v1.28.0
 	github.com/jackc/pgtype v1.14.3
+	github.com/jaswdr/faker/v2 v2.3.0
 	github.com/lib/pq v1.10.9
 	github.com/mssola/user_agent v0.6.0
 	github.com/pquerna/otp v1.4.0

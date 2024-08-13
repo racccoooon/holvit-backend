@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/jaswdr/faker/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/robfig/cron/v3"
 	"holvit/cache"
@@ -58,6 +59,7 @@ func initialize(dp *ioc.DependencyProvider) {
 
 	if !realmsResult.Any() {
 		seedData(ctx)
+		seedDemoData(ctx)
 	}
 
 	initializeApplicationData(ctx)
@@ -105,6 +107,49 @@ func seedData(ctx context.Context) {
 		Password:  config.C.InitialAdminPassword,
 		Temporary: true,
 	}, services.DangerousNoAuthStrategy{})
+}
+
+func seedDemoData(ctx context.Context) {
+	if !config.C.IsDevelopment() {
+		return
+	}
+	fake := faker.New()
+
+	scope := middlewares.GetScope(ctx)
+
+	logging.Logger.Info("Seeding demo data...")
+
+	realmService := ioc.Get[services.RealmService](scope)
+	realm := realmService.CreateRealm(ctx, services.CreateRealmRequest{
+		Name:        "demo",
+		DisplayName: "Demo Realm",
+	})
+
+	for i := 0; i < 5; i++ {
+		clientService := ioc.Get[services.ClientService](scope)
+		_ = clientService.CreateClient(ctx, services.CreateClientRequest{
+			RealmId:      realm.Id,
+			ClientId:     h.Some(fake.Internet().Slug()),
+			DisplayName:  fake.App().Name(),
+			WithSecret:   false,
+			RedirectUrls: []string{fake.Internet().Domain()},
+		})
+	}
+
+	for i := 0; i < 10; i++ {
+		userService := ioc.Get[services.UserService](scope)
+		userId := userService.CreateUser(ctx, services.CreateUserRequest{
+			RealmId:  realm.Id,
+			Username: fake.Gamer().Tag(),
+			Email:    h.Some(fake.Internet().Email()),
+		}).Unwrap()
+
+		userService.SetPassword(ctx, services.SetPasswordRequest{
+			UserId:    userId,
+			Password:  config.C.InitialAdminPassword,
+			Temporary: false,
+		}, services.DangerousNoAuthStrategy{})
+	}
 }
 
 func configureServices() *ioc.DependencyProvider {

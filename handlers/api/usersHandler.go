@@ -9,6 +9,7 @@ import (
 	"holvit/ioc"
 	"holvit/middlewares"
 	"holvit/repos"
+	"holvit/services"
 	"net/http"
 	"strconv"
 )
@@ -59,8 +60,8 @@ func getRequestRealm(r *http.Request) repos.Realm {
 }
 
 type ApiFindResponse[T any] struct {
-	TotalCount int
-	Data       []T
+	TotalCount int `json:"totalCount"`
+	Rows       []T `json:"rows"`
 }
 
 type ApiUserReponse struct {
@@ -83,6 +84,9 @@ func FindUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	scope := middlewares.GetScope(ctx)
 
+	currentSessionService := ioc.Get[services.CurrentSessionService](scope)
+	currentSessionService.VerifyAuthorized()
+
 	realm := getRequestRealm(r)
 
 	filter := repos.UserFilter{
@@ -95,14 +99,14 @@ func FindUsers(w http.ResponseWriter, r *http.Request) {
 	userRepository := ioc.Get[repos.UserRepository](scope)
 	users := userRepository.FindUsers(ctx, filter)
 
-	data := make([]ApiUserReponse, 0)
+	rows := make([]ApiUserReponse, 0)
 	for _, user := range users.Values() {
-		data = append(data, MapUserResponse(user))
+		rows = append(rows, MapUserResponse(user))
 	}
 
 	response := ApiFindResponse[ApiUserReponse]{
 		TotalCount: users.Count(),
-		Data:       data,
+		Rows:       rows,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

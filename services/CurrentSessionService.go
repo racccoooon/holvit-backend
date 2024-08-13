@@ -18,17 +18,18 @@ import (
 )
 
 type CurrentSessionService interface {
-	VerifyAuthorized() error
+	IsAuthorized() bool
+	VerifyAuthorized()
 
-	DeviceIdString() (string, error)
-	DeviceId(ctx context.Context) (uuid.UUID, error)
-	Device(ctx context.Context) (*repos.UserDevice, error)
+	DeviceIdString() string
+	DeviceId(ctx context.Context) uuid.UUID
+	Device(ctx context.Context) repos.UserDevice
 
-	UserId() (uuid.UUID, error)
+	UserId() uuid.UUID
 	User(ctx context.Context) h.Result[*repos.User]
 
-	RealmId() (uuid.UUID, error)
-	Realm(ctx context.Context) (*repos.Realm, error)
+	RealmId() uuid.UUID
+	Realm(ctx context.Context) repos.Realm
 	SetSession(w http.ResponseWriter, userId uuid.UUID, rememberMe bool, realmName string, token string)
 	DeleteSession(w http.ResponseWriter, realmName string)
 }
@@ -63,33 +64,30 @@ func (s *CurrentSessionServiceImpl) SetSession(w http.ResponseWriter, userId uui
 	s.userId = &userId
 }
 
-func (s *CurrentSessionServiceImpl) VerifyAuthorized() error {
+func (s *CurrentSessionServiceImpl) IsAuthorized() bool {
+	return s.user != nil
+}
+
+func (s *CurrentSessionServiceImpl) VerifyAuthorized() {
 	if s.userId == nil {
-		return httpErrors.Unauthorized().WithMessage("not authorized")
+		panic(httpErrors.Unauthorized().WithMessage("not authorized"))
 	}
-
-	return nil
 }
 
-func (s *CurrentSessionServiceImpl) DeviceIdString() (string, error) {
+func (s *CurrentSessionServiceImpl) DeviceIdString() string {
 	if s.deviceIdString == nil {
-		return "", httpErrors.BadRequest().WithMessage("Missing device id cookie")
+		panic(httpErrors.BadRequest().WithMessage("Missing device id cookie"))
 	}
 
-	return *s.deviceIdString, nil
+	return *s.deviceIdString
 }
 
-func (s *CurrentSessionServiceImpl) DeviceId(ctx context.Context) (uuid.UUID, error) {
-	if err := s.VerifyAuthorized(); err != nil {
-		return uuid.UUID{}, err
-	}
+func (s *CurrentSessionServiceImpl) DeviceId(ctx context.Context) uuid.UUID {
+	s.VerifyAuthorized()
 
 	scope := middlewares.GetScope(ctx)
 
-	deviceIdString, err := s.DeviceIdString()
-	if err != nil {
-		return uuid.UUID{}, err
-	}
+	deviceIdString := s.DeviceIdString()
 
 	userDeviceRepository := ioc.Get[repos.UserDeviceRepository](scope)
 	devices := userDeviceRepository.FindUserDevices(ctx, repos.UserDeviceFilter{
@@ -98,36 +96,27 @@ func (s *CurrentSessionServiceImpl) DeviceId(ctx context.Context) (uuid.UUID, er
 	})
 
 	if devices.Count() == 0 {
-		return uuid.UUID{}, nil
+		panic(httpErrors.NotFound().WithMessage("Device not found")) //TODO: maybe different error
 	}
 
 	s.device = utils.Ptr(devices.First())
 	s.deviceId = &s.device.Id
 
-	return *s.deviceId, nil
+	return *s.deviceId
 }
 
-func (s *CurrentSessionServiceImpl) Device(ctx context.Context) (*repos.UserDevice, error) {
-	_, err := s.DeviceId(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.device, nil
+func (s *CurrentSessionServiceImpl) Device(ctx context.Context) repos.UserDevice {
+	_ = s.DeviceId(ctx)
+	return *s.device
 }
 
-func (s *CurrentSessionServiceImpl) UserId() (uuid.UUID, error) {
-	if err := s.VerifyAuthorized(); err != nil {
-		return uuid.UUID{}, err
-	}
-
-	return *s.userId, nil
+func (s *CurrentSessionServiceImpl) UserId() uuid.UUID {
+	s.VerifyAuthorized()
+	return *s.userId
 }
 
 func (s *CurrentSessionServiceImpl) User(ctx context.Context) h.Result[*repos.User] {
-	if err := s.VerifyAuthorized(); err != nil {
-		return h.Err[*repos.User](err)
-	}
+	s.VerifyAuthorized()
 
 	if s.user == nil {
 		scope := middlewares.GetScope(ctx)
@@ -138,18 +127,14 @@ func (s *CurrentSessionServiceImpl) User(ctx context.Context) h.Result[*repos.Us
 	return h.Ok(s.user)
 }
 
-func (s *CurrentSessionServiceImpl) RealmId() (uuid.UUID, error) {
-	if err := s.VerifyAuthorized(); err != nil {
-		return uuid.UUID{}, err
-	}
+func (s *CurrentSessionServiceImpl) RealmId() uuid.UUID {
+	s.VerifyAuthorized()
 
-	return *s.realmId, nil
+	return *s.realmId
 }
 
-func (s *CurrentSessionServiceImpl) Realm(ctx context.Context) (*repos.Realm, error) {
-	if err := s.VerifyAuthorized(); err != nil {
-		return nil, err
-	}
+func (s *CurrentSessionServiceImpl) Realm(ctx context.Context) repos.Realm {
+	s.VerifyAuthorized()
 
 	if s.realm == nil {
 		scope := middlewares.GetScope(ctx)
@@ -157,7 +142,8 @@ func (s *CurrentSessionServiceImpl) Realm(ctx context.Context) (*repos.Realm, er
 		realm := realmRepository.FindRealmById(ctx, *s.realmId).Unwrap()
 		s.realm = &realm
 	}
-	return s.realm, nil
+
+	return *s.realm
 }
 
 func setCookie(w http.ResponseWriter, name string, value string, maxAge int) {

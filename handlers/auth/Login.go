@@ -33,11 +33,7 @@ func CompleteAuthFlow(w http.ResponseWriter, r *http.Request) {
 	realm := realmRepository.FindRealmById(ctx, loginInfo.RealmId).Unwrap()
 
 	currentUser := ioc.Get[services.CurrentSessionService](scope)
-	deviceIdString, err := currentUser.DeviceIdString()
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
+	deviceIdString := currentUser.DeviceIdString()
 	if deviceIdString != loginInfo.DeviceId {
 		rcs.Error(httpErrors.Unauthorized().WithMessage("wrong device id"))
 	}

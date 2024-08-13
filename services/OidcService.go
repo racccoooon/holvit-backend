@@ -379,10 +379,7 @@ func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) 
 		scopeIds = append(scopeIds, scope.Id)
 	}
 
-	userId, err := currentUserService.UserId()
-	if err != nil {
-		return nil, err
-	}
+	userId := currentUserService.UserId()
 
 	scopeRepository.CreateGrants(ctx, userId, grantRequest.ClientId, scopeIds)
 
@@ -435,10 +432,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	currentUser := ioc.Get[CurrentSessionService](scope)
 
 	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
-	userid, err := currentUser.UserId()
-	if err != nil {
-		return nil, err
-	}
+	userid := currentUser.UserId()
 
 	scopes := scopeRepository.FindScopes(ctx, repos.ScopeFilter{
 		Names:         h.Some(authorizationRequest.Scopes),

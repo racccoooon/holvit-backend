@@ -27,14 +27,10 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
 	currentUserService := ioc.Get[services.CurrentSessionService](scope)
-	deviceIdString, err := currentUserService.DeviceIdString()
-	if err != nil {
-		rcs.Error(err)
-		return
-	}
+	deviceIdString := currentUserService.DeviceIdString()
 
 	var request VerifyPasswordRequest
-	err = json.NewDecoder(r.Body).Decode(&request)
+	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		rcs.Error(err)
 		return
@@ -62,7 +58,7 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 	user := userRepository.FindUsers(ctx, repos.UserFilter{
 		RealmId:  h.Some(realm.Id),
 		Username: h.Some(request.Username),
-	}).Unwrap().First()
+	}).First()
 
 	userService := ioc.Get[services.UserService](scope)
 	loginResponse := userService.VerifyLogin(ctx, services.VerifyLoginRequest{

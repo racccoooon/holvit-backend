@@ -18,6 +18,7 @@ import (
 	"holvit/utils"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 )
@@ -399,6 +400,10 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	err := validateResponseMode(authorizationRequest.ResponseMode)
 	if err != nil {
 		return nil, err
+	}
+
+	if !slices.Contains(authorizationRequest.Scopes, "openid") {
+		return nil, httpErrors.BadRequest().WithMessage("the openid scope is mandatory")
 	}
 
 	scope := middlewares.GetScope(ctx)

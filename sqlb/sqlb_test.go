@@ -6,16 +6,110 @@ import (
 )
 
 func Test_SelectConst(t *testing.T) {
-	query := Select("true").Build()
-	assert.Equal(t, query.Query, "SELECT true;")
-	assert.Nil(t, query.Parameters)
+	t.Run("true", func(t *testing.T) {
+		query := Select("true").Build()
+		assert.Equal(t, "SELECT true", query.Query)
+		assert.Len(t, query.Parameters, 0)
+	})
+	t.Run("false", func(t *testing.T) {
+		query := Select("false").Build()
+		assert.Equal(t, "SELECT false", query.Query)
+		assert.Len(t, query.Parameters, 0)
+	})
+	t.Run("quoted string", func(t *testing.T) {
+		query := Select(`"123"`).Build()
+		assert.Equal(t, `SELECT "123"`, query.Query)
+		assert.Len(t, query.Parameters, 0)
+	})
 }
 
-func Test_SelectConstParam(t *testing.T) {
-	query := Select("?, 1, 2, ?", true, false).Build()
+func Test_SelectConstMultiple(t *testing.T) {
+	t.Run("two", func(t *testing.T) {
+		query := Select("true", "false").Build()
+		assert.Equal(t, "SELECT true, false", query.Query)
+		assert.Len(t, query.Parameters, 0)
+	})
 }
 
-func Test_SqlBuilder(t *testing.T) {
+func Test_SelectTermParam(t *testing.T) {
+	query := Select(Term("?", true)).Build()
+	assert.Equal(t, "SELECT $1", query.Query)
+	assert.Equal(t, []any{true}, query.Parameters)
+}
+
+func Test_SelectTermMultipleParams(t *testing.T) {
+	query := Select(Term("? + ?", 1, 2)).Build()
+	assert.Equal(t, "SELECT $1 + $2", query.Query)
+	assert.Equal(t, []any{1, 2}, query.Parameters)
+}
+
+func Test_SelectTerm(t *testing.T) {
+	query := Select(Term("true")).Build()
+	assert.Equal(t, "SELECT true", query.Query)
+	assert.Len(t, query.Parameters, 0)
+}
+
+func Test_SelectMultipleTermsWithParams(t *testing.T) {
+	query := Select(Term("? + ?", 1, 2), Term("?", true)).Build()
+	assert.Equal(t, "SELECT $1 + $2, $3", query.Query)
+	assert.Equal(t, []any{1, 2, true}, query.Parameters)
+}
+
+func Test_SelectTermWithQuotedStringAndParam(t *testing.T) {
+	query := Select(Term(`"foo?" + ?`, "bar")).Build()
+	assert.Equal(t, `SELECT "foo?" + $1`, query.Query)
+	assert.Equal(t, []any{"bar"}, query.Parameters)
+}
+
+func Test_SelectAs(t *testing.T) {
+	query := Select(As(Term("? + ?", 1, 2), "bar"), As("foo", "foo2"), "a as b").Build()
+	assert.Equal(t, "SELECT $1 + $2 AS bar, foo AS foo2, a as b", query.Query)
+	assert.Equal(t, []any{1, 2}, query.Parameters)
+}
+
+func Test_Subselect(t *testing.T) {
+	query := Select(Term("?", 1), As(Select(Term("?", 2)), "b"), Term("?", 3)).Build()
+	assert.Equal(t, "SELECT $1, (SELECT $2) AS b, $3", query.Query)
+	assert.Equal(t, []any{1, 2, 3}, query.Parameters)
+}
+
+func Test_SelectFrom(t *testing.T) {
+	query := Select("foo", "bar").From("foobar").Build()
+	assert.Equal(t, "SELECT foo, bar FROM foobar", query.Query)
+	assert.Len(t, query.Parameters, 0)
+}
+
+func Test_SelectFromMultiple(t *testing.T) {
+	query := Select("foo", "bar").From("foobar").From("foobaz").Build()
+	assert.Equal(t, "SELECT foo, bar FROM foobar, foobaz", query.Query)
+	assert.Len(t, query.Parameters, 0)
+}
+
+func Test_SelectFromSubquery(t *testing.T) {
+	query := Select("foo", "bar").From(Select("a as foo", "b as bar").From("ab")).Build()
+	assert.Equal(t, "SELECT foo, bar FROM (SELECT a as foo, b as bar FROM ab)", query.Query)
+	assert.Len(t, query.Parameters, 0)
+}
+
+func Test_SelectFromSubqueryWithParams(t *testing.T) {
+	query := Select("foo", "bar", Term("?", 3)).From(Select("1 as foo", As(Term("?", 2), "bar"))).Build()
+	assert.Equal(t, "SELECT foo, bar, $1 FROM (SELECT 1 as foo, $2 AS bar)", query.Query)
+	assert.Equal(t, []any{3, 2}, query.Parameters)
+}
+
+func Test_SelectFromJoin(t *testing.T) {
+	query := Select("*").From("foo").Join("bar", "foo.id = bar.foo_id").Build()
+	assert.Equal(t, "SELECT * FROM foo JOIN bar ON foo.id = bar.foo_id", query.Query)
+	assert.Len(t, query.Parameters, 0)
+}
+
+func Test_SelectFromMultipleJoinsParams(t *testing.T) {
+	query := Select("*", Term("?", 2)).From("foo").Join("bar", "foo.id = bar.foo_id and foo.x = ?", 3).Join("baz", "bar.id = baz.bar_id").Build()
+	assert.Equal(t, "SELECT *, $1 FROM foo JOIN bar ON foo.id = bar.foo_id and foo.x = $2 JOIN baz ON bar.id = baz.bar_id", query.Query)
+	assert.Equal(t, []any{2, 3}, query.Parameters)
+}
+
+func asdf(t *testing.T) {
 	// select foo, bar from something where x > 1 and y < x limit 10 offset 3
 
 	Select("foo", "bar").
@@ -33,12 +127,12 @@ func Test_SqlBuilder(t *testing.T) {
 		As(Select("count(*)").From("bar").Where("foo.a == foo.b"), "x"), // as X how?
 	).From("foo").Where("asdf == ?", 0)
 
-	cond1 := Predicate("foo.x == ?", 7)
-	cond2 := Predicate("foo.y any ?", []int{1, 2, 3})
-	cond3 := Predicate("foo.z > foo.asdf")
+	cond1 := Term("foo.x == ?", 7)
+	cond2 := Term("foo.y any ?", []int{1, 2, 3})
+	cond3 := Term("foo.z > foo.asdf")
 
 	cond := And(cond1, cond2)
-	if someWhateverThing {
+	if true {
 		cond = Or(cond, cond3)
 	}
 

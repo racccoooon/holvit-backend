@@ -3,6 +3,7 @@ module holvit
 go 1.22
 
 require (
+	github.com/DataDog/go-sqllexer v0.0.13
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/brotli/go/cbrotli v0.0.0-20240715182736-39bcecf4559f
 	github.com/google/uuid v1.4.0

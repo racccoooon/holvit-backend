@@ -10,6 +10,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/sqlb"
 	"holvit/utils"
 	"time"
 )
@@ -67,33 +68,33 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 		panic(err)
 	}
 
-	sb := sqlbuilder.Select(filter.CountCol(),
+	q := sqlb.Select(filter.CountCol(),
 		"id", "user_id", "client_id", "realm_id", "hashed_token", "valid_until", "issuer", "subject", "audience", "scopes").
 		From("refresh_tokens")
 
 	filter.Id.IfSome(func(x uuid.UUID) {
-		sb.Where(sb.Equal("id", x))
+		q.Where("id = ?", x)
 	})
 
 	filter.HashedToken.IfSome(func(x string) {
-		sb.Where(sb.Equal("hashed_token", x))
+		q.Where("hashed_token = ?", x)
 	})
 
 	filter.ClientId.IfSome(func(x uuid.UUID) {
-		sb.Where(sb.Equal("client_id", x))
+		q.Where("client_id = ?", x)
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply(sb)
+		x.Apply2(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply(sb)
+		x.Apply2(q)
 	})
 
-	sqlString, args := sb.Build()
-	logging.Logger.Debugf("executing sql: %s", sqlString)
-	rows, err := tx.Query(sqlString, args...)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
 		panic(err)
 	}

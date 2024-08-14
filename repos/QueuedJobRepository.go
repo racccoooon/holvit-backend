@@ -13,6 +13,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/sqlb"
 	"holvit/utils"
 )
 
@@ -107,32 +108,32 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 		selectCount = "-1"
 	}
 
-	sb := sqlbuilder.Select(selectCount, "id", "status", "type", "details", "failure_count", "error").
+	q := sqlb.Select(selectCount, "id", "status", "type", "details", "failure_count", "error").
 		From("queued_jobs")
 
 	filter.Id.IfSome(func(x uuid.UUID) {
-		sb.Where(sb.Equal("id", x))
+		q.Where("id = ?", x)
 	})
 
 	filter.Status.IfSome(func(x string) {
-		sb.Where(sb.Equal("status", x))
+		q.Where("status = ?", x)
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply(sb)
+		x.Apply2(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply(sb)
+		x.Apply2(q)
 	})
 
 	if filter.IgnoreLocked {
-		sb.SQL("for update skip locked")
+		q.LockForUpdate(true)
 	}
 
-	sqlString, args := sb.Build()
-	logging.Logger.Debugf("executing sql: %s", sqlString)
-	rows, err := tx.Query(sqlString, args...)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
 		panic(err)
 	}

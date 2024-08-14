@@ -10,6 +10,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/sqlb"
 	"holvit/utils"
 )
 
@@ -77,29 +78,29 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 		panic(err)
 	}
 
-	sb := sqlbuilder.Select(filter.CountCol(),
+	q := sqlb.Select(filter.CountCol(),
 		"id", "name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_device_verification", "require_totp", "enable_remember_me").
 		From("realms")
 
 	filter.Id.IfSome(func(x uuid.UUID) {
-		sb.Where(sb.Equal("id", x))
+		q.Where("id = ?", x)
 	})
 
 	filter.Name.IfSome(func(x string) {
-		sb.Where(sb.Equal("name", x))
+		q.Where("name = ?", x)
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply(sb)
+		x.Apply2(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply(sb)
+		x.Apply2(q)
 	})
 
-	sqlString, args := sb.Build()
-	logging.Logger.Debugf("executing sql: %s", sqlString)
-	rows, err := tx.Query(sqlString, args...)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
 		panic(err)
 	}

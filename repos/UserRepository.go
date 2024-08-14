@@ -2,7 +2,6 @@ package repos
 
 import (
 	"context"
-	"fmt"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"holvit/h"
@@ -10,6 +9,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/sqlb"
 	"holvit/utils"
 )
 
@@ -65,34 +65,32 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) F
 		panic(err)
 	}
 
-	sqlString := `select ` + filter.CountCol() + `, "id", "realm_id", "username", "email", "email_verified" from users where true`
+	q := sqlb.Select(filter.CountCol(), "id", "realm_id", "username", "email", "email_verified").
+		From("users")
 
-	args := make([]interface{}, 0)
 	filter.Id.IfSome(func(x uuid.UUID) {
-		args = append(args, x)
-		sqlString += fmt.Sprintf(" and id = $%d", len(args))
+		q.Where("id = ?", x)
 	})
 
 	filter.RealmId.IfSome(func(x uuid.UUID) {
-		args = append(args, x)
-		sqlString += fmt.Sprintf(" and realm_id = $%d", len(args))
+		q.Where("realm_id = ?", x)
 	})
 
 	filter.Username.IfSome(func(x string) {
-		args = append(args, x)
-		sqlString += fmt.Sprintf(" and username = lower($%d)", len(args))
+		q.Where("username = lower($%d)", x)
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		sqlString += x.SqlString()
+		x.Apply2(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		sqlString += x.SqlString()
+		x.Apply2(q)
 	})
 
-	logging.Logger.Debugf("executing sql: %s", sqlString)
-	rows, err := tx.Query(sqlString, args...)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
 		panic(err)
 	}

@@ -3,13 +3,13 @@ package repos
 import (
 	"context"
 	"github.com/google/uuid"
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgtype"
 	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/sqlb"
 	"holvit/utils"
 	"time"
 )
@@ -62,33 +62,33 @@ func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter U
 		panic(err)
 	}
 
-	sb := sqlbuilder.Select(filter.CountCol(),
+	q := sqlb.Select(filter.CountCol(),
 		"id", "user_id", "device_id", "display_name", "user_agent", "last_ip", "last_login_at").
 		From("user_devices")
 
 	filter.Id.IfSome(func(x uuid.UUID) {
-		sb.Where(sb.Equal("id", x))
+		q.Where("id = ?", x)
 	})
 
 	filter.DeviceId.IfSome(func(x string) {
-		sb.Where(sb.Equal("device_id", x))
+		q.Where("device_id = ?", x)
 	})
 
 	filter.UserId.IfSome(func(x uuid.UUID) {
-		sb.Where(sb.Equal("user_id", x))
+		q.Where("user_id = ?", x)
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply(sb)
+		x.Apply2(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply(sb)
+		x.Apply2(q)
 	})
 
-	sqlString, args := sb.Build()
-	logging.Logger.Debugf("executing sql: %s", sqlString)
-	rows, err := tx.Query(sqlString, args...)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
 		panic(err)
 	}

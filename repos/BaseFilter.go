@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
 	"holvit/h"
+	"holvit/sqlb"
 )
 
 type BaseFilter struct {
@@ -36,6 +37,16 @@ func (i SortInfo) Apply(sb *sqlbuilder.SelectBuilder) {
 	}
 }
 
+func (i SortInfo) Apply2(q sqlb.SelectQuery) {
+	field := i.Field
+	if i.Ascending {
+		field += " asc"
+	} else {
+		field += " desc"
+	}
+	q.OrderBy(field)
+}
+
 func (i SortInfo) SqlString() string {
 	direction := " asc"
 	if !i.Ascending {
@@ -50,6 +61,10 @@ type PagingInfo struct {
 }
 
 func (i PagingInfo) Apply(sb *sqlbuilder.SelectBuilder) {
+	sb.Limit(i.PageSize).Offset(i.PageSize * (i.PageNumber - 1))
+}
+
+func (i PagingInfo) Apply2(sb sqlb.SelectQuery) {
 	sb.Limit(i.PageSize).Offset(i.PageSize * (i.PageNumber - 1))
 }
 

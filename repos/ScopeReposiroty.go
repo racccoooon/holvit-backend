@@ -2,7 +2,6 @@ package repos
 
 import (
 	"context"
-	"fmt"
 	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/lib/pq"
@@ -11,6 +10,7 @@ import (
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
+	"holvit/sqlb"
 	"holvit/utils"
 )
 
@@ -84,56 +84,47 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 		panic(err)
 	}
 
-	sql := "select " + filter.CountCol() + ", s.id, s.realm_id, s.name, s.display_name, s.description"
+	q := sqlb.Select(filter.CountCol(), "s.id", "s.realm_id", "s.name", "s.display_name", "s.description").
+		From("scopes s")
 
 	if filter.IncludeGrants {
-		sql += ", g.id, g.scope_id, g.user_id, g.client_id"
-	} else {
-		sql += ", null, null, null, null"
+		q.Select("g.id", "g.scope_id", "g.user_id", "g.client_id")
 	}
-
-	sql += " from scopes s"
 
 	if filter.IncludeGrants {
 		if filter.OnlyGranted {
-			sql += " inner join"
+			q.InnerJoin("grants g", "g.scope_id = s.id")
 		} else {
-			sql += " left outer join"
+			q.LeftJoin("grants g", "g.scope_id = s.id")
 		}
-		sql += " grants g on g.scope_id = s.id"
 	}
 
-	parameters := make([]interface{}, 0)
-	parameters = append(parameters, filter.RealmId)
-	sql += fmt.Sprintf(" where s.realm_id = $%d", len(parameters))
+	q.Where("s.realm_id = ?", filter.RealmId)
 
 	filter.Id.IfSome(func(x uuid.UUID) {
-		parameters = append(parameters, x)
-		sql += fmt.Sprintf(" and s.id = $%d", len(parameters))
+		q.Where("s.id = ?", x)
 	})
 
 	filter.Names.IfSome(func(x []string) {
-		parameters = append(parameters, pq.Array(x))
-		sql += fmt.Sprintf(" and s.name = any($%d::text[])", len(parameters))
+		q.Where("s.name = any(?::text[])", pq.Array(x))
 	})
 
 	filter.ClientId.IfSome(func(x uuid.UUID) {
-		parameters = append(parameters, x)
-		sql += fmt.Sprintf(" and (g.client_id = $%d or g.client_id is null)", len(parameters))
+		q.Where("(g.client_id = ? or g.client_id is null)", x)
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		sql += x.SqlString()
+		x.Apply2(q)
 	})
 
-	if sortInfo, ok := filter.SortInfo.Get(); ok {
-		sql += sortInfo.SqlString() + `, "sort_index" asc`
-	} else {
-		sql += ` order by "sort_index" asc`
+	if x, ok := filter.SortInfo.Get(); ok {
+		x.Apply2(q)
 	}
+	q.OrderBy("sort_index asc")
 
-	logging.Logger.Debugf("executing sql: %s", sql)
-	rows, err := tx.Query(sql, parameters...)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
 		panic(err)
 	}

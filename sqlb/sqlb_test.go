@@ -61,6 +61,12 @@ func Test_SelectTermWithQuotedStringAndParam(t *testing.T) {
 	assert.Equal(t, []any{"bar"}, query.Parameters)
 }
 
+func Test_SelectMultiple(t *testing.T) {
+	query := Select("foo").Select("bar").Build()
+	assert.Equal(t, "SELECT foo, bar", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
 func Test_SelectAs(t *testing.T) {
 	query := Select(As(Term("? + ?", 1, 2), "bar"), As("foo", "foo2"), "a as b").Build()
 	assert.Equal(t, "SELECT $1 + $2 AS bar, foo AS foo2, a as b", query.Query)
@@ -141,7 +147,7 @@ func Test_SelectCrossJoin(t *testing.T) {
 
 func Test_SelectExists(t *testing.T) {
 	query := Select(Exists(Select("1").From("foo"))).Build()
-	assert.Equal(t, "SELECT EXISTS(SELECT 1 FROM foo)", query.Query)
+	assert.Equal(t, "SELECT EXISTS (SELECT 1 FROM foo)", query.Query)
 	assert.Empty(t, query.Parameters)
 }
 
@@ -155,6 +161,135 @@ func Test_SelectWhereParams(t *testing.T) {
 	query := Select("foo", Term("?", 1)).From("bar").Where("x > ?", 2).Build()
 	assert.Equal(t, "SELECT foo, $1 FROM bar WHERE x > $2", query.Query)
 	assert.Equal(t, []any{1, 2}, query.Parameters)
+}
+
+func Test_SelectWhereTerm(t *testing.T) {
+	query := Select("*").From("foo").Where(And("true and false", "true")).Build()
+	assert.Equal(t, "SELECT * FROM foo WHERE (true and false) AND (true)", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_SelectWhereTermComplex(t *testing.T) {
+	query := Select("*").From("foo").Where(Or(
+		And(
+			Term("x = ?", 1),
+			"asdf < 10",
+		),
+		And(
+			Term("bar any ?", []int{2, 3, 4}),
+			Not("z IS NULL"),
+		),
+	)).Build()
+	assert.Equal(t, "SELECT * FROM foo WHERE ((x = $1) AND (asdf < 10)) OR ((bar any $2) AND (NOT(z IS NULL)))", query.Query)
+	assert.Equal(t, []any{1, []int{2, 3, 4}}, query.Parameters)
+}
+
+func Test_SelectWhereMultiple(t *testing.T) {
+	query := Select("*").From("foo").Where("a > 1").Where("b < 1").Build()
+	assert.Equal(t, "SELECT * FROM foo WHERE (a > 1) AND (b < 1)", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_SelectDistinct(t *testing.T) {
+	query := Select("*").From("foo").Distinct().Build()
+	assert.Equal(t, "SELECT DISTINCT * FROM foo", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_SelectDistinctOn(t *testing.T) {
+	query := Select("*").From("foo").Distinct("a", "b").Build()
+	assert.Equal(t, "SELECT DISTINCT ON (a, b) * FROM foo", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_SelectDistinctOnMultiple(t *testing.T) {
+	query := Select("*").From("foo").Distinct("a", "b").Distinct("c").Build()
+	assert.Equal(t, "SELECT DISTINCT ON (a, b, c) * FROM foo", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_SelectDistinctOnComplex(t *testing.T) {
+	query := Select("*").From("foo").Distinct(Term("(a / ?)::int", 37)).Build()
+	assert.Equal(t, "SELECT DISTINCT ON ((a / $1)::int) * FROM foo", query.Query)
+	assert.Equal(t, []any{37}, query.Parameters)
+}
+
+func Test_SelectOrderBy(t *testing.T) {
+	query := Select("*").From("foo").OrderBy("name desc", "id asc").Build()
+	assert.Equal(t, "SELECT * FROM foo ORDER BY name desc, id asc", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_SelectOrderByMultiple(t *testing.T) {
+	query := Select("*").From("foo").OrderBy("name desc", "foo").OrderBy("id asc").Build()
+	assert.Equal(t, "SELECT * FROM foo ORDER BY name desc, foo, id asc", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_SelectOrderByComplex(t *testing.T) {
+	query := Select("*").From("foobar").OrderBy(Term("CASE WHEN name = ? THEN foo ELSE ? END", "foobar", 7)).Build()
+	assert.Equal(t, "SELECT * FROM foobar ORDER BY CASE WHEN name = $1 THEN foo ELSE $2 END", query.Query)
+	assert.Equal(t, []any{"foobar", 7}, query.Parameters)
+}
+
+func Test_SelectLimit(t *testing.T) {
+	query := Select("*").From("foobar").Limit(20).Build()
+	assert.Equal(t, "SELECT * FROM foobar LIMIT $1", query.Query)
+	assert.Equal(t, []any{20}, query.Parameters)
+}
+
+func Test_SelectLimitImplicitTerm(t *testing.T) {
+	query := Select("*").From("foobar").Limit("foo").Build()
+	assert.Equal(t, "SELECT * FROM foobar LIMIT foo", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_SelectLimitExplicitTerm(t *testing.T) {
+	query := Select("*").From("foobar").Limit(Term("? + 2", 10)).Build()
+	assert.Equal(t, "SELECT * FROM foobar LIMIT $1 + 2", query.Query)
+	assert.Equal(t, []any{10}, query.Parameters)
+}
+
+func Test_SelectLimitSubquery(t *testing.T) {
+	query := Select("*").From("foo").Limit(Select("count(*)").From("bar")).Build()
+	assert.Equal(t, "SELECT * FROM foo LIMIT (SELECT count(*) FROM bar)", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_SelectForUpdate(t *testing.T) {
+	query := Select("*").From("foo").LockForUpdate(false).Build()
+	assert.Equal(t, "SELECT * FROM foo FOR UPDATE", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_SelectForUpdateSkipLocked(t *testing.T) {
+	query := Select("*").From("foo").LockForUpdate(true).Build()
+	assert.Equal(t, "SELECT * FROM foo FOR UPDATE SKIP LOCKED", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_WithSelectString(t *testing.T) {
+	query := With("foo", "SELECT id, name FROM bar").Select("name").From("foo").Build()
+	assert.Equal(t, "WITH foo AS (SELECT id, name FROM bar) SELECT name FROM foo", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_WithSelectStringParams(t *testing.T) {
+	query := With("foo", "SELECT id, name FROM bar WHERE x > ?", 21).Select("name").From("foo").Build()
+	assert.Equal(t, "WITH foo AS (SELECT id, name FROM bar WHERE x > $1) SELECT name FROM foo", query.Query)
+	assert.Equal(t, []any{21}, query.Parameters)
+}
+
+func Test_WithSelectSubquery(t *testing.T) {
+	query := With("foo", Select("id", "name").From("bar")).Select("name").From("foo").Build()
+	assert.Equal(t, "WITH foo AS (SELECT id, name FROM bar) SELECT name FROM foo", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_WithSelectMultiple(t *testing.T) {
+	query := With("foo", Select("id", "name").From("bar")).With("xyz", "SELECT id, name FROM asdf").Select("name").From("foo").Build()
+	assert.Equal(t, "WITH foo AS (SELECT id, name FROM bar), xyz AS (SELECT id, name FROM asdf) SELECT name FROM foo", query.Query)
+	assert.Empty(t, query.Parameters)
 }
 
 func asdf(t *testing.T) {

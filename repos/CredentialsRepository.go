@@ -160,6 +160,10 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 		x.Apply(sb)
 	})
 
+	filter.SortInfo.IfSome(func(x SortInfo) {
+		x.Apply(sb)
+	})
+
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)

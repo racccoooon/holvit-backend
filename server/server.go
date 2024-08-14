@@ -64,7 +64,9 @@ func Serve(dp *ioc.DependencyProvider) {
 	r.HandleFunc(routes.LoginComplete.String(), auth.CompleteAuthFlow).Methods("POST")
 	//TODO: r.HandleFunc(routes.ApiResendEmailVerification.String(), auth.ResendEmailVerification).Methods("POST")
 
+	r.HandleFunc(routes.FindRealms.String(), api.FindRealms).Methods("GET")
 	r.HandleFunc(routes.FindUsers.String(), api.FindUsers).Methods("GET")
+	r.HandleFunc(routes.FindScopes.String(), api.FindScopes).Methods("GET")
 
 	registerStatics(r)
 

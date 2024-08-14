@@ -11,6 +11,7 @@ import (
 type BaseFilter struct {
 	Id         h.Opt[uuid.UUID]
 	PagingInfo h.Opt[PagingInfo]
+	SortInfo   h.Opt[SortInfo]
 }
 
 func (f *BaseFilter) CountCol() string {
@@ -18,6 +19,28 @@ func (f *BaseFilter) CountCol() string {
 		return "count(*) over()"
 	}
 	return "-1"
+}
+
+type SortInfo struct {
+	Field     string
+	Ascending bool
+}
+
+func (i SortInfo) Apply(sb *sqlbuilder.SelectBuilder) {
+	sb.OrderBy(i.Field)
+	if i.Ascending {
+		sb.Asc()
+	} else {
+		sb.Desc()
+	}
+}
+
+func (i SortInfo) SqlString() string {
+	direction := " asc"
+	if !i.Ascending {
+		direction = " desc"
+	}
+	return fmt.Sprintf(" order by %s%s", i.Field, direction)
 }
 
 type PagingInfo struct {

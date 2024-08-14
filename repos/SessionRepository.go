@@ -102,6 +102,10 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 		x.Apply(sb)
 	})
 
+	filter.SortInfo.IfSome(func(x SortInfo) {
+		x.Apply(sb)
+	})
+
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)

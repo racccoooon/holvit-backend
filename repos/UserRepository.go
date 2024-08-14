@@ -67,7 +67,7 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) F
 
 	sqlString := `select ` + filter.CountCol() + `, "id", "realm_id", "username", "email", "email_verified" from users where true`
 
-	args := []interface{}{}
+	args := make([]interface{}, 0)
 	filter.Id.IfSome(func(x uuid.UUID) {
 		args = append(args, x)
 		sqlString += fmt.Sprintf(" and id = $%d", len(args))
@@ -84,6 +84,10 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) F
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
+		sqlString += x.SqlString()
+	})
+
+	filter.SortInfo.IfSome(func(x SortInfo) {
 		sqlString += x.SqlString()
 	})
 

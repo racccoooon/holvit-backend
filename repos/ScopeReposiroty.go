@@ -126,7 +126,11 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 		sql += x.SqlString()
 	})
 
-	sql += ` order by "sort_index" asc`
+	if sortInfo, ok := filter.SortInfo.Get(); ok {
+		sql += sortInfo.SqlString() + `, "sort_index" asc`
+	} else {
+		sql += ` order by "sort_index" asc`
+	}
 
 	logging.Logger.Debugf("executing sql: %s", sql)
 	rows, err := tx.Query(sql, parameters...)

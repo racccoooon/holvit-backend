@@ -122,6 +122,10 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 		x.Apply(sb)
 	})
 
+	filter.SortInfo.IfSome(func(x SortInfo) {
+		x.Apply(sb)
+	})
+
 	if filter.IgnoreLocked {
 		sb.SQL("for update skip locked")
 	}

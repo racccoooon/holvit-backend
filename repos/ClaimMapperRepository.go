@@ -111,6 +111,10 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 		sqlString += x.SqlString()
 	})
 
+	filter.SortInfo.IfSome(func(x SortInfo) {
+		sqlString += x.SqlString()
+	})
+
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)
 	if err != nil {

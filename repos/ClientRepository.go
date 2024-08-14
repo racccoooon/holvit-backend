@@ -95,6 +95,10 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 		x.Apply(sb)
 	})
 
+	filter.SortInfo.IfSome(func(x SortInfo) {
+		x.Apply(sb)
+	})
+
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	rows, err := tx.Query(sqlString, args...)

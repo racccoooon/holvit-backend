@@ -15,6 +15,7 @@ type SqlQuery struct {
 type Query interface{}
 
 type SelectQuery interface {
+	Select(cols ...any) SelectQuery
 	From(table any) SelectQuery
 	Where(condition any, params ...any) SelectQuery
 	Limit(limit int) SelectQuery
@@ -34,6 +35,7 @@ type selectQuery struct {
 	columns []any
 	from    []any
 	joins   []selectJoin
+	where   []TermQueryFragment
 }
 
 type joinType int
@@ -53,14 +55,19 @@ type selectJoin struct {
 	condition TermQueryFragment
 }
 
+func (s *selectQuery) Select(cols ...any) SelectQuery {
+	s.columns = append(s.columns, cols...)
+	return s
+}
+
 func (s *selectQuery) From(table any) SelectQuery {
 	s.from = append(s.from, table)
 	return s
 }
 
 func (s *selectQuery) Where(condition any, params ...any) SelectQuery {
-	//TODO implement me
-	panic("implement me")
+	s.where = append(s.where, Term(condition, params...))
+	return s
 }
 
 func (s *selectQuery) Limit(limit int) SelectQuery {
@@ -192,6 +199,17 @@ func (s *selectQuery) buildJoin(sql *strings.Builder, p *params) {
 	}
 }
 
+func (s *selectQuery) buildWhere(sql *strings.Builder, p *params) {
+	for idx, where := range s.where {
+		if idx == 0 {
+			sql.WriteString(" WHERE ")
+		} else {
+			sql.WriteString(" AND ")
+		}
+		sql.WriteString(where.build(p))
+	}
+}
+
 type params []any
 
 func (p *params) append(param any) string {
@@ -204,6 +222,7 @@ func (s *selectQuery) build(p *params) string {
 	s.buildSelect(&sql, p)
 	s.buildFrom(&sql, p)
 	s.buildJoin(&sql, p)
+	s.buildWhere(&sql, p)
 	return sql.String()
 }
 

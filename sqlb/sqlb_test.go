@@ -145,6 +145,18 @@ func Test_SelectExists(t *testing.T) {
 	assert.Empty(t, query.Parameters)
 }
 
+func Test_SelectWhere(t *testing.T) {
+	query := Select("*").From("foo").Where("true").Build()
+	assert.Equal(t, "SELECT * FROM foo WHERE true", query.Query)
+	assert.Empty(t, query.Parameters)
+}
+
+func Test_SelectWhereParams(t *testing.T) {
+	query := Select("foo", Term("?", 1)).From("bar").Where("x > ?", 2).Build()
+	assert.Equal(t, "SELECT foo, $1 FROM bar WHERE x > $2", query.Query)
+	assert.Equal(t, []any{1, 2}, query.Parameters)
+}
+
 func asdf(t *testing.T) {
 	// select foo, bar from something where x > 1 and y < x limit 10 offset 3
 

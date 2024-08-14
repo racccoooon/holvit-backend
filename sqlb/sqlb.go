@@ -88,28 +88,47 @@ func (s *selectQuery) Join(table any, on any, params ...any) SelectQuery {
 }
 
 func (s *selectQuery) InnerJoin(table any, on any, params ...any) SelectQuery {
-	//TODO implement me
-	panic("implement me")
+	s.joins = append(s.joins, selectJoin{
+		type_:     joinInner,
+		table:     table,
+		condition: Term(on, params...),
+	})
+	return s
 }
 
 func (s *selectQuery) LeftJoin(table any, on any, params ...any) SelectQuery {
-	//TODO implement me
-	panic("implement me")
+	s.joins = append(s.joins, selectJoin{
+		type_:     joinLeftOuter,
+		table:     table,
+		condition: Term(on, params...),
+	})
+	return s
 }
 
 func (s *selectQuery) RightJoin(table any, on any, params ...any) SelectQuery {
-	//TODO implement me
-	panic("implement me")
+	s.joins = append(s.joins, selectJoin{
+		type_:     joinRightOuter,
+		table:     table,
+		condition: Term(on, params...),
+	})
+	return s
 }
 
 func (s *selectQuery) FullJoin(table any, on any, params ...any) SelectQuery {
-	//TODO implement me
-	panic("implement me")
+	s.joins = append(s.joins, selectJoin{
+		type_:     joinFullOuter,
+		table:     table,
+		condition: Term(on, params...),
+	})
+	return s
 }
 
 func (s *selectQuery) CrossJoin(table any) SelectQuery {
-	//TODO implement me
-	panic("implement me")
+	s.joins = append(s.joins, selectJoin{
+		type_: joinCross,
+		table: table,
+	})
+	return s
 }
 
 func (s *selectQuery) buildSelect(sql *strings.Builder, p *params) {
@@ -222,8 +241,11 @@ func With(name string, query Query) WithQuery {
 
 }
 
-func Select(args ...any) SelectQuery {
-	return &selectQuery{columns: args}
+func Select(col any, cols ...any) SelectQuery {
+	c := make([]any, 0, len(cols)+1)
+	c = append(c, col)
+	c = append(c, cols...)
+	return &selectQuery{columns: c}
 
 }
 
@@ -240,7 +262,14 @@ func (t *TermQueryFragment) build(p *params) string {
 		paramIdx := 0
 		for _, token := range tokens {
 			if token.Type == sqllexer.OPERATOR && token.Value == "?" {
-				parts = append(parts, p.append(t.params[paramIdx]))
+				param := t.params[paramIdx]
+				if q, ok := param.(*selectQuery); ok {
+					parts = append(parts, q.build(p))
+				} else if q, ok := param.(*TermQueryFragment); ok {
+					parts = append(parts, q.build(p))
+				} else {
+					parts = append(parts, p.append(param))
+				}
 				paramIdx++
 			} else {
 				parts = append(parts, token.Value)
@@ -264,6 +293,13 @@ func Or(terms ...TermQueryFragment) TermQueryFragment {
 }
 func Not(term TermQueryFragment) TermQueryFragment {
 	panic("not implemented")
+}
+
+func Exists(subquery SelectQuery) TermQueryFragment {
+	return TermQueryFragment{
+		term:   "EXISTS(?)",
+		params: []any{subquery},
+	}
 }
 
 func (s *SqlQuery) concat(other *SqlQuery) SqlQuery {

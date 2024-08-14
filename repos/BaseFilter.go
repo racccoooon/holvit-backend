@@ -12,6 +12,7 @@ type BaseFilter struct {
 	Id         h.Opt[uuid.UUID]
 	PagingInfo h.Opt[PagingInfo]
 	SortInfo   h.Opt[SortInfo]
+	SearchText h.Opt[string]
 }
 
 func (f *BaseFilter) CountCol() string {

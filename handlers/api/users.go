@@ -34,6 +34,13 @@ func FindUsers(w http.ResponseWriter, r *http.Request) {
 	filter := repos.UserFilter{
 		BaseFilter: repos.BaseFilter{
 			PagingInfo: pagingFromQuery(r),
+			SortInfo: h.MapOpt(sortFromQuery(r), func(order QuerySortOrder) repos.SortInfo {
+				return order.MapAllowed(map[string]string{
+					"username": "username",
+					"email":    "email",
+				})
+			}),
+			SearchText: searchTextFromQuery(r),
 		},
 		RealmId: h.Some(realm.Id),
 	}

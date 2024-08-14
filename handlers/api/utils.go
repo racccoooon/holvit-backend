@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"holvit/h"
 	"holvit/httpErrors"
@@ -22,7 +23,30 @@ type QuerySortOrder struct {
 	Ascending bool
 }
 
-func orderFromQuery(r *http.Request) h.Opt[QuerySortOrder] {
+func (q QuerySortOrder) MapAllowed(allowed map[string]string) repos.SortInfo {
+	if mapped, ok := allowed[q.SortField]; ok {
+		return repos.SortInfo{
+			Field:     mapped,
+			Ascending: false,
+		}
+	}
+	panic(httpErrors.BadRequest().WithMessage(fmt.Sprintf("unsupported sort field '%s'", q.SortField)))
+}
+
+func searchTextFromQuery(r *http.Request) h.Opt[string] {
+	err := r.ParseForm()
+	if err != nil {
+		panic(err)
+	}
+
+	searchText := r.Form.Get("q")
+	if searchText == "" {
+		return h.None[string]()
+	}
+	return h.Some(searchText)
+}
+
+func sortFromQuery(r *http.Request) h.Opt[QuerySortOrder] {
 	err := r.ParseForm()
 	if err != nil {
 		panic(err)

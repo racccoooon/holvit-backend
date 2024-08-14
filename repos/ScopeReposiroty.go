@@ -24,7 +24,7 @@ type Scope struct {
 
 	SortIndex int
 
-	Grant *Grant
+	Grant h.Opt[Grant]
 }
 
 type DuplicateScopeError struct{}
@@ -134,25 +134,37 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 	var result []Scope
 	for rows.Next() {
 		var row Scope
-		var grant Grant
-		var grantId *uuid.UUID
-		err := rows.Scan(&totalCount,
+		var grantId h.Opt[uuid.UUID]
+		var grantScopeId h.Opt[uuid.UUID]
+		var grantUserId h.Opt[uuid.UUID]
+		var grantClientId h.Opt[uuid.UUID]
+		scan := []any{&totalCount,
 			&row.Id,
 			&row.RealmId,
 			&row.Name,
 			&row.DisplayName,
-			&row.Description,
-			&grantId,
-			&grant.ScopeId,
-			&grant.UserId,
-			&grant.ClientId)
+			&row.Description}
+		if filter.IncludeGrants {
+			scan = append(scan,
+				grantId.AsMutPtr(),
+				grantScopeId.AsMutPtr(),
+				grantUserId.AsMutPtr(),
+				grantClientId.AsMutPtr())
+		}
+		err := rows.Scan(scan)
 		if err != nil {
 			panic(err)
 		}
 
-		if filter.IncludeGrants && grantId != nil {
-			grant.Id = *grantId
-			row.Grant = &grant
+		if filter.IncludeGrants && grantId.IsSome() {
+			row.Grant = h.Some(Grant{
+				BaseModel: BaseModel{
+					Id: grantId.Unwrap(),
+				},
+				ScopeId:  grantScopeId.Unwrap(),
+				UserId:   grantUserId.Unwrap(),
+				ClientId: grantClientId.Unwrap(),
+			})
 		}
 
 		result = append(result, row)

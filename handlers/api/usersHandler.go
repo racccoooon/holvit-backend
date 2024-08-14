@@ -9,7 +9,6 @@ import (
 	"holvit/ioc"
 	"holvit/middlewares"
 	"holvit/repos"
-	"holvit/services"
 	"net/http"
 	"strconv"
 )
@@ -20,7 +19,7 @@ func pagingFromQuery(r *http.Request) h.Opt[repos.PagingInfo] {
 		panic(err)
 	}
 
-	pageSizeString := r.Form.Get("page")
+	pageSizeString := r.Form.Get("pageSize")
 	if pageSizeString == "" {
 		panic(httpErrors.BadRequest().WithMessage("page size parameter is required"))
 	}
@@ -84,8 +83,8 @@ func FindUsers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	scope := middlewares.GetScope(ctx)
 
-	currentSessionService := ioc.Get[services.CurrentSessionService](scope)
-	currentSessionService.VerifyAuthorized()
+	//currentSessionService := ioc.Get[services.CurrentSessionService](scope)
+	//currentSessionService.VerifyAuthorized()
 
 	realm := getRequestRealm(r)
 

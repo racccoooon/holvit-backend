@@ -65,7 +65,7 @@ func (s *CurrentSessionServiceImpl) SetSession(w http.ResponseWriter, userId uui
 }
 
 func (s *CurrentSessionServiceImpl) IsAuthorized() bool {
-	return s.user != nil
+	return s.userId != nil
 }
 
 func (s *CurrentSessionServiceImpl) VerifyAuthorized() {

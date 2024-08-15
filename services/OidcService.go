@@ -444,7 +444,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 
 	missingGrants := make([]repos.Scope, 0)
 	for _, oidcScope := range scopes.Values() {
-		if oidcScope.Grant == nil {
+		if oidcScope.Grant.IsNone() {
 			missingGrants = append(missingGrants, oidcScope)
 		}
 	}
@@ -472,7 +472,7 @@ func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	grantedScopes := make([]string, 0)
 	grantedScopeIds := make([]uuid.UUID, 0)
 	for _, oidcScope := range scopes.Values() {
-		if oidcScope.Grant != nil {
+		if oidcScope.Grant.IsSome() {
 			grantedScopes = append(grantedScopes, oidcScope.Name)
 			grantedScopeIds = append(grantedScopeIds, oidcScope.Id)
 		}

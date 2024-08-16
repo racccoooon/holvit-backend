@@ -53,13 +53,13 @@ type ClientRepository interface {
 	UpdateClient(ctx context.Context, id uuid.UUID, upd ClientUpdate) h.Result[h.Unit]
 }
 
-type ClientRepositoryImpl struct{}
+type clientRepositoryImpl struct{}
 
 func NewClientRepository() ClientRepository {
-	return &ClientRepositoryImpl{}
+	return &clientRepositoryImpl{}
 }
 
-func (c *ClientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID) h.Opt[Client] {
+func (c *clientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID) h.Opt[Client] {
 	return c.FindClients(ctx, ClientFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
@@ -67,7 +67,7 @@ func (c *ClientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID)
 	}).FirstOrNone()
 }
 
-func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFilter) FilterResult[Client] {
+func (c *clientRepositoryImpl) FindClients(ctx context.Context, filter ClientFilter) FilterResult[Client] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -128,7 +128,7 @@ func (c *ClientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 	return NewPagedResult(result, totalCount)
 }
 
-func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client Client) h.Result[uuid.UUID] {
+func (c *clientRepositoryImpl) CreateClient(ctx context.Context, client Client) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -164,7 +164,7 @@ func (c *ClientRepositoryImpl) CreateClient(ctx context.Context, client Client) 
 	return h.Ok(resultingId)
 }
 
-func (c *ClientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, upd ClientUpdate) h.Result[h.Unit] {
+func (c *clientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, upd ClientUpdate) h.Result[h.Unit] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

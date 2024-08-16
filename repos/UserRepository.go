@@ -42,13 +42,13 @@ type UserRepository interface {
 	CreateUser(ctx context.Context, user User) h.Result[uuid.UUID]
 }
 
-type UserRepositoryImpl struct{}
+type userRepositoryImpl struct{}
 
 func NewUserRepository() UserRepository {
-	return &UserRepositoryImpl{}
+	return &userRepositoryImpl{}
 }
 
-func (u *UserRepositoryImpl) FindUserById(ctx context.Context, id uuid.UUID) h.Opt[User] {
+func (u *userRepositoryImpl) FindUserById(ctx context.Context, id uuid.UUID) h.Opt[User] {
 	return u.FindUsers(ctx, UserFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
@@ -56,7 +56,7 @@ func (u *UserRepositoryImpl) FindUserById(ctx context.Context, id uuid.UUID) h.O
 	}).FirstOrNone()
 }
 
-func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) FilterResult[User] {
+func (u *userRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) FilterResult[User] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -116,7 +116,7 @@ func (u *UserRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) F
 	return NewPagedResult(result, totalCount)
 }
 
-func (u *UserRepositoryImpl) CreateUser(ctx context.Context, user User) h.Result[uuid.UUID] {
+func (u *userRepositoryImpl) CreateUser(ctx context.Context, user User) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

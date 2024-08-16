@@ -82,13 +82,13 @@ type CredentialRepository interface {
 	DeleteCredential(ctx context.Context, id uuid.UUID) h.Result[h.Unit]
 }
 
-type CredentialRepositoryImpl struct{}
+type credentialRepositoryImpl struct{}
 
 func NewCredentialRepository() CredentialRepository {
-	return &CredentialRepositoryImpl{}
+	return &credentialRepositoryImpl{}
 }
 
-func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credential Credential) h.Result[uuid.UUID] {
+func (c *credentialRepositoryImpl) CreateCredential(ctx context.Context, credential Credential) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -125,7 +125,7 @@ func (c *CredentialRepositoryImpl) CreateCredential(ctx context.Context, credent
 	return h.Ok(resultingId)
 }
 
-func (c *CredentialRepositoryImpl) FindCredentialById(ctx context.Context, id uuid.UUID) h.Opt[Credential] {
+func (c *credentialRepositoryImpl) FindCredentialById(ctx context.Context, id uuid.UUID) h.Opt[Credential] {
 	return c.FindCredentials(ctx, CredentialFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
@@ -133,7 +133,7 @@ func (c *CredentialRepositoryImpl) FindCredentialById(ctx context.Context, id uu
 	}).FirstOrNone()
 }
 
-func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter CredentialFilter) FilterResult[Credential] {
+func (c *credentialRepositoryImpl) FindCredentials(ctx context.Context, filter CredentialFilter) FilterResult[Credential] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -202,7 +202,7 @@ func (c *CredentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 	return NewPagedResult(result, totalCount)
 }
 
-func (c *CredentialRepositoryImpl) DeleteCredential(ctx context.Context, id uuid.UUID) h.Result[h.Unit] {
+func (c *credentialRepositoryImpl) DeleteCredential(ctx context.Context, id uuid.UUID) h.Result[h.Unit] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

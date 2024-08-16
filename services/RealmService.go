@@ -21,6 +21,8 @@ type CreateRealmRequest struct {
 	RequireDeviceVerification *bool
 	RequireTotp               *bool
 	EnableRememberMe          *bool
+
+	PasswordHistoryLength *int
 }
 
 type CreateRealmResponse struct {
@@ -56,6 +58,7 @@ func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 		RequireDeviceVerification: utils.GetOrDefault(request.RequireDeviceVerification, false),
 		RequireTotp:               utils.GetOrDefault(request.RequireTotp, false),
 		EnableRememberMe:          utils.GetOrDefault(request.EnableRememberMe, false),
+		PasswordHistoryLength:     utils.GetOrDefault(request.PasswordHistoryLength, 3),
 	}).Unwrap() //TODO: handle duplicate name error
 
 	s.createOpenIdScope(ctx, realmId)

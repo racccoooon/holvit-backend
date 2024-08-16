@@ -66,13 +66,13 @@ type ClaimMapperRepository interface {
 	AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) uuid.UUID
 }
 
-type ClaimMapperRepositoryImpl struct{}
+type claimMapperRepositoryImpl struct{}
 
 func NewClaimMapperRepository() ClaimMapperRepository {
-	return &ClaimMapperRepositoryImpl{}
+	return &claimMapperRepositoryImpl{}
 }
 
-func (c *ClaimMapperRepositoryImpl) FindClaimMapperById(ctx context.Context, id uuid.UUID) h.Opt[ClaimMapper] {
+func (c *claimMapperRepositoryImpl) FindClaimMapperById(ctx context.Context, id uuid.UUID) h.Opt[ClaimMapper] {
 	return c.FindClaimMappers(ctx, ClaimMapperFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
@@ -80,7 +80,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMapperById(ctx context.Context, id 
 	}).FirstOrNone()
 }
 
-func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) FilterResult[ClaimMapper] {
+func (c *claimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter ClaimMapperFilter) FilterResult[ClaimMapper] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -152,7 +152,7 @@ func (c *ClaimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 	return NewPagedResult(result, totalCount)
 }
 
-func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claimMapper ClaimMapper) uuid.UUID {
+func (c *claimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claimMapper ClaimMapper) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -182,7 +182,7 @@ func (c *ClaimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claim
 	return resultingId
 }
 
-func (c *ClaimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) uuid.UUID {
+func (c *claimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, request AssociateScopeClaimRequest) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

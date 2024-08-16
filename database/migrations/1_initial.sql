@@ -14,6 +14,8 @@ create table "realms"
     "require_totp"                bool  not null,
     "enable_remember_me"          bool  not null,
 
+    "password_history_length"     int   not null,
+
     primary key ("id")
 );
 

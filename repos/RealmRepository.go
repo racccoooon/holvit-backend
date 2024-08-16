@@ -27,6 +27,7 @@ type Realm struct {
 	RequireDeviceVerification bool
 	RequireTotp               bool
 	EnableRememberMe          bool
+	PasswordHistoryLength     int
 }
 
 type RealmFilter struct {
@@ -79,7 +80,8 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 	}
 
 	q := sqlb.Select(filter.CountCol(),
-		"id", "name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_device_verification", "require_totp", "enable_remember_me").
+		"id", "name", "display_name", "encrypted_private_key", "require_username", "require_email",
+		"require_device_verification", "require_totp", "enable_remember_me", "password_history_length").
 		From("realms")
 
 	filter.Id.IfSome(func(x uuid.UUID) {
@@ -119,7 +121,8 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 			&row.RequireEmail,
 			&row.RequireDeviceVerification,
 			&row.RequireTotp,
-			&row.EnableRememberMe)
+			&row.EnableRememberMe,
+			&row.PasswordHistoryLength)
 		if err != nil {
 			panic(err)
 		}
@@ -141,8 +144,8 @@ func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm Realm) h.Re
 	}
 
 	sqlString := `insert into "realms"
-    			("name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_device_verification", "require_totp", "enable_remember_me")
-    			values ($1, $2, $3, $4, $5, $6, $7, $8)
+    			("name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_device_verification", "require_totp", "enable_remember_me", "password_history_length")
+    			values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     			returning "id"`
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 
@@ -154,7 +157,8 @@ func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm Realm) h.Re
 		realm.RequireEmail,
 		realm.RequireDeviceVerification,
 		realm.RequireTotp,
-		realm.EnableRememberMe).Scan(&resultingId)
+		realm.EnableRememberMe,
+		realm.PasswordHistoryLength).Scan(&resultingId)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code.Name() {

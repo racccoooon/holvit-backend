@@ -41,12 +41,12 @@ type RolesRepository interface {
 }
 
 func NewRolesRepository() RolesRepository {
-	return &RoleRepositoryImpl{}
+	return &roleRepositoryImpl{}
 }
 
-type RoleRepositoryImpl struct{}
+type roleRepositoryImpl struct{}
 
-func (r *RoleRepositoryImpl) FindRoleById(ctx context.Context, id uuid.UUID) h.Opt[Role] {
+func (r *roleRepositoryImpl) FindRoleById(ctx context.Context, id uuid.UUID) h.Opt[Role] {
 	return r.FindRoles(ctx, RoleFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
@@ -54,7 +54,7 @@ func (r *RoleRepositoryImpl) FindRoleById(ctx context.Context, id uuid.UUID) h.O
 	}).FirstOrNone()
 }
 
-func (r *RoleRepositoryImpl) FindRoles(ctx context.Context, filter RoleFilter) FilterResult[Role] {
+func (r *roleRepositoryImpl) FindRoles(ctx context.Context, filter RoleFilter) FilterResult[Role] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -107,7 +107,7 @@ func (r *RoleRepositoryImpl) FindRoles(ctx context.Context, filter RoleFilter) F
 	return NewPagedResult(result, totalCount)
 }
 
-func (r *RoleRepositoryImpl) CreateRole(ctx context.Context, role Role) h.Result[uuid.UUID] {
+func (r *roleRepositoryImpl) CreateRole(ctx context.Context, role Role) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

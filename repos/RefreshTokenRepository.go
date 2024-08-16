@@ -45,13 +45,13 @@ type RefreshTokenRepository interface {
 	DeleteRefreshToken(ctx context.Context, id uuid.UUID) h.Result[h.Unit]
 }
 
-type RefreshTokenRepositoryImpl struct{}
+type refreshTokenRepositoryImpl struct{}
 
 func NewRefreshTokenRepository() RefreshTokenRepository {
-	return &RefreshTokenRepositoryImpl{}
+	return &refreshTokenRepositoryImpl{}
 }
 
-func (r *RefreshTokenRepositoryImpl) FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Opt[RefreshToken] {
+func (r *refreshTokenRepositoryImpl) FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Opt[RefreshToken] {
 	return r.FindRefreshTokens(ctx, RefreshTokenFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
@@ -59,7 +59,7 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokenById(ctx context.Context, i
 	}).FirstOrNone()
 }
 
-func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) FilterResult[RefreshToken] {
+func (r *refreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) FilterResult[RefreshToken] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -124,7 +124,7 @@ func (r *RefreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 	return NewPagedResult(result, totalCount)
 }
 
-func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, refreshToken RefreshToken) uuid.UUID {
+func (r *refreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, refreshToken RefreshToken) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -159,7 +159,7 @@ func (r *RefreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, ref
 	return resultingId
 }
 
-func (r *RefreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id uuid.UUID) h.Result[h.Unit] {
+func (r *refreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id uuid.UUID) h.Result[h.Unit] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

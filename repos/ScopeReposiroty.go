@@ -61,13 +61,13 @@ type ScopeRepository interface {
 	CreateGrants(ctx context.Context, userId uuid.UUID, clientId uuid.UUID, scopeIds []uuid.UUID)
 }
 
-type ScopeRepositoryImpl struct{}
+type scopeRepositoryImpl struct{}
 
 func NewScopeReposiroty() ScopeRepository {
-	return &ScopeRepositoryImpl{}
+	return &scopeRepositoryImpl{}
 }
 
-func (s *ScopeRepositoryImpl) FindScopeById(ctx context.Context, id uuid.UUID) h.Opt[Scope] {
+func (s *scopeRepositoryImpl) FindScopeById(ctx context.Context, id uuid.UUID) h.Opt[Scope] {
 	return s.FindScopes(ctx, ScopeFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
@@ -75,7 +75,7 @@ func (s *ScopeRepositoryImpl) FindScopeById(ctx context.Context, id uuid.UUID) h
 	}).FirstOrNone()
 }
 
-func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter) FilterResult[Scope] {
+func (s *scopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter) FilterResult[Scope] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -173,7 +173,7 @@ func (s *ScopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 	return NewPagedResult(result, totalCount)
 }
 
-func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope Scope) h.Result[uuid.UUID] {
+func (s *scopeRepositoryImpl) CreateScope(ctx context.Context, scope Scope) h.Result[uuid.UUID] {
 	iocScope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](iocScope)
 
@@ -212,7 +212,7 @@ func (s *ScopeRepositoryImpl) CreateScope(ctx context.Context, scope Scope) h.Re
 	return h.Ok(resultingId)
 }
 
-func (s *ScopeRepositoryImpl) CreateGrants(ctx context.Context, userId uuid.UUID, clientId uuid.UUID, scopeIds []uuid.UUID) {
+func (s *scopeRepositoryImpl) CreateGrants(ctx context.Context, userId uuid.UUID, clientId uuid.UUID, scopeIds []uuid.UUID) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

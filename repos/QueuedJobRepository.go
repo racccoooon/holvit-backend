@@ -79,13 +79,13 @@ type QueuedJobRepository interface {
 	UpdateQueuedJob(ctx context.Context, id uuid.UUID, upd QueuedJobUpdate)
 }
 
-type QueuedJobRepositoryImpl struct{}
+type queuedJobRepositoryImpl struct{}
 
 func NewQueuedJobRepository() QueuedJobRepository {
-	return &QueuedJobRepositoryImpl{}
+	return &queuedJobRepositoryImpl{}
 }
 
-func (r *QueuedJobRepositoryImpl) FindQueuedJobById(ctx context.Context, id uuid.UUID) h.Opt[QueuedJob] {
+func (r *queuedJobRepositoryImpl) FindQueuedJobById(ctx context.Context, id uuid.UUID) h.Opt[QueuedJob] {
 	return r.FindQueuedJobs(ctx, QueuedJobFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
@@ -94,7 +94,7 @@ func (r *QueuedJobRepositoryImpl) FindQueuedJobById(ctx context.Context, id uuid
 
 }
 
-func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) FilterResult[QueuedJob] {
+func (c *queuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter QueuedJobFilter) FilterResult[QueuedJob] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -168,7 +168,7 @@ func (c *QueuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 	return NewPagedResult(result, totalCount)
 }
 
-func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job QueuedJob) uuid.UUID {
+func (c *queuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job QueuedJob) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -198,7 +198,7 @@ func (c *QueuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job Queue
 	return resultingId
 }
 
-func (c *QueuedJobRepositoryImpl) UpdateQueuedJob(ctx context.Context, id uuid.UUID, upd QueuedJobUpdate) {
+func (c *queuedJobRepositoryImpl) UpdateQueuedJob(ctx context.Context, id uuid.UUID, upd QueuedJobUpdate) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

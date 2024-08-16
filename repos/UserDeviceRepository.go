@@ -40,12 +40,12 @@ type UserDeviceRepository interface {
 }
 
 func NewUserDeviceRepository() UserDeviceRepository {
-	return &UserDeviceRepositoryImpl{}
+	return &userDeviceRepositoryImpl{}
 }
 
-type UserDeviceRepositoryImpl struct{}
+type userDeviceRepositoryImpl struct{}
 
-func (r *UserDeviceRepositoryImpl) FindUserDeviceById(ctx context.Context, id uuid.UUID) h.Opt[UserDevice] {
+func (r *userDeviceRepositoryImpl) FindUserDeviceById(ctx context.Context, id uuid.UUID) h.Opt[UserDevice] {
 	return r.FindUserDevices(ctx, UserDeviceFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
@@ -53,7 +53,7 @@ func (r *UserDeviceRepositoryImpl) FindUserDeviceById(ctx context.Context, id uu
 	}).FirstOrNone()
 }
 
-func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter UserDeviceFilter) FilterResult[UserDevice] {
+func (r *userDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter UserDeviceFilter) FilterResult[UserDevice] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -115,7 +115,7 @@ func (r *UserDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter U
 	return NewPagedResult(result, totalCount)
 }
 
-func (r *UserDeviceRepositoryImpl) CreateUserDevice(ctx context.Context, userDevice UserDevice) uuid.UUID {
+func (r *userDeviceRepositoryImpl) CreateUserDevice(ctx context.Context, userDevice UserDevice) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

@@ -41,13 +41,13 @@ type SessionRepository interface {
 	DeleteOldSessions(ctx context.Context)
 }
 
-type SessionRepositoryImpl struct{}
+type sessionRepositoryImpl struct{}
 
 func NewSessionRepository() SessionRepository {
-	return &SessionRepositoryImpl{}
+	return &sessionRepositoryImpl{}
 }
 
-func (s *SessionRepositoryImpl) DeleteOldSessions(ctx context.Context) {
+func (s *sessionRepositoryImpl) DeleteOldSessions(ctx context.Context) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -70,7 +70,7 @@ func (s *SessionRepositoryImpl) DeleteOldSessions(ctx context.Context) {
 	}
 }
 
-func (s *SessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUID) h.Opt[Session] {
+func (s *sessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUID) h.Opt[Session] {
 	return s.FindSessions(ctx, SessionFilter{
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
@@ -78,7 +78,7 @@ func (s *SessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUI
 	}).FirstOrNone()
 }
 
-func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter SessionFilter) FilterResult[Session] {
+func (s *sessionRepositoryImpl) FindSessions(ctx context.Context, filter SessionFilter) FilterResult[Session] {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -135,7 +135,7 @@ func (s *SessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 	return NewPagedResult(result, totalCount)
 }
 
-func (s *SessionRepositoryImpl) CreateSession(ctx context.Context, session Session) uuid.UUID {
+func (s *sessionRepositoryImpl) CreateSession(ctx context.Context, session Session) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

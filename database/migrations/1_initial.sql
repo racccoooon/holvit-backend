@@ -65,6 +65,18 @@ create unique index "idx_only_one_password_per_user" on "credentials" ("user_id"
 alter table "credentials"
     add constraint "fk_credentials_users" foreign key ("user_id") references "users";
 
+create table "password_history"
+(
+    "id" uuid not null default gen_random_uuid(),
+    "user_id" uuid not null,
+    "hashed_password" text not null,
+    "created_at" timestamp not null,
+    primary key ("id")
+);
+
+alter table "password_history"
+    add constraint "fk_password_history_users" foreign key ("user_id") references "users";
+
 create table "scopes"
 (
     "id"           uuid not null default gen_random_uuid(),

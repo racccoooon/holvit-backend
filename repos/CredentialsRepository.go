@@ -79,7 +79,7 @@ type CredentialRepository interface {
 	CreateCredential(ctx context.Context, credential Credential) h.Result[uuid.UUID]
 	FindCredentialById(ctx context.Context, id uuid.UUID) h.Opt[Credential]
 	FindCredentials(ctx context.Context, filter CredentialFilter) FilterResult[Credential]
-	DeleteCredential(ctx context.Context, id uuid.UUID) h.Result[h.Unit]
+	DeleteCredential(ctx context.Context, id uuid.UUID)
 }
 
 type credentialRepositoryImpl struct{}
@@ -202,7 +202,7 @@ func (c *credentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 	return NewPagedResult(result, totalCount)
 }
 
-func (c *credentialRepositoryImpl) DeleteCredential(ctx context.Context, id uuid.UUID) h.Result[h.Unit] {
+func (c *credentialRepositoryImpl) DeleteCredential(ctx context.Context, id uuid.UUID) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -220,10 +220,8 @@ func (c *credentialRepositoryImpl) DeleteCredential(ctx context.Context, id uuid
 	if err != nil {
 		panic(err)
 	}
-	affected, err := result.RowsAffected()
+	_, err = result.RowsAffected()
 	if err != nil {
 		panic(err)
 	}
-
-	return h.UErrIf(affected == 0, DbNotFoundError{})
 }

@@ -42,7 +42,7 @@ type RefreshTokenRepository interface {
 	FindRefreshTokenById(ctx context.Context, id uuid.UUID) h.Opt[RefreshToken]
 	FindRefreshTokens(ctx context.Context, filter RefreshTokenFilter) FilterResult[RefreshToken]
 	CreateRefreshToken(ctx context.Context, refreshToken RefreshToken) uuid.UUID
-	DeleteRefreshToken(ctx context.Context, id uuid.UUID) h.Result[h.Unit]
+	DeleteRefreshToken(ctx context.Context, id uuid.UUID)
 }
 
 type refreshTokenRepositoryImpl struct{}
@@ -159,7 +159,7 @@ func (r *refreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, ref
 	return resultingId
 }
 
-func (r *refreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id uuid.UUID) h.Result[h.Unit] {
+func (r *refreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id uuid.UUID) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -177,10 +177,8 @@ func (r *refreshTokenRepositoryImpl) DeleteRefreshToken(ctx context.Context, id 
 	if err != nil {
 		panic(err)
 	}
-	affected, err := result.RowsAffected()
+	_, err = result.RowsAffected()
 	if err != nil {
 		panic(err)
 	}
-
-	return h.UErrIf(affected == 0, DbNotFoundError{})
 }

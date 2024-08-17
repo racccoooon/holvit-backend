@@ -51,7 +51,7 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 		return h.Err[h.T2[string, repos.RefreshToken]](httpErrors.Unauthorized().WithMessage("token not valid"))
 	}
 
-	refreshTokenRepository.DeleteRefreshToken(ctx, refreshToken.Id).Unwrap()
+	refreshTokenRepository.DeleteRefreshToken(ctx, refreshToken.Id)
 
 	return h.Ok(h.NewT2(r.CreateRefreshToken(ctx, CreateRefreshTokenRequest{
 		ClientId: clientId,

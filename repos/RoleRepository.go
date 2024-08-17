@@ -22,6 +22,16 @@ type Role struct {
 	DisplayName string
 	Name        string
 	Description string
+
+	ImpliesCache []uuid.UUID
+}
+
+type RoleUpdate struct {
+	DisplayName h.Opt[string]
+	Name        h.Opt[string]
+	Description h.Opt[string]
+
+	ImpliesCache h.Opt[[]uuid.UUID]
 }
 
 type DuplicateRoleError struct{}
@@ -32,12 +42,16 @@ func (e DuplicateRoleError) Error() string {
 
 type RoleFilter struct {
 	BaseFilter
+	RealmId h.Opt[uuid.UUID]
+	RoleIds h.Opt[[]uuid.UUID]
 }
 
 type RolesRepository interface {
 	FindRoleById(ctx context.Context, id uuid.UUID) h.Opt[Role]
 	FindRoles(ctx context.Context, filter RoleFilter) FilterResult[Role]
 	CreateRole(ctx context.Context, role Role) h.Result[uuid.UUID]
+	DeleteRoles(ctx context.Context, realmId uuid.UUID, ids []uuid.UUID)
+	UpdateRole(ctx context.Context, id uuid.UUID, upd RoleUpdate)
 }
 
 func NewRolesRepository() RolesRepository {
@@ -64,11 +78,19 @@ func (r *roleRepositoryImpl) FindRoles(ctx context.Context, filter RoleFilter) F
 	}
 
 	q := sqlb.Select(filter.CountCol(),
-		"id", "realm_id", "client_id", "display_name", "name", "description").
+		"id", "realm_id", "client_id", "display_name", "name", "description", "implies_cache").
 		From("roles")
 
 	filter.Id.IfSome(func(x uuid.UUID) {
 		q.Where("id = ?", x)
+	})
+
+	filter.RealmId.IfSome(func(x uuid.UUID) {
+		q.Where("realm_id = ?", x)
+	})
+
+	filter.RoleIds.IfSome(func(x []uuid.UUID) {
+		q.Where("id IN (?)", pq.Array(x))
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
@@ -97,7 +119,8 @@ func (r *roleRepositoryImpl) FindRoles(ctx context.Context, filter RoleFilter) F
 			row.ClientId.AsMutPtr(),
 			&row.DisplayName,
 			&row.Name,
-			&row.Description)
+			&row.Description,
+			pq.Array(&row.ImpliesCache))
 		if err != nil {
 			panic(err)
 		}
@@ -144,4 +167,61 @@ func (r *roleRepositoryImpl) CreateRole(ctx context.Context, role Role) h.Result
 	}
 
 	return h.Ok(resultingId)
+}
+
+func (r *roleRepositoryImpl) DeleteRoles(ctx context.Context, realmId uuid.UUID, ids []uuid.UUID) {
+	scope := middlewares.GetScope(ctx)
+	rcs := ioc.Get[requestContext.RequestContextService](scope)
+
+	tx, err := rcs.GetTx()
+	if err != nil {
+		panic(err)
+	}
+
+	q := sqlb.DeleteFrom("roles").
+		Where("realm_id =  ?", realmId).
+		Where("id = any(?)", pq.Array(ids))
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	_, err = tx.Exec(query.Query, query.Parameters...)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (r *roleRepositoryImpl) UpdateRole(ctx context.Context, id uuid.UUID, upd RoleUpdate) {
+	scope := middlewares.GetScope(ctx)
+	rcs := ioc.Get[requestContext.RequestContextService](scope)
+
+	tx, err := rcs.GetTx()
+	if err != nil {
+		panic(err)
+	}
+
+	q := sqlb.Update("roles")
+
+	upd.DisplayName.IfSome(func(x string) {
+		q.Set("display_name", x)
+	})
+
+	upd.Name.IfSome(func(x string) {
+		q.Set("name", x)
+	})
+
+	upd.Description.IfSome(func(x string) {
+		q.Set("description", x)
+	})
+
+	upd.ImpliesCache.IfSome(func(x []uuid.UUID) {
+		q.Set("implies_cache", pq.Array(x))
+	})
+
+	q.Where("id = ?", id)
+
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	_, err = tx.Exec(query.Query, query.Parameters...)
+	if err != nil {
+		panic(err)
+	}
 }

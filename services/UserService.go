@@ -187,7 +187,7 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 	}).SingleOrNone()
 
 	if existingCredential, ok := credential.Get(); ok {
-		credentialRepository.DeleteCredential(ctx, existingCredential.Id).Unwrap()
+		credentialRepository.DeleteCredential(ctx, existingCredential.Id)
 	}
 
 	hashAlgorithm := config.C.GetHasher()

@@ -346,6 +346,7 @@ create table "roles"
     "display_name"     text      not null,
     "name"             text      not null,
     "description"      text      not null,
+    "implies_cache"    uuid[]    not null default [],
     primary key ("id")
 );
 
@@ -363,7 +364,7 @@ alter table "roles"
 alter table "roles"
     add constraint "fk_roles_clients" foreign key ("client_id") references "clients";
 
-create table "implied_roles"
+create table "role_implications"
 (
     "id"               uuid      not null default gen_random_uuid(),
     "audit_created_at" timestamp not null default now(),
@@ -375,15 +376,15 @@ create table "implied_roles"
 
 create trigger "set_audit_updated_at"
     before update
-    on "implied_roles"
+    on "role_implications"
     for each row
 execute function update_audit_timestamp();
 
-alter table "implied_roles"
-    add constraint "fk_implied_roles_role" foreign key ("role_id") references "roles";
+alter table "role_implications"
+    add constraint "fk_implied_roles_role" foreign key ("role_id") references "roles" on delete cascade;
 
-alter table "implied_roles"
-    add constraint "fk_implied_roles_implied_role" foreign key ("implied_role_id") references "roles";
+alter table "role_implications"
+    add constraint "fk_implied_roles_implied_role" foreign key ("implied_role_id") references "roles" on delete cascade;
 
 create table "user_roles"
 (
@@ -407,8 +408,9 @@ alter table "user_roles"
     add constraint "fk_user_roles_roles" foreign key ("role_id") references "roles";
 
 -- +migrate Down
+drop table "password_history" cascade;
 drop table "user_roles" cascade;
-drop table "implied_roles" cascade;
+drop table "role_implications" cascade;
 drop table "roles" cascade;
 drop table "queued_jobs" cascade;
 drop table "user_devices" cascade;

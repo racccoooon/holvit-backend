@@ -205,34 +205,11 @@ func (o *oidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 		}
 	}
 
-	claimsService := ioc.Get[ClaimsService](scope)
-	claims := claimsService.GetClaims(ctx, GetClaimsRequest{
-		UserId:   codeInfo.UserId,
-		ScopeIds: codeInfo.GrantedScopeIds,
-	})
-
-	idTokenValidTime := time.Hour * 1     //TODO: add this to realm and maybe to scopes
-	accessTokenValidTime := time.Hour * 1 //TODO: add this to realm and maybe to scopes
-
 	issuer := "http://localhost:8080/oidc" //TODO: this needs to be in the config (external url)
-	audience := client.ClientId
 
-	idTokenClaims := jwt.MapClaims{
-		"sub": codeInfo.UserId.String(),
-		"iss": issuer,
-		"aud": audience,
-		"iat": now.Unix(),
-		"exp": now.Add(idTokenValidTime).Unix(),
-	}
+	idToken := makeIdToken(ctx, codeInfo.UserId, codeInfo.GrantedScopeIds, codeInfo.UserId.String(), issuer, client.ClientId, now)
 
-	for _, claim := range claims {
-		idTokenClaims[claim.Name] = claim.Claim
-	}
-
-	subject := idTokenClaims["sub"].(string)
-
-	idToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, idTokenClaims)
-
+	accessTokenValidTime := time.Hour * 1 //TODO: add this to realm and maybe to scopes
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.MapClaims{
 		"sub":    codeInfo.UserId,
 		"scopes": codeInfo.GrantedScopes,
@@ -262,8 +239,8 @@ func (o *oidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 		UserId:   codeInfo.UserId,
 		RealmId:  client.RealmId,
 		Issuer:   issuer,
-		Subject:  subject,
-		Audience: audience,
+		Subject:  codeInfo.UserId.String(),
+		Audience: client.ClientId,
 		Scopes:   codeInfo.GrantedScopes,
 	})
 
@@ -308,29 +285,9 @@ func (o *oidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 		grantedScopeIds = append(grantedScopeIds, dbScope.Id)
 	}
 
-	claimsService := ioc.Get[ClaimsService](scope)
-	claims := claimsService.GetClaims(ctx, GetClaimsRequest{
-		UserId:   refreshToken.UserId,
-		ScopeIds: grantedScopeIds,
-	})
+	idToken := makeIdToken(ctx, refreshToken.UserId, grantedScopeIds, refreshToken.Subject, refreshToken.Issuer, refreshToken.Audience, now)
 
 	accessTokenValidTime := time.Hour * 1 //TODO: add this to realm and maybe to scopes
-	idTokenValidTime := time.Hour * 1     //TODO: add this to realm and maybe to scopes
-
-	idTokenClaims := jwt.MapClaims{
-		"sub": refreshToken.Subject,
-		"iss": refreshToken.Issuer,
-		"aud": refreshToken.Audience,
-		"iat": now.Unix(),
-		"exp": now.Add(idTokenValidTime).Unix(),
-	}
-
-	for _, claim := range claims {
-		idTokenClaims[claim.Name] = claim.Claim
-	}
-
-	idToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, idTokenClaims)
-
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.MapClaims{
 		"sub":    refreshToken.UserId,
 		"scopes": request.ScopeNames,
@@ -361,6 +318,32 @@ func (o *oidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 		RefreshToken: refreshTokenString,
 		ExpiresIn:    int(accessTokenValidTime / time.Second),
 	}, nil
+}
+
+func makeIdToken(ctx context.Context, userId uuid.UUID, scopeIds []uuid.UUID, subject, issuer, audience string, now time.Time) *jwt.Token {
+	scope := middlewares.GetScope(ctx)
+
+	claimsService := ioc.Get[ClaimsService](scope)
+	claims := claimsService.GetClaims(ctx, GetClaimsRequest{
+		UserId:   userId,
+		ScopeIds: scopeIds,
+	})
+
+	idTokenValidTime := time.Hour * 1 //TODO: add this to realm and maybe to scopes
+
+	idTokenClaims := jwt.MapClaims{
+		"sub": subject,
+		"iss": issuer,
+		"aud": audience,
+		"iat": now.Unix(),
+		"exp": now.Add(idTokenValidTime).Unix(),
+	}
+
+	for _, claim := range claims {
+		idTokenClaims[claim.Name] = claim.Claim
+	}
+
+	return jwt.NewWithClaims(jwt.SigningMethodEdDSA, idTokenClaims)
 }
 
 func (o *oidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) (AuthorizationResponse, error) {

@@ -76,24 +76,7 @@ func (q *updateQuery) build(sql *strings.Builder, p *params) {
 		sql.WriteString(" FROM ")
 		buildFragments(sql, p, q.from, ", ")
 	}
-
-	if len(q.where) > 0 {
-		wrapConds := len(q.where) > 1
-		for idx, where := range q.where {
-			if idx == 0 {
-				sql.WriteString(" WHERE ")
-			} else {
-				sql.WriteString(" AND ")
-			}
-			if wrapConds {
-				sql.WriteString("(")
-			}
-			where.build(sql, p)
-			if wrapConds {
-				sql.WriteString(")")
-			}
-		}
-	}
+	buildWhere(sql, p, q.where)
 
 	if len(q.returning) > 0 {
 		sql.WriteString(" RETURNING ")

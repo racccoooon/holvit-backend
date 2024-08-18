@@ -1,6 +1,9 @@
 package sqlb
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 func And(terms ...any) RawQuery {
 	return andor(" AND ", terms...)
@@ -39,7 +42,7 @@ func As(query any, name string) RawQuery {
 
 func andor(joiner string, terms ...any) RawQuery {
 	if len(terms) == 0 {
-		panic("no terms given")
+		panic(fmt.Errorf("no terms given"))
 	}
 	if len(terms) == 1 {
 		q := makeRawFragment(terms[0])

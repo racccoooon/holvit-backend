@@ -230,11 +230,11 @@ func Test_SelectWhereRawComplex(t *testing.T) {
 			"asdf < 10",
 		),
 		And(
-			Raw("bar any ?", []int{2, 3, 4}),
+			Raw("bar = any(?)", []int{2, 3, 4}),
 			Not("z IS NULL"),
 		),
 	)).Build()
-	assert.Equal(t, "SELECT * FROM foo WHERE ((x = $1) AND (asdf < 10)) OR ((bar any $2) AND (NOT(z IS NULL)))", query.Query)
+	assert.Equal(t, "SELECT * FROM foo WHERE ((x = $1) AND (asdf < 10)) OR ((bar = any($2)) AND (NOT(z IS NULL)))", query.Query)
 	assert.Equal(t, []any{1, []int{2, 3, 4}}, query.Parameters)
 }
 
@@ -470,6 +470,48 @@ func Test_InsertReturning(t *testing.T) {
 	query := InsertInto("foo", "a", "b", "c").Values(1, 2, 3).Returning("id", "bar", Raw("x + ? AS y", 4)).Build()
 	assert.Equal(t, "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3) RETURNING id, bar, x + $4 AS y", query.Query)
 	assert.Equal(t, []any{1, 2, 3, 4}, query.Parameters)
+}
+
+func Test_InsertOnConflictDoNothing(t *testing.T) {
+	query := InsertInto("foo", "a", "b", "c").Values(1, 2, 3).OnConflict().DoNothing().Build()
+	assert.Equal(t, "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", query.Query)
+	assert.Equal(t, []any{1, 2, 3}, query.Parameters)
+}
+
+func Test_InsertOnConflictCols(t *testing.T) {
+	query := InsertInto("foo", "a", "b", "c").Values(1, 2, 3).OnConflict().Cols("a", "b").DoNothing().Build()
+	assert.Equal(t, "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3) ON CONFLICT (a, b) DO NOTHING", query.Query)
+	assert.Equal(t, []any{1, 2, 3}, query.Parameters)
+}
+
+func Test_InsertOnConflictConstraint(t *testing.T) {
+	query := InsertInto("foo", "a", "b", "c").Values(1, 2, 3).OnConflict().Constraint("foo_unique_id").DoNothing().Build()
+	assert.Equal(t, "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3) ON CONFLICT ON CONSTRAINT foo_unique_id DO NOTHING", query.Query)
+	assert.Equal(t, []any{1, 2, 3}, query.Parameters)
+}
+
+func Test_InsertOnConflictReturning(t *testing.T) {
+	query := InsertInto("foo", "a", "b", "c").Values(1, 2, 3).OnConflict().Constraint("foo_unique_id").DoNothing().Returning("id").Build()
+	assert.Equal(t, "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3) ON CONFLICT ON CONSTRAINT foo_unique_id DO NOTHING RETURNING id", query.Query)
+	assert.Equal(t, []any{1, 2, 3}, query.Parameters)
+}
+
+func Test_InsertOnConflictDoUpdate(t *testing.T) {
+	query := InsertInto("foo", "a", "b", "c").Values(1, 2, 3).OnConflict().Cols("a", "b").DoUpdate().Set("c", "EXCLUDED.c + ?", 4).Build()
+	assert.Equal(t, "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3) ON CONFLICT (a, b) DO UPDATE SET c = EXCLUDED.c + $4", query.Query)
+	assert.Equal(t, []any{1, 2, 3, 4}, query.Parameters)
+}
+
+func Test_InsertOnConflictDoUpdateWhere(t *testing.T) {
+	query := InsertInto("foo", "a", "b", "c").Values(1, 2, 3).OnConflict().Cols("a", "b").DoUpdate().Set("c", "EXCLUDED.c + ?", 4).Where("x = ?", 5).Build()
+	assert.Equal(t, "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3) ON CONFLICT (a, b) DO UPDATE SET c = EXCLUDED.c + $4 WHERE x = $5", query.Query)
+	assert.Equal(t, []any{1, 2, 3, 4, 5}, query.Parameters)
+}
+
+func Test_InsertOnConflictRaw(t *testing.T) {
+	query := InsertInto("foo", "a", "b", "c").Values(1, 2, 3).OnConflictRaw("ON CONFLICT (a, b) WHERE a > 10 DO UPDATE SET c = EXCLUDED.c + ? WHERE x = ?", 4, 5).Build()
+	assert.Equal(t, "INSERT INTO foo (a, b, c) VALUES ($1, $2, $3) ON CONFLICT (a, b) WHERE a > 10 DO UPDATE SET c = EXCLUDED.c + $4 WHERE x = $5", query.Query)
+	assert.Equal(t, []any{1, 2, 3, 4, 5}, query.Parameters)
 }
 
 func Test_Update(t *testing.T) {

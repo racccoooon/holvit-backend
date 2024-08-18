@@ -46,7 +46,7 @@ func makeRawFragment(term any, params ...any) RawQuery {
 			params: []any{q},
 		}
 	} else {
-		panic("unsupported type")
+		panic(fmt.Errorf("unsupported type"))
 	}
 }
 
@@ -66,4 +66,22 @@ func buildWith(sql *strings.Builder, p *params, withs []RawQuery) {
 	sql.WriteString("WITH ")
 	buildFragments(sql, p, withs, ", ")
 	sql.WriteRune(' ')
+}
+
+func buildWhere(sql *strings.Builder, p *params, conditions []RawQuery) {
+	wrapConds := len(conditions) > 1
+	for idx, cond := range conditions {
+		if idx == 0 {
+			sql.WriteString(" WHERE ")
+		} else {
+			sql.WriteString(" AND ")
+		}
+		if wrapConds {
+			sql.WriteString("(")
+		}
+		cond.build(sql, p)
+		if wrapConds {
+			sql.WriteString(")")
+		}
+	}
 }

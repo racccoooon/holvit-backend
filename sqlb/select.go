@@ -227,24 +227,6 @@ func (s *selectQuery) buildJoin(sql *strings.Builder, p *params) {
 	}
 }
 
-func (s *selectQuery) buildWhere(sql *strings.Builder, p *params) {
-	wrapConds := len(s.where) > 1
-	for idx, where := range s.where {
-		if idx == 0 {
-			sql.WriteString(" WHERE ")
-		} else {
-			sql.WriteString(" AND ")
-		}
-		if wrapConds {
-			sql.WriteString("(")
-		}
-		where.build(sql, p)
-		if wrapConds {
-			sql.WriteString(")")
-		}
-	}
-}
-
 func (s *selectQuery) buildGroupBy(sql *strings.Builder, p *params) {
 	if len(s.groupBy) == 0 {
 		return
@@ -304,7 +286,7 @@ func (s *selectQuery) build(sql *strings.Builder, p *params) {
 	s.buildSelect(sql, p)
 	s.buildFrom(sql, p)
 	s.buildJoin(sql, p)
-	s.buildWhere(sql, p)
+	buildWhere(sql, p, s.where)
 	s.buildGroupBy(sql, p)
 	s.buildHaving(sql, p)
 	s.buildOrderBy(sql, p)

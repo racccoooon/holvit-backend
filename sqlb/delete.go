@@ -44,21 +44,7 @@ func (q *deleteQuery) build(sql *strings.Builder, p *params) {
 		buildFragments(sql, p, q.using, ", ")
 	}
 
-	wrapConds := len(q.where) > 1
-	for idx, where := range q.where {
-		if idx == 0 {
-			sql.WriteString(" WHERE ")
-		} else {
-			sql.WriteString(" AND ")
-		}
-		if wrapConds {
-			sql.WriteString("(")
-		}
-		where.build(sql, p)
-		if wrapConds {
-			sql.WriteString(")")
-		}
-	}
+	buildWhere(sql, p, q.where)
 
 	if len(q.returning) > 0 {
 		sql.WriteString(" RETURNING ")

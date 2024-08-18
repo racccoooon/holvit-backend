@@ -12,7 +12,6 @@ import (
 	"holvit/repos"
 	"holvit/requestContext"
 	"holvit/services/jobs"
-	"holvit/utils"
 )
 
 var (
@@ -39,39 +38,38 @@ func NewJobService(c *cron.Cron) JobService {
 }
 
 func executeQueuedJobs() {
-	logging.Logger.Debug("Scheduler is executing queued jobs")
+	requestContext.RunWithScope(ioc.RootScope, context.Background(), func(ctx context.Context) {
+		logging.Logger.Debug("Scheduler is executing queued jobs")
+		scope := middlewares.GetScope(ctx)
 
-	scope := ioc.RootScope.NewScope()
-	defer utils.PanicOnErr(scope.Close)
-	ctx := middlewares.ContextWithNewScope(context.Background(), scope)
+		queuedJobRepository := ioc.Get[repos.QueuedJobRepository](scope)
+		queuedJobs := queuedJobRepository.FindQueuedJobs(ctx, repos.QueuedJobFilter{
+			IgnoreLocked: true,
+			Status:       h.Some("pending"),
+		})
 
-	queuedJobRepository := ioc.Get[repos.QueuedJobRepository](scope)
-	queuedJobs := queuedJobRepository.FindQueuedJobs(ctx, repos.QueuedJobFilter{
-		IgnoreLocked: true,
-		Status:       h.Some("pending"),
-	})
+		for _, job := range queuedJobs.Values() {
+			result := executors[job.Type].Execute(ctx, job.Details)
 
-	for _, job := range queuedJobs.Values() {
-		result := executors[job.Type].Execute(ctx, job.Details)
+			if result.IsErr() {
+				upd := repos.QueuedJobUpdate{
+					Error:        h.Some(result.UnwrapErr().Error()),
+					FailureCount: h.Some(job.FailureCount + 1),
+					Status:       h.Some("pending"),
+				}
 
-		if result.IsErr() {
-			upd := repos.QueuedJobUpdate{
-				Error:        h.Some(result.UnwrapErr().Error()),
-				FailureCount: h.Some(job.FailureCount + 1),
-				Status:       h.Some("pending"),
+				if job.FailureCount == 3 { //TODO: maybe configurable
+					upd.Status = h.Some("failed")
+				}
+
+				queuedJobRepository.UpdateQueuedJob(ctx, job.Id, upd)
+			} else {
+				queuedJobRepository.UpdateQueuedJob(ctx, job.Id, repos.QueuedJobUpdate{
+					Status: h.Some("completed"),
+				})
 			}
-
-			if job.FailureCount == 3 { //TODO: maybe configurable
-				upd.Status = h.Some("failed")
-			}
-
-			queuedJobRepository.UpdateQueuedJob(ctx, job.Id, upd)
-		} else {
-			queuedJobRepository.UpdateQueuedJob(ctx, job.Id, repos.QueuedJobUpdate{
-				Status: h.Some("completed"),
-			})
 		}
-	}
+	})
 }
 
 type jobServiceImpl struct {

@@ -1,10 +1,13 @@
 package requestContext
 
 import (
+	"context"
 	"database/sql"
 	"github.com/google/uuid"
 	"holvit/events"
 	"holvit/ioc"
+	"holvit/middlewares"
+	"holvit/utils"
 )
 
 type AfterTxEventArgs struct {
@@ -83,4 +86,17 @@ func (rcs *RequestContextServiceImpl) Close() error {
 
 	events.Publish(rcs.afterTxEvent, args)
 	return err
+}
+
+func RunWithScope(dp *ioc.DependencyProvider, ctx context.Context, run func(ctx context.Context)) {
+	scope := dp.NewScope()
+	defer func() {
+		err := recover()
+		if err != nil {
+			panic(err)
+		} else {
+			utils.PanicOnErr(scope.Close)
+		}
+	}()
+	run(middlewares.ContextWithNewScope(ctx, scope))
 }

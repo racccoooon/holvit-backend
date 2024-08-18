@@ -47,21 +47,8 @@ func main() {
 	os.Exit(0)
 }
 
-func runWithScope(dp *ioc.DependencyProvider, ctx context.Context, run func(ctx context.Context)) {
-	scope := dp.NewScope()
-	defer func() {
-		err := recover()
-		if err != nil {
-			panic(err)
-		} else {
-			utils.PanicOnErr(scope.Close)
-		}
-	}()
-	run(middlewares.ContextWithNewScope(ctx, scope))
-}
-
 func initialize(dp *ioc.DependencyProvider) {
-	runWithScope(dp, context.Background(), func(ctx context.Context) {
+	requestContext.RunWithScope(dp, context.Background(), func(ctx context.Context) {
 		scope := middlewares.GetScope(ctx)
 		realmRepository := ioc.Get[repos.RealmRepository](scope)
 

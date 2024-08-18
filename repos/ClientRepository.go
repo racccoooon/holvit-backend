@@ -101,8 +101,8 @@ func (c *clientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 	})
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	rows, err := tx.Query(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	rows, err := tx.Query(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}

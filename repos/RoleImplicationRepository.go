@@ -50,8 +50,8 @@ func (r *roleImplicationRepositoryImpl) CreateImplications(ctx context.Context, 
 	}
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	_, err = tx.Exec(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	_, err = tx.Exec(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -70,8 +70,8 @@ func (r *roleImplicationRepositoryImpl) DeleteImplicationsForRole(ctx context.Co
 		Where("role_id = ?", id)
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	_, err = tx.Exec(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	_, err = tx.Exec(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -92,8 +92,8 @@ func (r *roleImplicationRepositoryImpl) FindRoleImplications(ctx context.Context
 		Where("r.realm_id = ?", filter.RealmId)
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	rows, err := tx.Query(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	rows, err := tx.Query(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}

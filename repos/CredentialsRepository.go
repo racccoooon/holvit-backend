@@ -106,9 +106,9 @@ func (c *credentialRepositoryImpl) CreateCredential(ctx context.Context, credent
 		Returning("id")
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
 
-	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
+	err = tx.QueryRow(query.Sql, query.Parameters...).Scan(&resultingId)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code.Name() {
@@ -166,8 +166,8 @@ func (c *credentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 	})
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	rows, err := tx.Query(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	rows, err := tx.Query(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}

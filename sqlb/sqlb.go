@@ -7,7 +7,7 @@ import (
 )
 
 type SqlQuery struct {
-	Query      string
+	Sql        string
 	Parameters []any
 }
 

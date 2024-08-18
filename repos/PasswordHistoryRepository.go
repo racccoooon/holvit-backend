@@ -50,8 +50,8 @@ func (p *passwordHistoryRepositoryImpl) DeleteEntries(ctx context.Context, ids [
 		Where("user_id IN (?)", pq.Array(ids))
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	_, err = tx.Exec(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	_, err = tx.Exec(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -70,8 +70,8 @@ func (p *passwordHistoryRepositoryImpl) CreateEntry(ctx context.Context, entry P
 		Values(entry.UserId, entry.HashedPassword, entry.CreatedAt)
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	_, err = tx.Exec(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	_, err = tx.Exec(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -92,8 +92,8 @@ func (p *passwordHistoryRepositoryImpl) GetHistory(ctx context.Context, filter P
 	q.Where("user_id = ?", filter.UserId)
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	rows, err := tx.Query(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	rows, err := tx.Query(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}

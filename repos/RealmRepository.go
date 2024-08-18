@@ -101,8 +101,8 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 	})
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	rows, err := tx.Query(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	rows, err := tx.Query(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -156,8 +156,8 @@ func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm Realm) h.Re
 		Returning("id")
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	err = tx.QueryRow(query.Sql, query.Parameters...).Scan(&resultingId)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code.Name() {

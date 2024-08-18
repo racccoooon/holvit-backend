@@ -299,7 +299,7 @@ func (s *selectQuery) Build() SqlQuery {
 	var sql strings.Builder
 	s.build(&sql, &p)
 	return SqlQuery{
-		Query:      sql.String(),
+		Sql:        sql.String(),
 		Parameters: p,
 	}
 }

@@ -29,7 +29,7 @@ func (q *deleteQuery) Build() SqlQuery {
 	var sql strings.Builder
 	q.build(&sql, &p)
 	return SqlQuery{
-		Query:      sql.String(),
+		Sql:        sql.String(),
 		Parameters: p,
 	}
 }

@@ -105,8 +105,8 @@ func (r *roleRepositoryImpl) FindRoles(ctx context.Context, filter RoleFilter) F
 	})
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	rows, err := tx.Query(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	rows, err := tx.Query(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -149,8 +149,8 @@ func (r *roleRepositoryImpl) CreateRole(ctx context.Context, role Role) h.Result
 		Values(role.RealmId, role.ClientId.ToNillablePtr(), role.DisplayName, role.Name, role.Description, role.Internal)
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	err = tx.QueryRow(query.Sql, query.Parameters...).Scan(&resultingId)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code.Name() {
@@ -180,8 +180,8 @@ func (r *roleRepositoryImpl) DeleteRoles(ctx context.Context, realmId uuid.UUID,
 		Where("realm_id =  ?", realmId).
 		Where("id = any(?)", pq.Array(ids))
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	_, err = tx.Exec(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	_, err = tx.Exec(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -217,8 +217,8 @@ func (r *roleRepositoryImpl) UpdateRole(ctx context.Context, id uuid.UUID, upd R
 	q.Where("id = ?", id)
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	_, err = tx.Exec(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	_, err = tx.Exec(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}

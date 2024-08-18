@@ -115,9 +115,9 @@ func (c *claimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 	})
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
 
-	rows, err := tx.Query(query.Query, query.Parameters...)
+	rows, err := tx.Query(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -172,8 +172,8 @@ func (c *claimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claim
 		Returning("id")
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	err = tx.QueryRow(query.Sql, query.Parameters...).Scan(&resultingId)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -198,8 +198,8 @@ func (c *claimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, re
 		Returning("id")
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	err = tx.QueryRow(query.Sql, query.Parameters...).Scan(&resultingId)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}

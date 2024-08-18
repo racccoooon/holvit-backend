@@ -61,8 +61,8 @@ func (s *sessionRepositoryImpl) DeleteOldSessions(ctx context.Context) {
 	q := sqlb.DeleteFrom("sessions").Where("valid_until < ", now)
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	_, err = tx.Exec(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	_, err = tx.Exec(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -106,8 +106,8 @@ func (s *sessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 	})
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	rows, err := tx.Query(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	rows, err := tx.Query(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -153,8 +153,8 @@ func (s *sessionRepositoryImpl) CreateSession(ctx context.Context, session Sessi
 		Returning("id")
 
 	query := q.Build()
-	logging.Logger.Debugf("Executing sql: %s", query.Query)
-	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
+	logging.Logger.Debugf("Executing sql: %s", query.Sql)
+	err = tx.QueryRow(query.Sql, query.Parameters...).Scan(&resultingId)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}

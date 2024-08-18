@@ -52,8 +52,8 @@ func (u *userRoleRepositoryImpl) CreateUserRoles(ctx context.Context, userRoles 
 	// TODO: q.OnDuplicate
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	_, err = tx.Exec(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	_, err = tx.Exec(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -72,8 +72,8 @@ func (u *userRoleRepositoryImpl) DeleteUserRole(ctx context.Context, id uuid.UUI
 		Where("id = ?", id)
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	_, err = tx.Exec(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	_, err = tx.Exec(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}
@@ -94,8 +94,8 @@ func (u *userRoleRepositoryImpl) FindUserRoles(ctx context.Context, filter UserR
 	q.Where("user_id = ?", filter.UserId)
 
 	query := q.Build()
-	logging.Logger.Debugf("executing sql: %s", query.Query)
-	rows, err := tx.Query(query.Query, query.Parameters...)
+	logging.Logger.Debugf("executing sql: %s", query.Sql)
+	rows, err := tx.Query(query.Sql, query.Parameters...)
 	if err != nil {
 		panic(mapCustomErrorCodes(err))
 	}

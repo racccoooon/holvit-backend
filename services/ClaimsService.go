@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/sourcegraph/conc/iter"
 	"holvit/constants"
 	"holvit/h"
 	"holvit/ioc"
@@ -43,16 +44,48 @@ func (c *claimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequ
 	claims := make([]ClaimResponse, 0, len(mappers.Values()))
 
 	userInfoMappers := make([]interface{}, 0)
+	rolesMappers := make([]interface{}, 0)
+
 	for _, mapper := range mappers.Values() {
 		switch mapper.Type {
 		case constants.ClaimMapperUserInfo:
 			userInfoMappers = append(userInfoMappers, mapper.Details)
+		case constants.ClaimMapperRoles:
+			rolesMappers = append(rolesMappers, mapper.Details)
 		}
 	}
 
 	userRepository := ioc.Get[repos.UserRepository](scope)
+	user := userRepository.FindUserById(ctx, request.UserId).Unwrap()
+
+	if len(rolesMappers) > 0 {
+		userRoleRepository := ioc.Get[repos.UserRoleRepository](scope)
+		roleRepository := ioc.Get[repos.RoleRepository](scope)
+
+		userRoles := userRoleRepository.FindUserRoles(ctx, repos.UserRoleFilter{
+			UserId: request.UserId,
+		})
+
+		roleIds := iter.Map(userRoles, func(userRole *repos.UserRole) uuid.UUID {
+			return userRole.RoleId
+		})
+
+		roles := roleRepository.FindRoles(ctx, repos.RoleFilter{
+			RealmId: user.RealmId,
+			RoleIds: h.Some(roleIds),
+		})
+
+		roleNames := iter.Map(roles.Values(), func(role *repos.Role) string {
+			return role.Name
+		})
+
+		claims = append(claims, ClaimResponse{
+			Name:  "role",
+			Claim: roleNames,
+		})
+	}
+
 	if len(userInfoMappers) > 0 {
-		user := userRepository.FindUserById(ctx, request.UserId).Unwrap()
 
 		for _, m := range userInfoMappers {
 			mapper := m.(repos.UserInfoClaimMapperDetails)

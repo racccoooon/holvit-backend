@@ -15,6 +15,7 @@ const CredentialTypeTotp = "totp"
 const QueuedJobSendMail = "send_mail"
 
 const ClaimMapperUserInfo = "user_info"
+const ClaimMapperRoles = "roles"
 
 const UserInfoPropertyId = "id"
 const UserInfoPropertyEmail = "email"

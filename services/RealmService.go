@@ -103,6 +103,37 @@ func (s *realmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 	}
 }
 
+func (s *realmServiceImpl) createRoleScope(ctx context.Context, realmId uuid.UUID) {
+	scope := middlewares.GetScope(ctx)
+
+	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
+	claimMapperRepository := ioc.Get[repos.ClaimMapperRepository](scope)
+
+	scopeId := scopeRepository.CreateScope(ctx, repos.Scope{
+		RealmId:     realmId,
+		Name:        "roles",
+		DisplayName: "Roles",
+		Description: "Access your roles",
+		SortIndex:   4,
+	}).Unwrap()
+
+	mapperId := claimMapperRepository.CreateClaimMapper(ctx, repos.ClaimMapper{
+		BaseModel:   repos.BaseModel{},
+		RealmId:     realmId,
+		DisplayName: "Roles",
+		Description: "The roles of the user",
+		Type:        constants.ClaimMapperUserInfo,
+		Details: repos.RolesClaimMapperDetails{
+			ClaimName: "roles",
+		},
+	})
+
+	_ = claimMapperRepository.AssociateClaimMapper(ctx, repos.AssociateScopeClaimRequest{
+		ClaimMapperId: mapperId,
+		ScopeId:       scopeId,
+	})
+}
+
 func (s *realmServiceImpl) createProfileScope(ctx context.Context, realmId uuid.UUID) {
 	scope := middlewares.GetScope(ctx)
 
@@ -115,7 +146,7 @@ func (s *realmServiceImpl) createProfileScope(ctx context.Context, realmId uuid.
 		DisplayName: "Profile",
 		Description: "Access your name",
 		SortIndex:   3,
-	})
+	}).Unwrap()
 
 	mapperId := claimMapperRepository.CreateClaimMapper(ctx, repos.ClaimMapper{
 		BaseModel:   repos.BaseModel{},
@@ -131,7 +162,7 @@ func (s *realmServiceImpl) createProfileScope(ctx context.Context, realmId uuid.
 
 	_ = claimMapperRepository.AssociateClaimMapper(ctx, repos.AssociateScopeClaimRequest{
 		ClaimMapperId: mapperId,
-		ScopeId:       scopeId.Unwrap(),
+		ScopeId:       scopeId,
 	})
 }
 

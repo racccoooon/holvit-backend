@@ -29,6 +29,23 @@ type ClaimMapper struct {
 	Details interface{}
 }
 
+type RolesClaimMapperDetails struct {
+	ClaimName string
+}
+
+func (c RolesClaimMapperDetails) Value() (driver.Value, error) {
+	return json.Marshal(c)
+}
+
+func (c *RolesClaimMapperDetails) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &c)
+}
+
 type UserInfoClaimMapperDetails struct {
 	ClaimName string
 	Property  string
@@ -142,6 +159,8 @@ func (c *claimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 		switch row.Type {
 		case constants.ClaimMapperUserInfo:
 			row.Details = utils.FromRawMessage[UserInfoClaimMapperDetails](detailsRaw).Unwrap()
+		case constants.ClaimMapperRoles:
+			row.Details = utils.FromRawMessage[RolesClaimMapperDetails](detailsRaw).Unwrap()
 		default:
 			logging.Logger.Fatalf("Unsupported mapper type '%v' in claims mapper '%v'", row.Type, row.Id.String())
 		}

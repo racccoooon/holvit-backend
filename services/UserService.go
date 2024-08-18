@@ -176,6 +176,8 @@ func (u *userServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 		//TODO: panic or return error
 	}
 
+	//TODO: check password history
+
 	scope := middlewares.GetScope(ctx)
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)

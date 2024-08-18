@@ -4,12 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jaswdr/faker/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/robfig/cron/v3"
 	"holvit/cache"
 	"holvit/config"
+	"holvit/constants"
 	"holvit/crons"
 	"holvit/database"
 	"holvit/h"
@@ -81,12 +83,12 @@ func seedData(ctx context.Context) {
 
 	realmService := ioc.Get[services.RealmService](scope)
 	masterRealm := realmService.CreateRealm(ctx, services.CreateRealmRequest{
-		Name:        config.C.MasterRealmName,
-		DisplayName: config.C.MasterRealmDisplayName,
+		Name:        constants.MasterRealmName,
+		DisplayName: "Admin Realm",
 	})
 
 	clientService := ioc.Get[services.ClientService](scope)
-	clientResponse := clientService.CreateClient(ctx, services.CreateClientRequest{
+	adminClient := clientService.CreateClient(ctx, services.CreateClientRequest{
 		RealmId:      masterRealm.Id,
 		ClientId:     h.Some("holvit_admin"),
 		DisplayName:  "Holvit Admin",
@@ -94,13 +96,26 @@ func seedData(ctx context.Context) {
 		RedirectUrls: []string{routes.AdminFrontend.Url()},
 	})
 
-	logging.Logger.Infof("admin client id=%s secret=%s", clientResponse.ClientId, clientResponse.ClientSecret)
+	logging.Logger.Infof("admin client id=%s secret=%s", adminClient.ClientId, adminClient.ClientSecret)
 
 	userService := ioc.Get[services.UserService](scope)
 	adminUserId := userService.CreateUser(ctx, services.CreateUserRequest{
 		RealmId:  masterRealm.Id,
 		Username: config.C.AdminUserName,
 	}).Unwrap()
+
+	roleRepository := ioc.Get[repos.RoleRepository](scope)
+	superUserRole := roleRepository.FindRoles(ctx, repos.RoleFilter{
+		RealmId: masterRealm.Id,
+		Name:    h.Some(constants.SuperUserRoleName),
+	}).First()
+
+	roleService := ioc.Get[services.RoleService](scope)
+	roleService.AssignRolesToUser(ctx, services.AssignRolesToUserRequest{
+		RealmId: masterRealm.Id,
+		UserId:  adminUserId,
+		RoleIds: []uuid.UUID{superUserRole.Id},
+	})
 
 	userService.SetPassword(ctx, services.SetPasswordRequest{
 		UserId:    adminUserId,
@@ -192,7 +207,10 @@ func configureServices() *ioc.DependencyProvider {
 		return repos.NewClientRepository()
 	})
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.ScopeRepository {
-		return repos.NewScopeReposiroty()
+		return repos.NewScopeRepository()
+	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.RoleRepository {
+		return repos.NewRoleRepository()
 	})
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.RefreshTokenRepository {
 		return repos.NewRefreshTokenRepository()

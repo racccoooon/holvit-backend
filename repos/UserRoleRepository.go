@@ -3,41 +3,38 @@ package repos
 import (
 	"context"
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 	"holvit/ioc"
 	"holvit/logging"
 	"holvit/middlewares"
 	"holvit/requestContext"
 	"holvit/sqlb"
 	"holvit/utils"
-	"time"
 )
 
-type PasswordHistoryEntry struct {
+type UserRole struct {
 	BaseModel
 
-	UserId         uuid.UUID
-	HashedPassword string
-	CreatedAt      time.Time
+	UserId uuid.UUID
+	RoleId uuid.UUID
 }
 
-type PasswordHistoryFilter struct {
+type UserRoleFilter struct {
 	UserId uuid.UUID
 }
 
-type PasswordHistoryRepository interface {
-	GetHistory(ctx context.Context, filter PasswordHistoryFilter) []PasswordHistoryEntry
-	CreateEntry(ctx context.Context, entry PasswordHistoryEntry)
-	DeleteEntries(ctx context.Context, ids []uuid.UUID)
+type UserRoleRepository interface {
+	CreateUserRoles(ctx context.Context, userRoles []UserRole)
+	DeleteUserRole(ctx context.Context, id uuid.UUID)
+	FindUserRoles(ctx context.Context, filter UserRoleFilter) []UserRole
 }
 
-func NewPasswordHistoryRepository() PasswordHistoryRepository {
-	return &passwordHistoryRepositoryImpl{}
+func NewUserRoleRepository() UserRoleRepository {
+	return &userRoleRepositoryImpl{}
 }
 
-type passwordHistoryRepositoryImpl struct{}
+type userRoleRepositoryImpl struct{}
 
-func (p *passwordHistoryRepositoryImpl) DeleteEntries(ctx context.Context, ids []uuid.UUID) {
+func (u *userRoleRepositoryImpl) CreateUserRoles(ctx context.Context, userRoles []UserRole) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -46,8 +43,13 @@ func (p *passwordHistoryRepositoryImpl) DeleteEntries(ctx context.Context, ids [
 		panic(err)
 	}
 
-	q := sqlb.DeleteFrom("password_history").
-		Where("user_id IN (?)", pq.Array(ids))
+	q := sqlb.InsertInto("user_roles", "user_id", "role_id")
+
+	for _, userRole := range userRoles {
+		q.Values(userRole.UserId, userRole.RoleId)
+	}
+
+	// TODO: q.OnDuplicate
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Query)
@@ -57,7 +59,7 @@ func (p *passwordHistoryRepositoryImpl) DeleteEntries(ctx context.Context, ids [
 	}
 }
 
-func (p *passwordHistoryRepositoryImpl) CreateEntry(ctx context.Context, entry PasswordHistoryEntry) {
+func (u *userRoleRepositoryImpl) DeleteUserRole(ctx context.Context, id uuid.UUID) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -66,8 +68,8 @@ func (p *passwordHistoryRepositoryImpl) CreateEntry(ctx context.Context, entry P
 		panic(err)
 	}
 
-	q := sqlb.InsertInto("password_history", "user_id", "hashed_password", "created_at").
-		Values(entry.UserId, entry.HashedPassword, entry.CreatedAt)
+	q := sqlb.DeleteFrom("user_roles").
+		Where("id = ?", id)
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Query)
@@ -77,7 +79,7 @@ func (p *passwordHistoryRepositoryImpl) CreateEntry(ctx context.Context, entry P
 	}
 }
 
-func (p *passwordHistoryRepositoryImpl) GetHistory(ctx context.Context, filter PasswordHistoryFilter) []PasswordHistoryEntry {
+func (u *userRoleRepositoryImpl) FindUserRoles(ctx context.Context, filter UserRoleFilter) []UserRole {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -86,8 +88,8 @@ func (p *passwordHistoryRepositoryImpl) GetHistory(ctx context.Context, filter P
 		panic(err)
 	}
 
-	q := sqlb.Select("id", "user_id", "hashed_password", "created_at").
-		From("password_history")
+	q := sqlb.Select("id", "user_id", "role_id").
+		From("user_roles")
 
 	q.Where("user_id = ?", filter.UserId)
 
@@ -99,13 +101,14 @@ func (p *passwordHistoryRepositoryImpl) GetHistory(ctx context.Context, filter P
 	}
 	defer utils.PanicOnErr(rows.Close)
 
-	var result []PasswordHistoryEntry
+	var totalCount int
+	var result []UserRole
 	for rows.Next() {
-		var row PasswordHistoryEntry
-		err := rows.Scan(&row.Id,
+		var row UserRole
+		err := rows.Scan(&totalCount,
+			&row.Id,
 			&row.UserId,
-			&row.HashedPassword,
-			&row.CreatedAt)
+			&row.RoleId)
 		if err != nil {
 			panic(mapCustomErrorCodes(err))
 		}

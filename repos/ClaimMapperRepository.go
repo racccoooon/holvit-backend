@@ -107,11 +107,11 @@ func (c *claimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	query := q.Build()
@@ -119,7 +119,7 @@ func (c *claimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -136,7 +136,7 @@ func (c *claimMapperRepositoryImpl) FindClaimMappers(ctx context.Context, filter
 			&row.Type,
 			&detailsRaw)
 		if err != nil {
-			panic(err)
+			panic(mapCustomErrorCodes(err))
 		}
 
 		switch row.Type {
@@ -163,20 +163,19 @@ func (c *claimMapperRepositoryImpl) CreateClaimMapper(ctx context.Context, claim
 		panic(err)
 	}
 
-	sqlString := `insert into "claim_mappers"
-				("realm_id", "display_name", "description", "type", "details")
-				values ($1, $2, $3, $4, $5)
-				returning "id"`
-	logging.Logger.Debugf("executing sql: %s", sqlString)
+	q := sqlb.InsertInto("claim_mappers", "realm_id", "display_name", "description", "type", "details").
+		Values(claimMapper.RealmId,
+			claimMapper.DisplayName,
+			claimMapper.Description,
+			claimMapper.Type,
+			claimMapper.Details).
+		Returning("id")
 
-	err = tx.QueryRow(sqlString,
-		claimMapper.RealmId,
-		claimMapper.DisplayName,
-		claimMapper.Description,
-		claimMapper.Type,
-		claimMapper.Details).Scan(&resultingId)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return resultingId
@@ -193,17 +192,16 @@ func (c *claimMapperRepositoryImpl) AssociateClaimMapper(ctx context.Context, re
 		panic(err)
 	}
 
-	sqlString := `insert into "scope_claims"
-				("scope_id", "claim_mapper_id")
-				values ($1, $2)
-				returning "id"`
-	logging.Logger.Debugf("executing sql: %s", sqlString)
+	q := sqlb.InsertInto("scope_claims", "scope_id", "claim_mapper_id").
+		Values(request.ScopeId,
+			request.ClaimMapperId).
+		Returning("id")
 
-	err = tx.QueryRow(sqlString,
-		request.ScopeId,
-		request.ClaimMapperId).Scan(&resultingId)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return resultingId

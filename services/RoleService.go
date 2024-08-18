@@ -46,10 +46,18 @@ type GetRolesForUserRequest struct {
 	RealmId uuid.UUID
 }
 
+type AssignRolesToUserRequest struct {
+	RealmId uuid.UUID
+	UserId  uuid.UUID
+	RoleIds []uuid.UUID
+}
+
 type RoleService interface {
 	CreateRole(ctx context.Context, request CreateRoleRequest)
 	DeleteRoles(ctx context.Context, request DeleteRoleRequest)
 	SetImplications(ctx context.Context, request SetImplicationRequest) h.Result[h.Unit]
+
+	AssignRolesToUser(ctx context.Context, request AssignRolesToUserRequest)
 }
 
 func NewRoleService() RoleService {
@@ -61,7 +69,7 @@ type roleServiceImpl struct{}
 func (s *roleServiceImpl) CreateRole(ctx context.Context, request CreateRoleRequest) {
 	scope := middlewares.GetScope(ctx)
 
-	rolesRepository := ioc.Get[repos.RolesRepository](scope)
+	rolesRepository := ioc.Get[repos.RoleRepository](scope)
 	rolesRepository.CreateRole(ctx, repos.Role{
 		RealmId:     request.RealmId,
 		ClientId:    request.ClientId,
@@ -74,7 +82,7 @@ func (s *roleServiceImpl) CreateRole(ctx context.Context, request CreateRoleRequ
 func (s *roleServiceImpl) DeleteRoles(ctx context.Context, request DeleteRoleRequest) {
 	scope := middlewares.GetScope(ctx)
 
-	rolesRepository := ioc.Get[repos.RolesRepository](scope)
+	rolesRepository := ioc.Get[repos.RoleRepository](scope)
 	rolesRepository.DeleteRoles(ctx, request.RealmId, request.RoleIds)
 	s.recalculateCache(ctx, request.RealmId)
 }
@@ -82,11 +90,11 @@ func (s *roleServiceImpl) DeleteRoles(ctx context.Context, request DeleteRoleReq
 func (s *roleServiceImpl) recalculateCache(ctx context.Context, realmId uuid.UUID) {
 	scope := middlewares.GetScope(ctx)
 
-	rolesRepository := ioc.Get[repos.RolesRepository](scope)
+	rolesRepository := ioc.Get[repos.RoleRepository](scope)
 	roleImplicationRepository := ioc.Get[repos.RoleImplicationRepository](scope)
 
 	roles := rolesRepository.FindRoles(ctx, repos.RoleFilter{
-		RealmId: h.Some(realmId),
+		RealmId: realmId,
 	})
 	implications := roleImplicationRepository.FindRoleImplications(ctx, repos.RoleImplicationFilter{
 		RealmId: realmId,
@@ -129,7 +137,7 @@ func (s *roleServiceImpl) recalculateCache(ctx context.Context, realmId uuid.UUI
 func (s *roleServiceImpl) SetImplications(ctx context.Context, request SetImplicationRequest) h.Result[h.Unit] {
 	scope := middlewares.GetScope(ctx)
 
-	rolesRepository := ioc.Get[repos.RolesRepository](scope)
+	rolesRepository := ioc.Get[repos.RoleRepository](scope)
 	roleImplicationRepository := ioc.Get[repos.RoleImplicationRepository](scope)
 
 	impliedRoles := rolesRepository.FindRoles(ctx, repos.RoleFilter{
@@ -161,4 +169,19 @@ func (s *roleServiceImpl) SetImplications(ctx context.Context, request SetImplic
 	s.recalculateCache(ctx, request.RealmId)
 
 	return h.UOk()
+}
+
+func (s *roleServiceImpl) AssignRolesToUser(ctx context.Context, request AssignRolesToUserRequest) {
+	scope := middlewares.GetScope(ctx)
+
+	userRoles := make([]repos.UserRole, 0, len(request.RoleIds))
+	for _, roleId := range request.RoleIds {
+		userRoles = append(userRoles, repos.UserRole{
+			UserId: request.UserId,
+			RoleId: roleId,
+		})
+	}
+
+	userRoleRepository := ioc.Get[repos.UserRoleRepository](scope)
+	userRoleRepository.CreateUserRoles(ctx, userRoles)
 }

@@ -7,6 +7,8 @@ type Result[T any] struct {
 	err   error
 }
 
+type UResult = Result[Unit]
+
 func UOk() Result[Unit] {
 	return Ok(Unit{})
 }

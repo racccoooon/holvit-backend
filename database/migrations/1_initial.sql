@@ -1,4 +1,7 @@
 -- +migrate Up
+--error codes:
+-- VV001 = Realm ids do not match
+
 create extension if not exists "citext";
 
 -- +migrate StatementBegin
@@ -347,6 +350,7 @@ create table "roles"
     "name"             text      not null,
     "description"      text      not null,
     "implies_cache"    uuid[]    not null default [],
+    "internal"         boolean   not null default false,
     primary key ("id")
 );
 
@@ -402,10 +406,30 @@ create trigger "set_audit_updated_at"
     for each row
 execute function update_audit_timestamp();
 
+create unique index "idx_unique_user_roles" on "user_roles" ("user_id", "role_id");
+
 alter table "user_roles"
-    add constraint "fk_user_roles_users" foreign key ("user_id") references "users";
+    add constraint "fk_user_roles_users" foreign key ("user_id") references "users" on delete cascade;
 alter table "user_roles"
-    add constraint "fk_user_roles_roles" foreign key ("role_id") references "roles";
+    add constraint "fk_user_roles_roles" foreign key ("role_id") references "roles" on delete cascade;
+
+-- +migrate StatementBegin
+create or replace function check_user_roles_realm_ids() returns trigger as $$
+begin
+    if (select u.realm_id from users u where u.id = new.user_id) != (select r.realm_id from roles r where r.id = new.role_id) then
+        raise exception 'Realm ids do not match up'
+            using errcode = 'VV001';
+    end if;
+
+    return new;
+end;
+$$ language plpgsql;
+-- +migrate StatementEnd
+
+create trigger trg_user_roles_check_realm_ids_match
+    before insert or update on user_roles
+    for each row
+execute function check_user_roles_realm_ids();
 
 -- +migrate Down
 drop table "password_history" cascade;

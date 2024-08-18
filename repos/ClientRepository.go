@@ -50,7 +50,7 @@ type ClientRepository interface {
 	FindClientById(ctx context.Context, id uuid.UUID) h.Opt[Client]
 	FindClients(ctx context.Context, filter ClientFilter) FilterResult[Client]
 	CreateClient(ctx context.Context, client Client) h.Result[uuid.UUID]
-	UpdateClient(ctx context.Context, id uuid.UUID, upd ClientUpdate) h.Result[h.Unit]
+	UpdateClient(ctx context.Context, id uuid.UUID, upd ClientUpdate) h.UResult
 }
 
 type clientRepositoryImpl struct{}
@@ -93,18 +93,18 @@ func (c *clientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -120,7 +120,7 @@ func (c *clientRepositoryImpl) FindClients(ctx context.Context, filter ClientFil
 			row.ClientSecret.AsMutPtr(),
 			pq.Array(&row.RedirectUris))
 		if err != nil {
-			panic(err)
+			panic(mapCustomErrorCodes(err))
 		}
 		result = append(result, row)
 	}
@@ -158,13 +158,13 @@ func (c *clientRepositoryImpl) CreateClient(ctx context.Context, client Client) 
 			}
 		}
 
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return h.Ok(resultingId)
 }
 
-func (c *clientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, upd ClientUpdate) h.Result[h.Unit] {
+func (c *clientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, upd ClientUpdate) h.UResult {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -202,7 +202,7 @@ func (c *clientRepositoryImpl) UpdateClient(ctx context.Context, id uuid.UUID, u
 			}
 		}
 
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return h.UOk()

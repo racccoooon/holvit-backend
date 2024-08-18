@@ -99,16 +99,16 @@ func (c *credentialRepositoryImpl) CreateCredential(ctx context.Context, credent
 		return h.Err[uuid.UUID](err)
 	}
 
-	sqlString := `insert into "credentials"
-    			("user_id", "type", "details")
-    			values ($1, $2, $3)
-    			returning "id"`
-	logging.Logger.Debugf("executing sql: %s", sqlString)
+	q := sqlb.InsertInto("credentials", "user_id", "type", "details").
+		Values(credential.UserId,
+			credential.Type,
+			credential.Details).
+		Returning("id")
 
-	err = tx.QueryRow(sqlString,
-		credential.UserId,
-		credential.Type,
-		credential.Details).Scan(&resultingId)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+
+	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code.Name() {
@@ -117,9 +117,9 @@ func (c *credentialRepositoryImpl) CreateCredential(ctx context.Context, credent
 					return h.Err[uuid.UUID](DuplicatePasswordOnUserError{})
 				}
 			}
-		} else {
-			panic(err)
 		}
+
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return h.Ok(resultingId)
@@ -158,18 +158,18 @@ func (c *credentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -184,7 +184,7 @@ func (c *credentialRepositoryImpl) FindCredentials(ctx context.Context, filter C
 			&row.Type,
 			&detailsRaw)
 		if err != nil {
-			panic(err)
+			panic(mapCustomErrorCodes(err))
 		}
 
 		switch row.Type {
@@ -216,12 +216,8 @@ func (c *credentialRepositoryImpl) DeleteCredential(ctx context.Context, id uuid
 
 	sqlString, args := sb.Build()
 	logging.Logger.Debugf("executing sql: %s", sqlString)
-	result, err := tx.Exec(sqlString, args...)
+	_, err = tx.Exec(sqlString, args...)
 	if err != nil {
-		panic(err)
-	}
-	_, err = result.RowsAffected()
-	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 }

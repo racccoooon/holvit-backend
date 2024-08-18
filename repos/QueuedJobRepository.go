@@ -120,11 +120,11 @@ func (c *queuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	if filter.IgnoreLocked {
@@ -135,7 +135,7 @@ func (c *queuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -152,7 +152,7 @@ func (c *queuedJobRepositoryImpl) FindQueuedJobs(ctx context.Context, filter Que
 			&row.FailureCount,
 			row.Error.AsMutPtr())
 		if err != nil {
-			panic(err)
+			panic(mapCustomErrorCodes(err))
 		}
 
 		switch row.Type {
@@ -179,20 +179,19 @@ func (c *queuedJobRepositoryImpl) CreateQueuedJob(ctx context.Context, job Queue
 		panic(err)
 	}
 
-	sqlString := `insert into "queued_jobs"
-				("status", "type", "details", "failure_count", "error")
-				values ($1, $2, $3, $4, $5)
-				returning "id"`
-	logging.Logger.Debugf("executing sql: %s", sqlString)
+	q := sqlb.InsertInto("queued_jobs", "status", "type", "details", "failure_count", "error").
+		Values(job.Status,
+			job.Type,
+			job.Details,
+			job.FailureCount,
+			job.Error.ToNillablePtr()).
+		Returning("id")
 
-	err = tx.QueryRow(sqlString,
-		job.Status,
-		job.Type,
-		job.Details,
-		job.FailureCount,
-		job.Error.ToNillablePtr()).Scan(&resultingId)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return resultingId
@@ -227,6 +226,6 @@ func (c *queuedJobRepositoryImpl) UpdateQueuedJob(ctx context.Context, id uuid.U
 	logging.Logger.Debugf("executing sql: %s", sqlString)
 	_, err = tx.Exec(sqlString, args...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 }

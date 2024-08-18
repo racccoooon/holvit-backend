@@ -46,3 +46,8 @@ const AuthenticateStepVerifyDevice = "verify_device"
 const AuthenticateStepSubmit = "submit"
 
 const TotpSecretLength = 32
+
+const MasterRealmName = "master"
+const SuperUserRoleName = "superuser"
+
+const SqlErrorCodeRealmsDoNotMatch = "VV001"

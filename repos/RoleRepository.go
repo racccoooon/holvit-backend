@@ -24,6 +24,7 @@ type Role struct {
 	Description string
 
 	ImpliesCache []uuid.UUID
+	Internal     bool
 }
 
 type RoleUpdate struct {
@@ -42,11 +43,12 @@ func (e DuplicateRoleError) Error() string {
 
 type RoleFilter struct {
 	BaseFilter
-	RealmId h.Opt[uuid.UUID]
+	RealmId uuid.UUID
 	RoleIds h.Opt[[]uuid.UUID]
+	Name    h.Opt[string]
 }
 
-type RolesRepository interface {
+type RoleRepository interface {
 	FindRoleById(ctx context.Context, id uuid.UUID) h.Opt[Role]
 	FindRoles(ctx context.Context, filter RoleFilter) FilterResult[Role]
 	CreateRole(ctx context.Context, role Role) h.Result[uuid.UUID]
@@ -54,7 +56,7 @@ type RolesRepository interface {
 	UpdateRole(ctx context.Context, id uuid.UUID, upd RoleUpdate)
 }
 
-func NewRolesRepository() RolesRepository {
+func NewRoleRepository() RoleRepository {
 	return &roleRepositoryImpl{}
 }
 
@@ -78,34 +80,35 @@ func (r *roleRepositoryImpl) FindRoles(ctx context.Context, filter RoleFilter) F
 	}
 
 	q := sqlb.Select(filter.CountCol(),
-		"id", "realm_id", "client_id", "display_name", "name", "description", "implies_cache").
-		From("roles")
+		"id", "realm_id", "client_id", "display_name", "name", "description", "implies_cache", "internal").
+		From("roles").
+		Where("realm_id = ?", filter.RealmId)
 
 	filter.Id.IfSome(func(x uuid.UUID) {
 		q.Where("id = ?", x)
-	})
-
-	filter.RealmId.IfSome(func(x uuid.UUID) {
-		q.Where("realm_id = ?", x)
 	})
 
 	filter.RoleIds.IfSome(func(x []uuid.UUID) {
 		q.Where("id IN (?)", pq.Array(x))
 	})
 
+	filter.Name.IfSome(func(x string) {
+		q.Where("name = ?", x)
+	})
+
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -120,9 +123,10 @@ func (r *roleRepositoryImpl) FindRoles(ctx context.Context, filter RoleFilter) F
 			&row.DisplayName,
 			&row.Name,
 			&row.Description,
-			pq.Array(&row.ImpliesCache))
+			pq.Array(&row.ImpliesCache),
+			&row.Internal)
 		if err != nil {
-			panic(err)
+			panic(mapCustomErrorCodes(err))
 		}
 		result = append(result, row)
 	}
@@ -141,18 +145,12 @@ func (r *roleRepositoryImpl) CreateRole(ctx context.Context, role Role) h.Result
 		return h.Err[uuid.UUID](err)
 	}
 
-	sqlString := `insert into "roles"
-				("realm_id", "client_id", "display_name", "name", "description")
-				values ($1, $2, $3, $4, $5)
-				returning "id"`
+	q := sqlb.InsertInto("roles", "realm_id", "client_id", "display_name", "name", "description", "internal").
+		Values(role.RealmId, role.ClientId.ToNillablePtr(), role.DisplayName, role.Name, role.Description, role.Internal)
 
-	logging.Logger.Debugf("executing sql: %s", sqlString)
-	err = tx.QueryRow(sqlString,
-		role.RealmId,
-		role.ClientId.ToNillablePtr(),
-		role.DisplayName,
-		role.Name,
-		role.Description).Scan(&resultingId)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code.Name() {
@@ -161,9 +159,9 @@ func (r *roleRepositoryImpl) CreateRole(ctx context.Context, role Role) h.Result
 					return h.Err[uuid.UUID](DuplicateRoleError{})
 				}
 			}
-		} else {
-			panic(err)
 		}
+
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return h.Ok(resultingId)
@@ -185,7 +183,7 @@ func (r *roleRepositoryImpl) DeleteRoles(ctx context.Context, realmId uuid.UUID,
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	_, err = tx.Exec(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 }
 
@@ -222,6 +220,6 @@ func (r *roleRepositoryImpl) UpdateRole(ctx context.Context, id uuid.UUID, upd R
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	_, err = tx.Exec(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 }

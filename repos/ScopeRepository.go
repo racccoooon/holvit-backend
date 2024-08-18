@@ -63,7 +63,7 @@ type ScopeRepository interface {
 
 type scopeRepositoryImpl struct{}
 
-func NewScopeReposiroty() ScopeRepository {
+func NewScopeRepository() ScopeRepository {
 	return &scopeRepositoryImpl{}
 }
 
@@ -114,11 +114,11 @@ func (s *scopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	if x, ok := filter.SortInfo.Get(); ok {
-		x.Apply2(q)
+		x.Apply(q)
 	}
 	q.OrderBy("sort_index asc")
 
@@ -126,7 +126,7 @@ func (s *scopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -153,7 +153,7 @@ func (s *scopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 		}
 		err := rows.Scan(scan)
 		if err != nil {
-			panic(err)
+			panic(mapCustomErrorCodes(err))
 		}
 
 		if filter.IncludeGrants && grantId.IsSome() {
@@ -184,18 +184,17 @@ func (s *scopeRepositoryImpl) CreateScope(ctx context.Context, scope Scope) h.Re
 		return h.Err[uuid.UUID](err)
 	}
 
-	sqlString := `insert into "scopes"
-    			("realm_id", "name", "display_name", "description", "sort_index")
-    			values ($1, $2, $3, $4, $5)
-    			returning "id"`
+	q := sqlb.InsertInto("scopes", "realm_id", "name", "display_name", "description", "sort_index").
+		Values(scope.RealmId,
+			scope.Name,
+			scope.DisplayName,
+			scope.Description,
+			scope.SortIndex).
+		Returning("id")
 
-	logging.Logger.Debugf("executing sql: %s", sqlString)
-	err = tx.QueryRow(sqlString,
-		scope.RealmId,
-		scope.Name,
-		scope.DisplayName,
-		scope.Description,
-		scope.SortIndex).Scan(&resultingId)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code.Name() {
@@ -204,9 +203,9 @@ func (s *scopeRepositoryImpl) CreateScope(ctx context.Context, scope Scope) h.Re
 					return h.Err[uuid.UUID](DuplicateScopeError{})
 				}
 			}
-		} else {
-			panic(err)
 		}
+
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return h.Ok(resultingId)
@@ -233,6 +232,6 @@ func (s *scopeRepositoryImpl) CreateGrants(ctx context.Context, userId uuid.UUID
 	_, err = tx.Exec(sqlString, args...)
 
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 }

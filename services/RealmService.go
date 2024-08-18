@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"github.com/google/uuid"
 	"holvit/cache"
 	"holvit/config"
 	"holvit/constants"
+	"holvit/h"
 	"holvit/ioc"
 	"holvit/middlewares"
 	"holvit/repos"
@@ -67,6 +69,49 @@ func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 
 	keyCache := ioc.Get[cache.KeyCache](scope)
 	keyCache.Set(realmId, privateKeyBytes)
+
+	roleRepository := ioc.Get[repos.RoleRepository](scope)
+	if request.Name != constants.MasterRealmName {
+		masterRealm := realmRepository.FindRealms(ctx, repos.RealmFilter{
+			Name: h.Some(constants.MasterRealmName),
+		}).First()
+
+		realmAdminRoleId := roleRepository.CreateRole(ctx, repos.Role{
+			RealmId:      masterRealm.Id,
+			ClientId:     h.None[uuid.UUID](),
+			DisplayName:  fmt.Sprintf("%s Realm Administrator", request.DisplayName),
+			Name:         fmt.Sprintf("%s.admin", request.Name),
+			Description:  fmt.Sprintf("Administrator role for the %s realm", request.DisplayName),
+			ImpliesCache: nil,
+			Internal:     true,
+		}).Unwrap() //TODO: handle duplicate error
+
+		superUserRole := roleRepository.FindRoles(ctx, repos.RoleFilter{
+			Name: h.Some(constants.SuperUserRoleName),
+		}).First()
+
+		roleImplicationRepository := ioc.Get[repos.RoleImplicationRepository](scope)
+		roleImplicationRepository.CreateImplications(ctx, []repos.RoleImplication{
+			{
+				RoleId:        superUserRole.Id,
+				ImpliedRoleId: realmAdminRoleId,
+			},
+		})
+
+		roleRepository.UpdateRole(ctx, superUserRole.Id, repos.RoleUpdate{
+			ImpliesCache: h.Some(append(superUserRole.ImpliesCache, realmAdminRoleId)),
+		})
+	} else {
+		roleRepository.CreateRole(ctx, repos.Role{
+			RealmId:      realmId,
+			ClientId:     h.None[uuid.UUID](),
+			DisplayName:  "Superuser",
+			Name:         constants.SuperUserRoleName,
+			Description:  "Superuser of this holvit installation",
+			ImpliesCache: nil,
+			Internal:     true,
+		})
+	}
 
 	return CreateRealmResponse{
 		Id: realmId,

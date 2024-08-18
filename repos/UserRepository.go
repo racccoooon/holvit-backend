@@ -81,18 +81,18 @@ func (u *userRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) F
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -107,7 +107,7 @@ func (u *userRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) F
 			row.Email.AsMutPtr(),
 			&row.EmailVerified)
 		if err != nil {
-			panic(err)
+			panic(mapCustomErrorCodes(err))
 		}
 
 		result = append(result, row)
@@ -127,14 +127,16 @@ func (u *userRepositoryImpl) CreateUser(ctx context.Context, user User) h.Result
 		return h.Err[uuid.UUID](err)
 	}
 
-	err = tx.QueryRow(`insert into "users"
-    			("realm_id", "username", "email", "email_verified")
-    			values ($1, $2, $3, $4)
-    			returning "id"`,
-		user.RealmId,
-		user.Username,
-		user.Email.ToNillablePtr(),
-		user.EmailVerified).Scan(&resultingId)
+	q := sqlb.InsertInto("users", "realm_id", "username", "email", "email_verified").
+		Values(user.RealmId,
+			user.Username,
+			user.Email.ToNillablePtr(),
+			user.EmailVerified).
+		Returning("id")
+
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code.Name() {
@@ -143,9 +145,9 @@ func (u *userRepositoryImpl) CreateUser(ctx context.Context, user User) h.Result
 					return h.Err[uuid.UUID](DuplicateUsernameError{})
 				}
 			}
-		} else {
-			panic(err)
 		}
+
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return h.Ok(resultingId)

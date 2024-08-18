@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/huandu/go-sqlbuilder"
 	"holvit/h"
 	"holvit/sqlb"
 )
@@ -28,16 +27,7 @@ type SortInfo struct {
 	Ascending bool
 }
 
-func (i SortInfo) Apply(sb *sqlbuilder.SelectBuilder) {
-	sb.OrderBy(i.Field)
-	if i.Ascending {
-		sb.Asc()
-	} else {
-		sb.Desc()
-	}
-}
-
-func (i SortInfo) Apply2(q sqlb.SelectQuery) {
+func (i SortInfo) Apply(q sqlb.SelectQuery) {
 	field := i.Field
 	if i.Ascending {
 		field += " asc"
@@ -60,11 +50,7 @@ type PagingInfo struct {
 	PageNumber int
 }
 
-func (i PagingInfo) Apply(sb *sqlbuilder.SelectBuilder) {
-	sb.Limit(i.PageSize).Offset(i.PageSize * (i.PageNumber - 1))
-}
-
-func (i PagingInfo) Apply2(sb sqlb.SelectQuery) {
+func (i PagingInfo) Apply(sb sqlb.SelectQuery) {
 	sb.Limit(i.PageSize).Offset(i.PageSize * (i.PageNumber - 1))
 }
 

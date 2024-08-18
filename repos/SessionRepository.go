@@ -3,7 +3,6 @@ package repos
 import (
 	"context"
 	"github.com/google/uuid"
-	"github.com/huandu/go-sqlbuilder"
 	"holvit/h"
 	"holvit/ioc"
 	"holvit/logging"
@@ -59,14 +58,13 @@ func (s *sessionRepositoryImpl) DeleteOldSessions(ctx context.Context) {
 	clockService := ioc.Get[utils.ClockService](scope)
 	now := clockService.Now()
 
-	sb := sqlbuilder.DeleteFrom("sessions")
-	sb.Where(sb.LessThan("valid_until", now))
+	q := sqlb.DeleteFrom("sessions").Where("valid_until < ", now)
 
-	sqlString, args := sb.Build()
-	logging.Logger.Debugf("executing sql: %s", sqlString)
-	_, err = tx.Exec(sqlString, args...)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	_, err = tx.Exec(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 }
 
@@ -100,18 +98,18 @@ func (s *sessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -127,7 +125,7 @@ func (s *sessionRepositoryImpl) FindSessions(ctx context.Context, filter Session
 			&row.HashedToken,
 			&row.ValidUntil)
 		if err != nil {
-			panic(err)
+			panic(mapCustomErrorCodes(err))
 		}
 		result = append(result, row)
 	}
@@ -146,20 +144,19 @@ func (s *sessionRepositoryImpl) CreateSession(ctx context.Context, session Sessi
 		panic(err)
 	}
 
-	sqlString := `insert into "sessions"
-    			("user_id", "user_device_id", "realm_id", "hashed_token", "valid_until")
-    			values ($1, $2, $3, $4, $5)
-    			returning "id"`
-	logging.Logger.Debugf("Executing sql: %s", sqlString)
+	q := sqlb.InsertInto("sessions", "user_id", "user_device_id", "realm_id", "hashed_token", "valid_until").
+		Values(session.UserId,
+			session.UserDeviceId,
+			session.RealmId,
+			session.HashedToken,
+			session.ValidUntil).
+		Returning("id")
 
-	err = tx.QueryRow(sqlString,
-		session.UserId,
-		session.UserDeviceId,
-		session.RealmId,
-		session.HashedToken,
-		session.ValidUntil).Scan(&resultingId)
+	query := q.Build()
+	logging.Logger.Debugf("Executing sql: %s", query.Query)
+	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return resultingId

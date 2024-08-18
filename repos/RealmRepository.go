@@ -51,7 +51,7 @@ type RealmRepository interface {
 	FindRealmById(ctx context.Context, id uuid.UUID) h.Opt[Realm]
 	FindRealms(ctx context.Context, filter RealmFilter) FilterResult[Realm]
 	CreateRealm(ctx context.Context, realm Realm) h.Result[uuid.UUID]
-	UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) h.Result[h.Unit]
+	UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) h.UResult
 }
 
 type RealmRepositoryImpl struct {
@@ -93,18 +93,18 @@ func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -143,39 +143,38 @@ func (r *RealmRepositoryImpl) CreateRealm(ctx context.Context, realm Realm) h.Re
 		panic(err)
 	}
 
-	sqlString := `insert into "realms"
-    			("name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_device_verification", "require_totp", "enable_remember_me", "password_history_length")
-    			values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    			returning "id"`
-	logging.Logger.Debugf("executing sql: %s", sqlString)
+	q := sqlb.InsertInto("realms", "name", "display_name", "encrypted_private_key", "require_username", "require_email", "require_device_verification", "require_totp", "enable_remember_me", "password_history_length").
+		Values(realm.Name,
+			realm.DisplayName,
+			realm.EncryptedPrivateKey,
+			realm.RequireUsername,
+			realm.RequireEmail,
+			realm.RequireDeviceVerification,
+			realm.RequireTotp,
+			realm.EnableRememberMe,
+			realm.PasswordHistoryLength).
+		Returning("id")
 
-	err = tx.QueryRow(sqlString,
-		realm.Name,
-		realm.DisplayName,
-		realm.EncryptedPrivateKey,
-		realm.RequireUsername,
-		realm.RequireEmail,
-		realm.RequireDeviceVerification,
-		realm.RequireTotp,
-		realm.EnableRememberMe,
-		realm.PasswordHistoryLength).Scan(&resultingId)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok {
 			switch pqErr.Code.Name() {
 			case "unique_violation":
 				if pqErr.Constraint == "idx_unique_realm_name" {
-					return h.Err[uuid.UUID](DuplicateUsernameError{})
+					return h.Err[uuid.UUID](DuplicateUsernameError{}) //TODO: correct error
 				}
 			}
-		} else {
-			panic(err)
 		}
+
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return h.Ok(resultingId)
 }
 
-func (r *RealmRepositoryImpl) UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) h.Result[h.Unit] {
+func (r *RealmRepositoryImpl) UpdateRealm(ctx context.Context, id uuid.UUID, upd RealmUpdate) h.UResult {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

@@ -23,9 +23,6 @@ type HolvitConfig struct {
 
 	Secret string
 
-	MasterRealmName        string
-	MasterRealmDisplayName string
-
 	AdminUserName        string
 	InitialAdminPassword string
 
@@ -162,9 +159,6 @@ func setDefaultConfigValues() {
 
 	C.Totp.Period = 30
 	C.Totp.Skew = 1
-
-	C.MasterRealmName = "admin"
-	C.MasterRealmDisplayName = "Admin Realm"
 
 	C.AdminUserName = "admin"
 

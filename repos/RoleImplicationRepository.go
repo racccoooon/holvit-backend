@@ -34,7 +34,7 @@ func NewRoleImplicationRepository() RoleImplicationRepository {
 
 type roleImplicationRepositoryImpl struct{}
 
-func (r *roleImplicationRepositoryImpl) CreateImplication(ctx context.Context, implications []RoleImplication) {
+func (r *roleImplicationRepositoryImpl) CreateImplications(ctx context.Context, implications []RoleImplication) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 
@@ -53,7 +53,7 @@ func (r *roleImplicationRepositoryImpl) CreateImplication(ctx context.Context, i
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	_, err = tx.Exec(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 }
 
@@ -73,7 +73,7 @@ func (r *roleImplicationRepositoryImpl) DeleteImplicationsForRole(ctx context.Co
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	_, err = tx.Exec(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 }
 
@@ -95,7 +95,7 @@ func (r *roleImplicationRepositoryImpl) FindRoleImplications(ctx context.Context
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -106,7 +106,7 @@ func (r *roleImplicationRepositoryImpl) FindRoleImplications(ctx context.Context
 			row.RoleId,
 			&row.ImpliedRoleId)
 		if err != nil {
-			panic(err)
+			panic(mapCustomErrorCodes(err))
 		}
 		result = append(result, row)
 	}

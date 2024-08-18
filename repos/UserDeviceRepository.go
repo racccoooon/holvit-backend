@@ -79,18 +79,18 @@ func (r *userDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter U
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -107,7 +107,7 @@ func (r *userDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter U
 			&row.LastIp,
 			&row.LastLoginAt)
 		if err != nil {
-			panic(err)
+			panic(mapCustomErrorCodes(err))
 		}
 		result = append(result, row)
 	}
@@ -126,21 +126,20 @@ func (r *userDeviceRepositoryImpl) CreateUserDevice(ctx context.Context, userDev
 		panic(err)
 	}
 
-	sqlString := `insert into "user_devices"
-    			("user_id", "device_id", "display_name", "user_agent", "last_ip", "last_login_at")
-    			values ($1, $2, $3, $4, $5, $6)
-    			returning "id"`
-	logging.Logger.Debugf("executing sql: %s", sqlString)
+	q := sqlb.InsertInto("user_devices", "user_id", "device_id", "display_name", "user_agent", "last_ip", "last_login_at").
+		Values(userDevice.UserId,
+			userDevice.DeviceId,
+			userDevice.DisplayName,
+			userDevice.UserAgent,
+			userDevice.LastIp,
+			userDevice.LastLoginAt).
+		Returning("id")
 
-	err = tx.QueryRow(sqlString,
-		userDevice.UserId,
-		userDevice.DeviceId,
-		userDevice.DisplayName,
-		userDevice.UserAgent,
-		userDevice.LastIp,
-		userDevice.LastLoginAt).Scan(&resultingId)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return resultingId

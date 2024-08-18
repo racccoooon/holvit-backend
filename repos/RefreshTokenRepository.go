@@ -85,18 +85,18 @@ func (r *refreshTokenRepositoryImpl) FindRefreshTokens(ctx context.Context, filt
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
-		x.Apply2(q)
+		x.Apply(q)
 	})
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Query)
 	rows, err := tx.Query(query.Query, query.Parameters...)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 	defer utils.PanicOnErr(rows.Close)
 
@@ -135,25 +135,23 @@ func (r *refreshTokenRepositoryImpl) CreateRefreshToken(ctx context.Context, ref
 		panic(err)
 	}
 
-	sqlString := `insert into "refresh_tokens"
-    			("user_id", "client_id", "realm_id", "hashed_token", "valid_until", "issuer", "subject", "audience", "scopes")
-    			values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    			returning "id"`
-	logging.Logger.Debugf("executing sql: %s", sqlString)
+	q := sqlb.InsertInto("refresh_tokens", "user_id", "client_id", "realm_id", "hashed_token", "valid_until", "issuer", "subject", "audience", "scopes").
+		Values(refreshToken.UserId,
+			refreshToken.ClientId,
+			refreshToken.RealmId,
+			refreshToken.HashedToken,
+			refreshToken.ValidUntil,
+			refreshToken.Issuer,
+			refreshToken.Subject,
+			refreshToken.Audience,
+			pq.Array(refreshToken.Scopes)).
+		Returning("id")
 
-	err = tx.QueryRow(sqlString,
-		refreshToken.UserId,
-		refreshToken.ClientId,
-		refreshToken.RealmId,
-		refreshToken.HashedToken,
-		refreshToken.ValidUntil,
-		refreshToken.Issuer,
-		refreshToken.Subject,
-		refreshToken.Audience,
-		pq.Array(refreshToken.Scopes)).
-		Scan(&resultingId)
+	query := q.Build()
+	logging.Logger.Debugf("executing sql: %s", query.Query)
+	err = tx.QueryRow(query.Query, query.Parameters...).Scan(&resultingId)
 	if err != nil {
-		panic(err)
+		panic(mapCustomErrorCodes(err))
 	}
 
 	return resultingId

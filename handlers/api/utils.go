@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"holvit/h"
 	"holvit/httpErrors"
@@ -12,6 +13,10 @@ import (
 	"net/http"
 	"strconv"
 )
+
+type CreateResponse struct {
+	Id uuid.UUID `json:"id"`
+}
 
 type FindResponse[T any] struct {
 	TotalCount int `json:"totalCount"`
@@ -123,6 +128,19 @@ func writeFindResponse[T any](w http.ResponseWriter, rows []T, totalCount int) {
 	response := FindResponse[T]{
 		TotalCount: totalCount,
 		Rows:       rows,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	encoder := json.NewEncoder(w)
+	err := encoder.Encode(response)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func writeCreateResponse(w http.ResponseWriter, id uuid.UUID) {
+	response := CreateResponse{
+		Id: id,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -36,13 +36,13 @@ type RealmService interface {
 	InitializeRealmKeys(ctx context.Context)
 }
 
-type RealmServiceImpl struct{}
+type realmServiceImpl struct{}
 
 func NewRealmService() RealmService {
-	return &RealmServiceImpl{}
+	return &realmServiceImpl{}
 }
 
-func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmRequest) CreateRealmResponse {
+func (s *realmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmRequest) CreateRealmResponse {
 	scope := middlewares.GetScope(ctx)
 
 	key := config.C.GetSymmetricEncryptionKey()
@@ -118,7 +118,7 @@ func (s *RealmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 	}
 }
 
-func (s *RealmServiceImpl) createProfileScope(ctx context.Context, realmId uuid.UUID) {
+func (s *realmServiceImpl) createProfileScope(ctx context.Context, realmId uuid.UUID) {
 	scope := middlewares.GetScope(ctx)
 
 	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
@@ -150,7 +150,7 @@ func (s *RealmServiceImpl) createProfileScope(ctx context.Context, realmId uuid.
 	})
 }
 
-func (s *RealmServiceImpl) createEmailScope(ctx context.Context, realmId uuid.UUID) {
+func (s *realmServiceImpl) createEmailScope(ctx context.Context, realmId uuid.UUID) {
 	scope := middlewares.GetScope(ctx)
 
 	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
@@ -199,7 +199,7 @@ func (s *RealmServiceImpl) createEmailScope(ctx context.Context, realmId uuid.UU
 	})
 }
 
-func (s *RealmServiceImpl) createOpenIdScope(ctx context.Context, realmId uuid.UUID) {
+func (s *realmServiceImpl) createOpenIdScope(ctx context.Context, realmId uuid.UUID) {
 	scope := middlewares.GetScope(ctx)
 
 	scopeRepository := ioc.Get[repos.ScopeRepository](scope)
@@ -231,7 +231,7 @@ func (s *RealmServiceImpl) createOpenIdScope(ctx context.Context, realmId uuid.U
 	})
 }
 
-func (s *RealmServiceImpl) InitializeRealmKeys(ctx context.Context) {
+func (s *realmServiceImpl) InitializeRealmKeys(ctx context.Context) {
 	scope := middlewares.GetScope(ctx)
 
 	realmRepository := ioc.Get[repos.RealmRepository](scope)

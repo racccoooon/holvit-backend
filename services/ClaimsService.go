@@ -27,12 +27,12 @@ type ClaimsService interface {
 }
 
 func NewClaimsService() ClaimsService {
-	return &ClaimsServiceImpl{}
+	return &claimsServiceImpl{}
 }
 
-type ClaimsServiceImpl struct{}
+type claimsServiceImpl struct{}
 
-func (c *ClaimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequest) []ClaimResponse {
+func (c *claimsServiceImpl) GetClaims(ctx context.Context, request GetClaimsRequest) []ClaimResponse {
 	scope := middlewares.GetScope(ctx)
 
 	claimMapperRepository := ioc.Get[repos.ClaimMapperRepository](scope)

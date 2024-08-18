@@ -164,13 +164,13 @@ type OidcService interface {
 	UserInfo(bearer string) map[string]interface{}
 }
 
-type OidcServiceImpl struct{}
+type oidcServiceImpl struct{}
 
 func NewOidcService() OidcService {
-	return &OidcServiceImpl{}
+	return &oidcServiceImpl{}
 }
 
-func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request AuthorizationCodeTokenRequest) (*TokenResponse, error) {
+func (o *oidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request AuthorizationCodeTokenRequest) (*TokenResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
 	clockService := ioc.Get[utils.ClockService](scope)
@@ -278,7 +278,7 @@ func (o *OidcServiceImpl) HandleAuthorizationCode(ctx context.Context, request A
 	}, nil
 }
 
-func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request RefreshTokenRequest) (*TokenResponse, error) {
+func (o *oidcServiceImpl) HandleRefreshToken(ctx context.Context, request RefreshTokenRequest) (*TokenResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
 	clockService := ioc.Get[utils.ClockService](scope)
@@ -363,7 +363,7 @@ func (o *OidcServiceImpl) HandleRefreshToken(ctx context.Context, request Refres
 	}, nil
 }
 
-func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) (AuthorizationResponse, error) {
+func (o *oidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) (AuthorizationResponse, error) {
 	scope := middlewares.GetScope(ctx)
 
 	currentUserService := ioc.Get[CurrentSessionService](scope)
@@ -386,7 +386,7 @@ func (o *OidcServiceImpl) Grant(ctx context.Context, grantRequest GrantRequest) 
 	return o.Authorize(ctx, grantRequest.AuthorizationRequest)
 }
 
-func (o *OidcServiceImpl) Authorize(ctx context.Context, authorizationRequest AuthorizationRequest) (AuthorizationResponse, error) {
+func (o *oidcServiceImpl) Authorize(ctx context.Context, authorizationRequest AuthorizationRequest) (AuthorizationResponse, error) {
 	if !(len(authorizationRequest.ResponseTypes) == 1 && authorizationRequest.ResponseTypes[0] == constants.AuthorizationResponseTypeCode) {
 		return nil, httpErrors.BadRequest().WithMessage("Unsupported authorization flow, only supporting 'code'")
 	}
@@ -506,7 +506,7 @@ func validateResponseMode(responseMode string) error {
 	return httpErrors.BadRequest().WithMessage(fmt.Sprintf("Unsupported response mode %v", responseMode))
 }
 
-func (o *OidcServiceImpl) UserInfo(bearer string) map[string]interface{} {
+func (o *oidcServiceImpl) UserInfo(bearer string) map[string]interface{} {
 
 	return nil
 }

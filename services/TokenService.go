@@ -57,9 +57,13 @@ type TokenService interface {
 	RetrieveLoginCode(ctx context.Context, token string) h.Opt[LoginInfo]
 }
 
-type TokenServiceImpl struct{}
+func NewTokenService() TokenService {
+	return &tokenServiceImpl{}
+}
 
-func (s *TokenServiceImpl) OverwriteLoginCode(ctx context.Context, token string, info LoginInfo) h.Result[h.Unit] {
+type tokenServiceImpl struct{}
+
+func (s *tokenServiceImpl) OverwriteLoginCode(ctx context.Context, token string, info LoginInfo) h.Result[h.Unit] {
 	found := s.overwriteInfo(ctx, info, "loginCode", token, time.Minute*30) // TODO config
 	if !found {
 		return h.UErr(httpErrors.NotFound().WithMessage(fmt.Sprintf("login code %s not found", token)))
@@ -67,43 +71,43 @@ func (s *TokenServiceImpl) OverwriteLoginCode(ctx context.Context, token string,
 	return h.UOk()
 }
 
-func (s *TokenServiceImpl) StoreLoginCode(ctx context.Context, info LoginInfo) string {
+func (s *tokenServiceImpl) StoreLoginCode(ctx context.Context, info LoginInfo) string {
 	return s.storeInfo(ctx, info, "loginCode", time.Minute*30) // TODO config
 }
 
-func (s *TokenServiceImpl) PeekLoginCode(ctx context.Context, token string) h.Opt[LoginInfo] {
+func (s *tokenServiceImpl) PeekLoginCode(ctx context.Context, token string) h.Opt[LoginInfo] {
 	var result LoginInfo
 	found := s.peekInfo(ctx, "loginCode", token, &result)
 	return h.SomeIf(found, result)
 }
 
-func (s *TokenServiceImpl) RetrieveLoginCode(ctx context.Context, token string) h.Opt[LoginInfo] {
+func (s *tokenServiceImpl) RetrieveLoginCode(ctx context.Context, token string) h.Opt[LoginInfo] {
 	var result LoginInfo
 	found := s.retrieveInfo(ctx, "loginCode", token, &result)
 	return h.SomeIf(found, result)
 }
 
-func (s *TokenServiceImpl) StoreOidcCode(ctx context.Context, info CodeInfo) string {
+func (s *tokenServiceImpl) StoreOidcCode(ctx context.Context, info CodeInfo) string {
 	return s.storeInfo(ctx, info, "oidcCode", time.Second*30)
 }
 
-func (s *TokenServiceImpl) RetrieveOidcCode(ctx context.Context, token string) h.Opt[CodeInfo] {
+func (s *tokenServiceImpl) RetrieveOidcCode(ctx context.Context, token string) h.Opt[CodeInfo] {
 	var result CodeInfo
 	found := s.retrieveInfo(ctx, "oidcCode", token, &result)
 	return h.SomeIf(found, result)
 }
 
-func (s *TokenServiceImpl) StoreGrantInfo(ctx context.Context, info GrantInfo) string {
+func (s *tokenServiceImpl) StoreGrantInfo(ctx context.Context, info GrantInfo) string {
 	return s.storeInfo(ctx, info, "grantInfo", time.Minute*5)
 }
 
-func (s *TokenServiceImpl) RetrieveGrantInfo(ctx context.Context, token string) h.Opt[GrantInfo] {
+func (s *tokenServiceImpl) RetrieveGrantInfo(ctx context.Context, token string) h.Opt[GrantInfo] {
 	var result GrantInfo
 	found := s.retrieveInfo(ctx, "grantInfo", token, &result)
 	return h.SomeIf(found, result)
 }
 
-func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name string, expiration time.Duration) string {
+func (s *tokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name string, expiration time.Duration) string {
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)
 	tokenBytes, err := utils.GenerateRandomBytes(32)
@@ -131,7 +135,7 @@ func (s *TokenServiceImpl) storeInfo(ctx context.Context, info interface{}, name
 	return token
 }
 
-func (s *TokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, name string, token string, expiration time.Duration) bool {
+func (s *tokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, name string, token string, expiration time.Duration) bool {
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)
 
@@ -155,7 +159,7 @@ func (s *TokenServiceImpl) overwriteInfo(ctx context.Context, info interface{}, 
 	return true
 }
 
-func (s *TokenServiceImpl) retrieveInfo(ctx context.Context, name string, token string, info interface{}) bool {
+func (s *tokenServiceImpl) retrieveInfo(ctx context.Context, name string, token string, info interface{}) bool {
 	logging.Logger.Debugf("retrieving redis: %s:%s", name, token)
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)
@@ -174,7 +178,7 @@ func (s *TokenServiceImpl) retrieveInfo(ctx context.Context, name string, token 
 	return true
 }
 
-func (s *TokenServiceImpl) peekInfo(ctx context.Context, name string, token string, info interface{}) bool {
+func (s *tokenServiceImpl) peekInfo(ctx context.Context, name string, token string, info interface{}) bool {
 	logging.Logger.Debugf("peeking redis: %s:%s", name, token)
 	scope := middlewares.GetScope(ctx)
 	redisClient := ioc.Get[*redis.Client](scope)

@@ -46,12 +46,12 @@ type DeviceService interface {
 }
 
 func NewDeviceService() DeviceService {
-	return &DeviceServiceImpl{}
+	return &deviceServiceImpl{}
 }
 
-type DeviceServiceImpl struct{}
+type deviceServiceImpl struct{}
 
-func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDeviceRequest) uuid.UUID {
+func (d *deviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDeviceRequest) uuid.UUID {
 	scope := middlewares.GetScope(ctx)
 
 	userDeviceRepository := ioc.Get[repos.UserDeviceRepository](scope)
@@ -82,7 +82,7 @@ func (d *DeviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 	return id
 }
 
-func (d *DeviceServiceImpl) SendVerificationEmail(ctx context.Context, request SendVerificationRequest) SendVerificationResponse {
+func (d *deviceServiceImpl) SendVerificationEmail(ctx context.Context, request SendVerificationRequest) SendVerificationResponse {
 	scope := middlewares.GetScope(ctx)
 	jobService := ioc.Get[JobService](scope)
 
@@ -102,7 +102,7 @@ func (d *DeviceServiceImpl) SendVerificationEmail(ctx context.Context, request S
 	}
 }
 
-func (d *DeviceServiceImpl) IsKnownUserDevice(ctx context.Context, request IsKnownDeviceRequest) IsKnownDeviceResponse {
+func (d *deviceServiceImpl) IsKnownUserDevice(ctx context.Context, request IsKnownDeviceRequest) IsKnownDeviceResponse {
 	scope := middlewares.GetScope(ctx)
 
 	userDeviceRepository := ioc.Get[repos.UserDeviceRepository](scope)

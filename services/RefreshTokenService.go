@@ -29,12 +29,12 @@ type RefreshTokenService interface {
 }
 
 func NewRefreshTokenService() RefreshTokenService {
-	return &RefreshTokenServiceImpl{}
+	return &refreshTokenServiceImpl{}
 }
 
-type RefreshTokenServiceImpl struct{}
+type refreshTokenServiceImpl struct{}
 
-func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token string, clientId uuid.UUID) h.Result[h.T2[string, repos.RefreshToken]] {
+func (r *refreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token string, clientId uuid.UUID) h.Result[h.T2[string, repos.RefreshToken]] {
 	scope := middlewares.GetScope(ctx)
 
 	hashedToken := utils.CheapHash(token)
@@ -64,7 +64,7 @@ func (r *RefreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 	})))
 }
 
-func (r *RefreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (string, repos.RefreshToken) {
+func (r *refreshTokenServiceImpl) CreateRefreshToken(ctx context.Context, request CreateRefreshTokenRequest) (string, repos.RefreshToken) {
 	scope := middlewares.GetScope(ctx)
 
 	clockService := ioc.Get[utils.ClockService](scope)

@@ -35,7 +35,7 @@ func NewJobService(c *cron.Cron) JobService {
 		logging.Logger.Fatal(err)
 	}
 
-	return &JobServiceImpl{}
+	return &jobServiceImpl{}
 }
 
 func executeQueuedJobs() {
@@ -74,10 +74,10 @@ func executeQueuedJobs() {
 	}
 }
 
-type JobServiceImpl struct {
+type jobServiceImpl struct {
 }
 
-func (s *JobServiceImpl) QueueJob(ctx context.Context, job repos.QueuedJobDetails) {
+func (s *jobServiceImpl) QueueJob(ctx context.Context, job repos.QueuedJobDetails) {
 	scope := middlewares.GetScope(ctx)
 	rcs := ioc.Get[requestContext.RequestContextService](scope)
 

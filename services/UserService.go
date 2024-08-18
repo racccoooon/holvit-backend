@@ -152,14 +152,14 @@ type UserService interface {
 	VerifyTotp(ctx context.Context, request VerifyTotpRequest)
 }
 
-type UserServiceImpl struct {
+type userServiceImpl struct {
 }
 
 func NewUserService() UserService {
-	return &UserServiceImpl{}
+	return &userServiceImpl{}
 }
 
-func (u *UserServiceImpl) CreateUser(ctx context.Context, request CreateUserRequest) h.Result[uuid.UUID] {
+func (u *userServiceImpl) CreateUser(ctx context.Context, request CreateUserRequest) h.Result[uuid.UUID] {
 	scope := middlewares.GetScope(ctx)
 
 	userRepository := ioc.Get[repos.UserRepository](scope)
@@ -171,7 +171,7 @@ func (u *UserServiceImpl) CreateUser(ctx context.Context, request CreateUserRequ
 	})
 }
 
-func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRequest, strategy AuthStrategy) {
+func (u *userServiceImpl) SetPassword(ctx context.Context, request SetPasswordRequest, strategy AuthStrategy) {
 	if !strategy.Authorize(ctx, request.UserId) {
 		//TODO: panic or return error
 	}
@@ -203,7 +203,7 @@ func (u *UserServiceImpl) SetPassword(ctx context.Context, request SetPasswordRe
 	}).Unwrap()
 }
 
-func (u *UserServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.UUID) bool {
+func (u *userServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.UUID) bool {
 	scope := middlewares.GetScope(ctx)
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
@@ -217,7 +217,7 @@ func (u *UserServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.U
 	return credential.Details.(repos.CredentialPasswordDetails).Temporary
 }
 
-func (u *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest, strategy AuthStrategy) {
+func (u *userServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest, strategy AuthStrategy) {
 	if !strategy.Authorize(ctx, request.UserId) {
 		//TODO:
 	}
@@ -240,7 +240,7 @@ func (u *UserServiceImpl) AddTotp(ctx context.Context, request AddTotpRequest, s
 	}).Unwrap()
 }
 
-func (u *UserServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) bool {
+func (u *userServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uuid.UUID) bool {
 	scope := middlewares.GetScope(ctx)
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
@@ -262,7 +262,7 @@ func (u *UserServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uui
 	return !anyTotp && realm.RequireTotp
 }
 
-func (u *UserServiceImpl) HasTotpConfigured(ctx context.Context, userId uuid.UUID) bool {
+func (u *userServiceImpl) HasTotpConfigured(ctx context.Context, userId uuid.UUID) bool {
 	scope := middlewares.GetScope(ctx)
 
 	credentialRepository := ioc.Get[repos.CredentialRepository](scope)
@@ -277,7 +277,7 @@ func (u *UserServiceImpl) HasTotpConfigured(ctx context.Context, userId uuid.UUI
 }
 
 // TODO: refactor looking up user by name and verifying password
-func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRequest) VerifyLoginResponse {
+func (u *userServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRequest) VerifyLoginResponse {
 	isValid := PasswordAuthStrategy{
 		Password: request.Password,
 	}.Authorize(ctx, request.UserId)
@@ -293,7 +293,7 @@ func (u *UserServiceImpl) VerifyLogin(ctx context.Context, request VerifyLoginRe
 }
 
 // TODO: refactor this away(just use the totp auth strategy where needed)
-func (u *UserServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequest) {
+func (u *userServiceImpl) VerifyTotp(ctx context.Context, request VerifyTotpRequest) {
 	isValid := TotpAuthStrategy{
 		Code: request.Code,
 	}.Authorize(ctx, request.UserId)

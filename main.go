@@ -263,7 +263,7 @@ func configureServices() *ioc.DependencyProvider {
 	})
 
 	ioc.AddSingleton(builder, func(dp *ioc.DependencyProvider) services.TokenService {
-		return &services.TokenServiceImpl{}
+		return services.NewTokenService()
 	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) *redis.Client {

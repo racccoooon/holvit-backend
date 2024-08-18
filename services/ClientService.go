@@ -37,15 +37,15 @@ type ClientService interface {
 	Authenticate(ctx context.Context, request AuthenticateClientRequest) h.Result[repos.Client]
 }
 
-type ClientServiceImpl struct{}
+type clientServiceImpl struct{}
 
 func NewClientService() ClientService {
-	return &ClientServiceImpl{}
+	return &clientServiceImpl{}
 }
 
 // TODO: make sure all error responses in oidc comply with https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
 
-func (c *ClientServiceImpl) Authenticate(ctx context.Context, request AuthenticateClientRequest) h.Result[repos.Client] {
+func (c *clientServiceImpl) Authenticate(ctx context.Context, request AuthenticateClientRequest) h.Result[repos.Client] {
 	scope := middlewares.GetScope(ctx)
 
 	clientRepository := ioc.Get[repos.ClientRepository](scope)
@@ -80,7 +80,7 @@ func (c *ClientServiceImpl) Authenticate(ctx context.Context, request Authentica
 	}
 }
 
-func (c *ClientServiceImpl) CreateClient(ctx context.Context, request CreateClientRequest) CreateClientResponse {
+func (c *clientServiceImpl) CreateClient(ctx context.Context, request CreateClientRequest) CreateClientResponse {
 	scope := middlewares.GetScope(ctx)
 
 	clientRepository := ioc.Get[repos.ClientRepository](scope)

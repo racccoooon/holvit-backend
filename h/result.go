@@ -1,5 +1,7 @@
 package h
 
+import "fmt"
+
 type Unit struct{}
 
 type Result[T any] struct {
@@ -63,7 +65,7 @@ func (r Result[T]) UnwrapOr(defaultValue T) T {
 
 func (r Result[T]) UnwrapErr() error {
 	if r.IsOk() {
-		panic("called UnwrapErr on a successful Result")
+		panic(fmt.Errorf("called UnwrapErr on a successful Result"))
 	}
 	return r.err
 }

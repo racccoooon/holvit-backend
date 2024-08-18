@@ -25,6 +25,7 @@ import (
 	"holvit/services"
 	"holvit/utils"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -146,6 +147,18 @@ func seedDemoData(ctx context.Context) {
 			DisplayName:  fake.App().Name(),
 			WithSecret:   false,
 			RedirectUrls: []string{fake.Internet().Domain()},
+		})
+	}
+
+	roleService := ioc.Get[services.RoleService](scope)
+	for i := 0; i < 5; i++ {
+		name := fake.Company().JobTitle()
+		roleService.CreateRole(ctx, services.CreateRoleRequest{
+			RealmId:     realm.Id,
+			ClientId:    h.None[uuid.UUID](),
+			Name:        strings.ToLower(name),
+			DisplayName: h.None[string](),
+			Description: h.Some(fake.Company().BS()),
 		})
 	}
 

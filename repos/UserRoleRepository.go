@@ -49,7 +49,7 @@ func (u *userRoleRepositoryImpl) CreateUserRoles(ctx context.Context, userRoles 
 		q.Values(userRole.UserId, userRole.RoleId)
 	}
 
-	// TODO: q.OnDuplicate
+	q.OnConflict().DoNothing()
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Sql)

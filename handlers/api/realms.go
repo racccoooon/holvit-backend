@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/google/uuid"
+	"github.com/sourcegraph/conc/iter"
 	"holvit/ioc"
 	"holvit/middlewares"
 	"holvit/repos"
@@ -14,7 +15,7 @@ type RealmResponse struct {
 	DisplayName string    `json:"displayName"`
 }
 
-func mapRealmResponse(realm repos.Realm) RealmResponse {
+func mapRealmResponse(realm *repos.Realm) RealmResponse {
 	return RealmResponse{
 		Id:          realm.Id,
 		Name:        realm.Name,
@@ -29,10 +30,7 @@ func FindRealms(w http.ResponseWriter, r *http.Request) {
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realms := realmRepository.FindRealms(ctx, repos.RealmFilter{})
 
-	rows := make([]RealmResponse, len(realms.Values()))
-	for _, realm := range realms.Values() {
-		rows = append(rows, mapRealmResponse(realm))
-	}
+	rows := iter.Map(realms.Values(), mapRealmResponse)
 
 	writeFindResponse(w, rows, realms.Count())
 }

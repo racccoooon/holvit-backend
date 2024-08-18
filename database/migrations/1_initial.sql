@@ -349,7 +349,7 @@ create table "roles"
     "display_name"     text      not null,
     "name"             text      not null,
     "description"      text      not null,
-    "implies_cache"    uuid[]    not null default [],
+    "implies_cache"    uuid[]    not null default array[]::uuid[],
     "internal"         boolean   not null default false,
     primary key ("id")
 );

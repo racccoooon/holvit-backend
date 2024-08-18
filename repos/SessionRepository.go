@@ -73,7 +73,7 @@ func (s *sessionRepositoryImpl) FindSessionById(ctx context.Context, id uuid.UUI
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).FirstOrNone()
+	}).SingleOrNone()
 }
 
 func (s *sessionRepositoryImpl) FindSessions(ctx context.Context, filter SessionFilter) FilterResult[Session] {

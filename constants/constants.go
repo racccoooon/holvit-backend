@@ -47,7 +47,7 @@ const AuthenticateStepSubmit = "submit"
 
 const TotpSecretLength = 32
 
-const MasterRealmName = "master"
+const MasterRealmName = "admin"
 const SuperUserRoleName = "superuser"
 
 const SqlErrorCodeRealmsDoNotMatch = "VV001"

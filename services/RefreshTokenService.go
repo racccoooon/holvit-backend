@@ -45,7 +45,7 @@ func (r *refreshTokenServiceImpl) ValidateAndRefresh(ctx context.Context, token 
 	refreshTokenRepository := ioc.Get[repos.RefreshTokenRepository](scope)
 	refreshToken := refreshTokenRepository.FindRefreshTokens(ctx, repos.RefreshTokenFilter{
 		HashedToken: h.Some(hashedToken),
-	}).First()
+	}).Single()
 
 	if refreshToken.ValidUntil.Compare(now) < 0 {
 		return h.Err[h.T2[string, repos.RefreshToken]](httpErrors.Unauthorized().WithMessage("token not valid"))

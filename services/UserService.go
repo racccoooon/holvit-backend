@@ -212,7 +212,7 @@ func (u *userServiceImpl) IsPasswordTemporary(ctx context.Context, userId uuid.U
 		BaseFilter: repos.BaseFilter{},
 		UserId:     h.Some(userId),
 		Type:       h.Some(constants.CredentialTypePassword),
-	}).First()
+	}).Single()
 
 	return credential.Details.(repos.CredentialPasswordDetails).Temporary
 }
@@ -247,7 +247,7 @@ func (u *userServiceImpl) RequiresTotpOnboarding(ctx context.Context, userId uui
 
 	anyTotp := credentialRepository.FindCredentials(ctx, repos.CredentialFilter{
 		BaseFilter: repos.BaseFilter{
-			PagingInfo: h.Some(repos.NewPagingInfo(1, 0)),
+			PagingInfo: h.Some(repos.NewPagingInfo(1, 1)),
 		},
 		UserId: h.Some(userId),
 		Type:   h.Some(constants.CredentialTypeTotp),
@@ -269,7 +269,7 @@ func (u *userServiceImpl) HasTotpConfigured(ctx context.Context, userId uuid.UUI
 
 	return credentialRepository.FindCredentials(ctx, repos.CredentialFilter{
 		BaseFilter: repos.BaseFilter{
-			PagingInfo: h.Some(repos.NewPagingInfo(1, 0)),
+			PagingInfo: h.Some(repos.NewPagingInfo(1, 1)),
 		},
 		UserId: h.Some(userId),
 		Type:   h.Some(constants.CredentialTypeTotp),

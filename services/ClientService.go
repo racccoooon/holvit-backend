@@ -51,7 +51,7 @@ func (c *clientServiceImpl) Authenticate(ctx context.Context, request Authentica
 	clientRepository := ioc.Get[repos.ClientRepository](scope)
 	client := clientRepository.FindClients(ctx, repos.ClientFilter{
 		ClientId: h.Some(request.ClientId),
-	}).First()
+	}).Single()
 
 	if hashedSecret, ok := client.ClientSecret.Get(); ok {
 		if providedSecret, ok := request.ClientSecret.Get(); ok {

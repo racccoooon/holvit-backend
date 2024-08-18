@@ -64,7 +64,7 @@ func (c *clientRepositoryImpl) FindClientById(ctx context.Context, id uuid.UUID)
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).FirstOrNone()
+	}).SingleOrNone()
 }
 
 func (c *clientRepositoryImpl) FindClients(ctx context.Context, filter ClientFilter) FilterResult[Client] {

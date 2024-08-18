@@ -408,13 +408,13 @@ func (o *oidcServiceImpl) Authorize(ctx context.Context, authorizationRequest Au
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realm := realmRepository.FindRealms(ctx, repos.RealmFilter{
 		Name: h.Some(authorizationRequest.RealmName),
-	}).First()
+	}).Single()
 
 	clientRepository := ioc.Get[repos.ClientRepository](scope)
 	client := clientRepository.FindClients(ctx, repos.ClientFilter{
 		RealmId:  h.Some(realm.Id),
 		ClientId: h.Some(authorizationRequest.ClientId),
-	}).First()
+	}).Single()
 
 	pkceChallenge := ""
 	if client.ClientSecret.IsSome() && authorizationRequest.PKCEChallenge != "" {

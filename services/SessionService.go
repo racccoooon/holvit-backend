@@ -60,7 +60,7 @@ func (s *sessionServiceImpl) LookupSession(ctx context.Context, token string) h.
 	sessionRepository := ioc.Get[repos.SessionRepository](scope)
 	session := sessionRepository.FindSessions(ctx, repos.SessionFilter{
 		HashedToken: h.Some(hashedToken),
-	}).FirstOrNone()
+	}).SingleOrNone()
 
 	if session, ok := session.Get(); ok && session.ValidUntil.Compare(now) < 0 {
 		return h.None[repos.Session]()

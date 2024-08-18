@@ -47,24 +47,35 @@ func main() {
 	os.Exit(0)
 }
 
-func initialize(dp *ioc.DependencyProvider) {
+func runWithScope(dp *ioc.DependencyProvider, ctx context.Context, run func(ctx context.Context)) {
 	scope := dp.NewScope()
-	defer utils.PanicOnErr(scope.Close)
+	defer func() {
+		err := recover()
+		if err != nil {
+			panic(err)
+		} else {
+			utils.PanicOnErr(scope.Close)
+		}
+	}()
+	run(middlewares.ContextWithNewScope(ctx, scope))
+}
 
-	ctx := middlewares.ContextWithNewScope(context.Background(), scope)
+func initialize(dp *ioc.DependencyProvider) {
+	runWithScope(dp, context.Background(), func(ctx context.Context) {
+		scope := middlewares.GetScope(ctx)
+		realmRepository := ioc.Get[repos.RealmRepository](scope)
 
-	realmRepository := ioc.Get[repos.RealmRepository](scope)
+		realmsResult := realmRepository.FindRealms(ctx, repos.RealmFilter{
+			BaseFilter: repos.BaseFilter{},
+		})
 
-	realmsResult := realmRepository.FindRealms(ctx, repos.RealmFilter{
-		BaseFilter: repos.BaseFilter{},
+		if !realmsResult.Any() {
+			seedData(ctx)
+			seedDemoData(ctx)
+		}
+
+		initializeApplicationData(ctx)
 	})
-
-	if !realmsResult.Any() {
-		seedData(ctx)
-		seedDemoData(ctx)
-	}
-
-	initializeApplicationData(ctx)
 }
 
 func initializeApplicationData(ctx context.Context) {
@@ -108,7 +119,7 @@ func seedData(ctx context.Context) {
 	superUserRole := roleRepository.FindRoles(ctx, repos.RoleFilter{
 		RealmId: masterRealm.Id,
 		Name:    h.Some(constants.SuperUserRoleName),
-	}).First()
+	}).Single()
 
 	roleService := ioc.Get[services.RoleService](scope)
 	roleService.AssignRolesToUser(ctx, services.AssignRolesToUserRequest{
@@ -227,6 +238,9 @@ func configureServices() *ioc.DependencyProvider {
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.SessionRepository {
 		return repos.NewSessionRepository()
 	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) repos.UserRoleRepository {
+		return repos.NewUserRoleRepository()
+	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.UserService {
 		return services.NewUserService()
@@ -248,6 +262,9 @@ func configureServices() *ioc.DependencyProvider {
 	})
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.DeviceService {
 		return services.NewDeviceService()
+	})
+	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.RoleService {
+		return services.NewRoleService()
 	})
 
 	ioc.Add(builder, func(dp *ioc.DependencyProvider) services.OidcService {

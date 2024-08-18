@@ -74,9 +74,9 @@ func (s *realmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 	if request.Name != constants.MasterRealmName {
 		masterRealm := realmRepository.FindRealms(ctx, repos.RealmFilter{
 			Name: h.Some(constants.MasterRealmName),
-		}).First()
+		}).Single()
 
-		realmAdminRoleId := roleRepository.CreateRole(ctx, repos.Role{
+		roleRepository.CreateRole(ctx, repos.Role{
 			RealmId:      masterRealm.Id,
 			ClientId:     h.None[uuid.UUID](),
 			DisplayName:  fmt.Sprintf("%s Realm Administrator", request.DisplayName),
@@ -86,21 +86,6 @@ func (s *realmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 			Internal:     true,
 		}).Unwrap() //TODO: handle duplicate error
 
-		superUserRole := roleRepository.FindRoles(ctx, repos.RoleFilter{
-			Name: h.Some(constants.SuperUserRoleName),
-		}).First()
-
-		roleImplicationRepository := ioc.Get[repos.RoleImplicationRepository](scope)
-		roleImplicationRepository.CreateImplications(ctx, []repos.RoleImplication{
-			{
-				RoleId:        superUserRole.Id,
-				ImpliedRoleId: realmAdminRoleId,
-			},
-		})
-
-		roleRepository.UpdateRole(ctx, superUserRole.Id, repos.RoleUpdate{
-			ImpliesCache: h.Some(append(superUserRole.ImpliesCache, realmAdminRoleId)),
-		})
 	} else {
 		roleRepository.CreateRole(ctx, repos.Role{
 			RealmId:      realmId,
@@ -110,7 +95,7 @@ func (s *realmServiceImpl) CreateRealm(ctx context.Context, request CreateRealmR
 			Description:  "Superuser of this holvit installation",
 			ImpliesCache: nil,
 			Internal:     true,
-		})
+		}).Unwrap()
 	}
 
 	return CreateRealmResponse{

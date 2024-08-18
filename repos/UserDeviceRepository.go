@@ -50,7 +50,7 @@ func (r *userDeviceRepositoryImpl) FindUserDeviceById(ctx context.Context, id uu
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).FirstOrNone()
+	}).SingleOrNone()
 }
 
 func (r *userDeviceRepositoryImpl) FindUserDevices(ctx context.Context, filter UserDeviceFilter) FilterResult[UserDevice] {

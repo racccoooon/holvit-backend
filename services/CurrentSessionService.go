@@ -99,7 +99,7 @@ func (s *currentSessionServiceImpl) DeviceId(ctx context.Context) uuid.UUID {
 		panic(httpErrors.NotFound().WithMessage("Device not found")) //TODO: maybe different error
 	}
 
-	s.device = utils.Ptr(devices.First())
+	s.device = utils.Ptr(devices.Single())
 	s.deviceId = &s.device.Id
 
 	return *s.deviceId

@@ -29,7 +29,7 @@ func login(w http.ResponseWriter, r *http.Request, realmName string) error {
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realm := realmRepository.FindRealms(ctx, repos.RealmFilter{
 		Name: h.Some(realmName),
-	}).First()
+	}).Single()
 
 	tokenService := ioc.Get[services.TokenService](scope)
 	loginToken := tokenService.StoreLoginCode(ctx, services.LoginInfo{

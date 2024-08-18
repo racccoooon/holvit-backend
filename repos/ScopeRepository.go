@@ -72,7 +72,7 @@ func (s *scopeRepositoryImpl) FindScopeById(ctx context.Context, id uuid.UUID) h
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).FirstOrNone()
+	}).SingleOrNone()
 }
 
 func (s *scopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter) FilterResult[Scope] {
@@ -151,7 +151,7 @@ func (s *scopeRepositoryImpl) FindScopes(ctx context.Context, filter ScopeFilter
 				grantUserId.AsMutPtr(),
 				grantClientId.AsMutPtr())
 		}
-		err := rows.Scan(scan)
+		err := rows.Scan(scan...)
 		if err != nil {
 			panic(mapCustomErrorCodes(err))
 		}

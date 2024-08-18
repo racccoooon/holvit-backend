@@ -114,7 +114,7 @@ func getRequestRealm(r *http.Request) repos.Realm {
 	realmRepository := ioc.Get[repos.RealmRepository](scope)
 	realm := realmRepository.FindRealms(ctx, repos.RealmFilter{
 		Name: h.Some(realmName),
-	}).First()
+	}).Single()
 
 	return realm
 }

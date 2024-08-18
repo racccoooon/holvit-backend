@@ -67,7 +67,7 @@ func (r *roleRepositoryImpl) FindRoleById(ctx context.Context, id uuid.UUID) h.O
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).FirstOrNone()
+	}).SingleOrNone()
 }
 
 func (r *roleRepositoryImpl) FindRoles(ctx context.Context, filter RoleFilter) FilterResult[Role] {
@@ -146,7 +146,8 @@ func (r *roleRepositoryImpl) CreateRole(ctx context.Context, role Role) h.Result
 	}
 
 	q := sqlb.InsertInto("roles", "realm_id", "client_id", "display_name", "name", "description", "internal").
-		Values(role.RealmId, role.ClientId.ToNillablePtr(), role.DisplayName, role.Name, role.Description, role.Internal)
+		Values(role.RealmId, role.ClientId.ToNillablePtr(), role.DisplayName, role.Name, role.Description, role.Internal).
+		Returning("id")
 
 	query := q.Build()
 	logging.Logger.Debugf("executing sql: %s", query.Sql)

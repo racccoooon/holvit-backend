@@ -58,7 +58,7 @@ func VerifyPassword(w http.ResponseWriter, r *http.Request) {
 	user := userRepository.FindUsers(ctx, repos.UserFilter{
 		RealmId:  h.Some(realm.Id),
 		Username: h.Some(request.Username),
-	}).First()
+	}).Single()
 
 	userService := ioc.Get[services.UserService](scope)
 	loginResponse := userService.VerifyLogin(ctx, services.VerifyLoginRequest{

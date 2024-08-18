@@ -64,10 +64,9 @@ func NewRealmRepository() RealmRepository {
 func (r *RealmRepositoryImpl) FindRealmById(ctx context.Context, id uuid.UUID) h.Opt[Realm] {
 	return r.FindRealms(ctx, RealmFilter{
 		BaseFilter: BaseFilter{
-			Id:         h.Some(id),
-			PagingInfo: h.Some(NewPagingInfo(1, 0)),
+			Id: h.Some(id),
 		},
-	}).FirstOrNone()
+	}).SingleOrNone()
 }
 
 func (r *RealmRepositoryImpl) FindRealms(ctx context.Context, filter RealmFilter) FilterResult[Realm] {

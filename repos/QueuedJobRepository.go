@@ -90,7 +90,7 @@ func (r *queuedJobRepositoryImpl) FindQueuedJobById(ctx context.Context, id uuid
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).FirstOrNone()
+	}).SingleOrNone()
 
 }
 

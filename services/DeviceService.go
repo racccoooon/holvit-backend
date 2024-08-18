@@ -55,12 +55,12 @@ func (d *deviceServiceImpl) AddKnownDevice(ctx context.Context, request AddDevic
 	scope := middlewares.GetScope(ctx)
 
 	userDeviceRepository := ioc.Get[repos.UserDeviceRepository](scope)
-	devices := userDeviceRepository.FindUserDevices(ctx, repos.UserDeviceFilter{
+	device := userDeviceRepository.FindUserDevices(ctx, repos.UserDeviceFilter{
 		UserId:   h.Some(request.UserId),
 		DeviceId: h.Some(request.DeviceId),
-	})
-	if devices.Count() > 0 {
-		return devices.First().Id
+	}).SingleOrNone()
+	if d, ok := device.Get(); ok {
+		return d.Id
 	}
 
 	ua := user_agent.New(request.UserAgent)

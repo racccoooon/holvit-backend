@@ -11,6 +11,7 @@ import (
 	"holvit/requestContext"
 	"holvit/sqlb"
 	"holvit/utils"
+	"strings"
 )
 
 type User struct {
@@ -53,7 +54,7 @@ func (u *userRepositoryImpl) FindUserById(ctx context.Context, id uuid.UUID) h.O
 		BaseFilter: BaseFilter{
 			Id: h.Some(id),
 		},
-	}).FirstOrNone()
+	}).SingleOrNone()
 }
 
 func (u *userRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) FilterResult[User] {
@@ -77,7 +78,7 @@ func (u *userRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) F
 	})
 
 	filter.Username.IfSome(func(x string) {
-		q.Where("username = lower($%d)", x)
+		q.Where("username = lower(?)", x)
 	})
 
 	filter.PagingInfo.IfSome(func(x PagingInfo) {
@@ -86,6 +87,20 @@ func (u *userRepositoryImpl) FindUsers(ctx context.Context, filter UserFilter) F
 
 	filter.SortInfo.IfSome(func(x SortInfo) {
 		x.Apply(q)
+	})
+
+	filter.SearchText.IfSome(func(x string) {
+		searchStrings := strings.Fields(x)
+		for _, str := range searchStrings {
+			if str == "" {
+				continue
+			}
+			str = strings.Replace(str, `\`, `\\`, -1)
+			str = strings.Replace(str, `%`, `\%`, -1)
+			str = strings.Replace(str, `_`, `\_`, -1)
+			str = "%" + str + "%"
+			q.Where("username ILIKE ? OR email ILIKE ?", str, str)
+		}
 	})
 
 	query := q.Build()

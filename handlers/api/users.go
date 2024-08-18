@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/google/uuid"
+	"github.com/sourcegraph/conc/iter"
 	"holvit/h"
 	"holvit/ioc"
 	"holvit/middlewares"
@@ -16,7 +17,7 @@ type UserReponse struct {
 	EmailVerified bool      `json:"emailVerified"`
 }
 
-func mapUserResponse(user repos.User) UserReponse {
+func mapUserResponse(user *repos.User) UserReponse {
 	return UserReponse{
 		Id:            user.Id,
 		Username:      user.Username,
@@ -48,10 +49,7 @@ func FindUsers(w http.ResponseWriter, r *http.Request) {
 	userRepository := ioc.Get[repos.UserRepository](scope)
 	users := userRepository.FindUsers(ctx, filter)
 
-	rows := make([]UserReponse, len(users.Values()))
-	for _, user := range users.Values() {
-		rows = append(rows, mapUserResponse(user))
-	}
+	rows := iter.Map(users.Values(), mapUserResponse)
 
 	writeFindResponse(w, rows, users.Count())
 }
